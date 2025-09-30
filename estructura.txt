@@ -1,0 +1,508 @@
+.
+|-- .env.local
+|-- .gitignore
+|-- README.md
+|-- app/
+|   |-- (auth)/
+|   |   |-- login/
+|   |   |   `-- page.tsx
+|   |   `-- register/
+|   |       `-- page.tsx
+|   |-- (dashboard)/
+|   |   |-- codigos-barras/
+|   |   |   |-- generador/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- lector/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- movimientos/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   `-- verificador/
+|   |   |       `-- page.tsx
+|   |   |-- configuracion/
+|   |   |   |-- categorias/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   |-- precio-repuestos/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- precio-servicios/
+|   |   |   |   `-- page.tsx
+|   |   |   `-- usuarios/
+|   |   |       |-- [id]/
+|   |   |       |   `-- page.tsx
+|   |   |       `-- page.tsx
+|   |   |-- contabilidad/
+|   |   |   |-- egresos/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- flujo-caja/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- ingresos/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   `-- utilidades/
+|   |   |       `-- page.tsx
+|   |   |-- dashboard/
+|   |   |   |-- loading.tsx
+|   |   |   `-- page.tsx
+|   |   |-- facturacion/
+|   |   |   |-- factura/
+|   |   |   |   `-- [id]/
+|   |   |   |       |-- edit/
+|   |   |   |       |   `-- page.tsx
+|   |   |   |       |-- page.tsx
+|   |   |   |       `-- pdf/
+|   |   |   |           `-- page.tsx
+|   |   |   |-- nueva/
+|   |   |   |   `-- page.tsx
+|   |   |   `-- page.tsx
+|   |   |-- inventario/
+|   |   |   |-- page.tsx
+|   |   |   |-- tornilleria/
+|   |   |   |   |-- [categoria]/
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   |-- [id]/
+|   |   |   |   |   |-- edit/
+|   |   |   |   |   |   `-- page.tsx
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   |-- nuevo/
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   `-- page.tsx
+|   |   |   |-- tornirepuestos/
+|   |   |   |   |-- [categoria]/
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   |-- [id]/
+|   |   |   |   |   |-- edit/
+|   |   |   |   |   |   `-- page.tsx
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   |-- nuevo/
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   `-- page.tsx
+|   |   |   `-- wayra/
+|   |   |       |-- calan/
+|   |   |       |   |-- [id]/
+|   |   |       |   |   |-- edit/
+|   |   |       |   |   |   `-- page.tsx
+|   |   |       |   |   `-- page.tsx
+|   |   |       |   |-- nuevo/
+|   |   |       |   |   `-- page.tsx
+|   |   |       |   `-- page.tsx
+|   |   |       |-- eni/
+|   |   |       |   |-- [id]/
+|   |   |       |   |   |-- edit/
+|   |   |       |   |   |   `-- page.tsx
+|   |   |       |   |   `-- page.tsx
+|   |   |       |   |-- nuevo/
+|   |   |       |   |   `-- page.tsx
+|   |   |       |   `-- page.tsx
+|   |   |       `-- page.tsx
+|   |   |-- personal/
+|   |   |   |-- nominas/
+|   |   |   |   |-- [periodo]/
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   `-- tecnicos/
+|   |   |       |-- [id]/
+|   |   |       |   `-- page.tsx
+|   |   |       `-- pago.tsx
+|   |   |-- reportes/
+|   |   |   |-- inventario/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- metas/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   |-- servicios/
+|   |   |   |   `-- page.tsx
+|   |   |   `-- ventas/
+|   |   |       `-- page.tsx
+|   |   |-- servicios/
+|   |   |   |-- historial/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- nueva-orden/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- orden/
+|   |   |   |   `-- [id]/
+|   |   |   |       |-- edit/
+|   |   |   |       |   `-- page.tsx
+|   |   |   |       `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   `-- tipos/
+|   |   |       `-- page.tsx
+|   |   `-- tornirepuestos/
+|   |       |-- [categoria]/
+|   |       |   `-- page.tsx
+|   |       |-- nuevo/
+|   |       |   `-- page.tsx
+|   |       `-- page.tsx
+|   |-- api/
+|   |   |-- auth/
+|   |   |   `-- [...nextauth]/
+|   |   |       `-- route.ts
+|   |   |-- codigos-barras/
+|   |   |   |-- generar/
+|   |   |   |   `-- route.ts
+|   |   |   |-- leer/
+|   |   |   |   `-- route.ts
+|   |   |   |-- movimiento/
+|   |   |   |   `-- route.ts
+|   |   |   |-- validar/
+|   |   |   |   `-- route.ts
+|   |   |   `-- verificar/
+|   |   |       `-- route.ts
+|   |   |-- configuracion/
+|   |   |   |-- categorias/
+|   |   |   |   |-- [id]/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- precios/
+|   |   |   |   |-- actualizar/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- route.ts
+|   |   |   `-- usuarios/
+|   |   |       |-- [id]/
+|   |   |       |   |-- rol/
+|   |   |       |   |   `-- route.ts
+|   |   |       |   `-- route.ts
+|   |   |       `-- route.ts
+|   |   |-- contabilidad/
+|   |   |   |-- egresos/
+|   |   |   |   |-- [id]/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- ingresos/
+|   |   |   |   |-- [id]/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- reportes/
+|   |   |   |   |-- export/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   `-- utilidades/
+|   |   |       `-- route.ts
+|   |   |-- facturacion/
+|   |   |   |-- [id]/
+|   |   |   |   |-- anular/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   |-- enviar/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- calcular/
+|   |   |   |   `-- route.ts
+|   |   |   |-- pdf/
+|   |   |   |   `-- [id]/
+|   |   |   |       `-- route.ts
+|   |   |   `-- route.ts
+|   |   |-- inventario/
+|   |   |   |-- movimientos/
+|   |   |   |   |-- [id]/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- route.ts
+|   |   |   |-- search/
+|   |   |   |   `-- route.ts
+|   |   |   |-- torni-repuestos/
+|   |   |   |   |-- repuestos/
+|   |   |   |   |   |-- categoria/
+|   |   |   |   |   |   `-- [categoria]/
+|   |   |   |   |   |       |-- [id]/
+|   |   |   |   |   |       |   `-- route.ts
+|   |   |   |   |   |       `-- route.ts
+|   |   |   |   |   `-- route.ts
+|   |   |   |   |-- route.ts
+|   |   |   |   `-- tornilleria/
+|   |   |   |       |-- [id]/
+|   |   |   |       |   `-- route.ts
+|   |   |   |       |-- categoria/
+|   |   |   |       |   `-- [categoria]/
+|   |   |   |       |       `-- route.ts
+|   |   |   |       `-- route.ts
+|   |   |   `-- wayra/
+|   |   |       |-- calan/
+|   |   |       |   |-- [id]/
+|   |   |       |   |   `-- route.ts
+|   |   |       |   `-- route.ts
+|   |   |       |-- eni/
+|   |   |       |   |-- [id]/
+|   |   |       |   |   `-- route.ts
+|   |   |       |   `-- route.ts
+|   |   |       `-- route.ts
+|   |   |-- personal/
+|   |   |   |-- [id]/
+|   |   |   |   `-- route.ts
+|   |   |   |-- nominas/
+|   |   |   |   |-- [periodo]/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- route.ts
+|   |   |   `-- tecnicos/
+|   |   |       |-- [id]/
+|   |   |       |   |-- route.ts
+|   |   |       |   `-- servicios/
+|   |   |       |       `-- route.ts
+|   |   |       `-- route.ts
+|   |   |-- reportes/
+|   |   |   |-- dashboard/
+|   |   |   |   `-- route.ts
+|   |   |   |-- inventario/
+|   |   |   |   |-- rotacion/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   |-- route.ts
+|   |   |   |   `-- stock-bajo/
+|   |   |   |       `-- route.ts
+|   |   |   |-- metas/
+|   |   |   |   |-- route.ts
+|   |   |   |   `-- seguimiento/
+|   |   |   |       `-- route.ts
+|   |   |   |-- servicios/
+|   |   |   |   |-- demanda/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   |-- route.ts
+|   |   |   |   `-- tecnicos/
+|   |   |   |       `-- route.ts
+|   |   |   `-- ventas/
+|   |   |       |-- export/
+|   |   |       |   `-- route.ts
+|   |   |       `-- route.tsx
+|   |   |-- servicios/
+|   |   |   |-- [id]/
+|   |   |   |   |-- estado/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   |-- facturar/
+|   |   |   |   |   `-- route.ts
+|   |   |   |   `-- route.ts
+|   |   |   |-- route.ts
+|   |   |   |-- tecnicos/
+|   |   |   |   `-- route.ts
+|   |   |   `-- tipos/
+|   |   |       |-- [id]/
+|   |   |       |   `-- route.ts
+|   |   |       `-- route.ts
+|   |   `-- upload/
+|   |       `-- excel/
+|   |           `-- route.ts
+|   |-- error.tsx
+|   |-- globals.css
+|   |-- layout.tsx
+|   |-- loading.tsx
+|   |-- not-found.tsx
+|   `-- page.tsx
+|-- components/
+|   |-- charts/
+|   |   |-- DashboardCharts.tsx
+|   |   |-- InventarioChart.tsx
+|   |   |-- MetasChart.tsx
+|   |   |-- ServiciosChart.tsx
+|   |   |-- UtilidadesChart.tsx
+|   |   `-- VentasChart.tsx
+|   |-- codigos-barras/
+|   |   |-- BarcodeDisplay.tsx
+|   |   |-- BarcodeGenerator.tsx
+|   |   |-- BarcodePrinter.tsx
+|   |   |-- BarcodeReader.tsx
+|   |   |-- BarcodeStats.tsx
+|   |   |-- MovimientoForm.tsx
+|   |   |-- ProductValidator.tsx
+|   |   `-- StockChecker.tsx
+|   |-- contabilidad/
+|   |   |-- BalanceGeneral.tsx
+|   |   |-- EgresosTable.tsx
+|   |   |-- FlujoCaja.tsx
+|   |   |-- IngresosTable.tsx
+|   |   |-- ResumenFinanciero.tsx
+|   |   `-- UtilidadesDisplay.tsx
+|   |-- facturacion/
+|   |   |-- ClienteSelector.tsx
+|   |   |-- DescuentoForm.tsx
+|   |   |-- FacturaPDF.tsx
+|   |   |-- FacturaPreview.tsx
+|   |   |-- FacturaTable.tsx
+|   |   |-- MetodoPago.tsx
+|   |   |-- ProductSelector.tsx
+|   |   |-- ServiciosSelector.tsx
+|   |   `-- TotalCalculator.tsx
+|   |-- forms/
+|   |   |-- CategoriaForm.tsx
+|   |   |-- ConfigForm.tsx
+|   |   |-- FacturaForm.tsx
+|   |   |-- MovimientoForm.tsx
+|   |   |-- OrdenTrabajo.tsx
+|   |   |-- ProductoWayraForm.tsx
+|   |   |-- RepuestoForm.tsx
+|   |   |-- TecnicoForm.tsx
+|   |   |-- TornilleriaForm.tsx
+|   |   `-- UserForm.tsx
+|   |-- inventario/
+|   |   |-- CategoryFilter.tsx
+|   |   |-- MovimientosList.tsx
+|   |   |-- PriceDisplay.tsx
+|   |   |-- ProductCard.tsx
+|   |   |-- ProductSearch.tsx
+|   |   |-- ProductTable.tsx
+|   |   |-- RepuestosTable.tsx
+|   |   |-- StockAlert.tsx
+|   |   |-- StockBadge.tsx
+|   |   |-- TornilleriaTable.tsx
+|   |   `-- WayraProductTable.tsx
+|   |-- layout/
+|   |   |-- Breadcrumb.tsx
+|   |   |-- Footer.tsx
+|   |   |-- Navbar.tsx
+|   |   |-- PageHeader.tsx
+|   |   `-- Sidebar.tsx
+|   |-- personal/
+|   |   |-- AsistenciaTracker.tsx
+|   |   |-- EmpleadoTable.tsx
+|   |   |-- HorarioCalendar.tsx
+|   |   |-- NominaTable.tsx
+|   |   |-- PerformanceTecnico.tsx
+|   |   `-- TecnicoCard.tsx
+|   |-- providers/
+|   |   `-- SessionProvider.tsx
+|   |-- reportes/
+|   |   |-- Dashboard.tsx
+|   |   |-- DateRangePicker.tsx
+|   |   |-- ExportButton.tsx
+|   |   |-- KPICard.tsx
+|   |   |-- MetasProgress.tsx
+|   |   |-- ReportTable.tsx
+|   |   |-- TendenciasChart.tsx
+|   |   `-- VentasPorCategoria.tsx
+|   |-- servicios/
+|   |   |-- CostoCalculator.tsx
+|   |   |-- EstadoOrden.tsx
+|   |   |-- MaterialesUsados.tsx
+|   |   |-- OrdenTable.tsx
+|   |   |-- OrdenTimeline.tsx
+|   |   |-- ServicioCard.tsx
+|   |   |-- ServiciosSelector.tsx
+|   |   |-- TecnicoSelect.tsx
+|   |   `-- TiempoEstimado.tsx
+|   `-- ui/
+|       |-- accordation.tsx
+|       |-- badge.tsx
+|       |-- button.tsx
+|       |-- calendar.tsx
+|       |-- card.tsx
+|       |-- checkbox.tsx
+|       |-- input.tsx
+|       |-- modal.tsx
+|       |-- progress.tsx
+|       |-- select.tsx
+|       |-- spinner.tsx
+|       |-- table.tsx
+|       |-- tabs.tsx
+|       |-- toast.tsx
+|       `-- tooltip.tsx
+|-- config/
+|   |-- barcode.ts
+|   |-- database.ts
+|   |-- email.ts
+|   |-- printing.ts
+|   `-- storage.ts
+|-- eslint.config.mjs
+|-- estructura.txt
+|-- lib/
+|   |-- auth/
+|   |   |-- config.ts
+|   |   |-- middleware.ts
+|   |   |-- permissions.ts
+|   |   `-- providers.ts
+|   |-- db/
+|   |   |-- connection.ts
+|   |   |-- migrations/
+|   |   |-- prisma.ts
+|   |   `-- queries/
+|   |       |-- facturas.ts
+|   |       |-- inventario.ts
+|   |       |-- productos.ts
+|   |       |-- reportes.ts
+|   |       `-- servicios.ts
+|   |-- hooks/
+|   |   |-- useAuth.ts
+|   |   |-- useBarcodeReader.ts
+|   |   |-- useDebounce.ts
+|   |   |-- useFacturacion.ts
+|   |   |-- useInventario.ts
+|   |   |-- useLocalStorage.ts
+|   |   |-- usePermissions.ts
+|   |   |-- useProducts.ts
+|   |   |-- useReports.ts
+|   |   |-- useRepuestos.ts
+|   |   |-- useServices.ts
+|   |   |-- useTornilleria.ts
+|   |   `-- useWayraProducts.ts
+|   |-- types/
+|   |   |-- api.ts
+|   |   |-- barcode.ts
+|   |   |-- contabilidad.ts
+|   |   |-- factura.ts
+|   |   |-- index.ts
+|   |   |-- inventario.ts
+|   |   |-- producto.ts
+|   |   |-- report.ts
+|   |   |-- repuesto.ts
+|   |   |-- service.ts
+|   |   |-- tornilleria.ts
+|   |   |-- user.ts
+|   |   `-- wayra.ts
+|   |-- utils/
+|   |   |-- barcode-utils.ts
+|   |   |-- calculations.ts
+|   |   |-- constants.ts
+|   |   |-- currency-utils.ts
+|   |   |-- date-utils.ts
+|   |   |-- excel-export.ts
+|   |   |-- formatters.ts
+|   |   |-- image-utils.ts
+|   |   |-- pdf-generator.ts
+|   |   |-- search-utils.ts
+|   |   `-- validators.ts
+|   `-- validations/
+|       |-- configuracion.ts
+|       |-- factura.ts
+|       |-- inventario.ts
+|       |-- producto.ts
+|       |-- servicio.ts
+|       `-- usuario.ts
+|-- middleware/
+|   |-- auth.ts
+|   |-- cors.ts
+|   |-- logging.ts
+|   `-- ratelimit.ts
+|-- next-env.d.ts
+|-- next.config.ts
+|-- package-lock.json
+|-- package.json
+|-- postcss.config.mjs
+|-- prisma/
+|   |-- migrations/
+|   |-- schema.prisma
+|   |-- seed.ts
+|   `-- seeds/
+|       |-- categorias.ts
+|       |-- configuracion.ts
+|       |-- servicios.ts
+|       `-- usuarios.ts
+|-- public/
+|   |-- barcodes/
+|   |   `-- generated/
+|   |-- documents/
+|   |   |-- facturas/
+|   |   `-- reportes/
+|   `-- images/
+|       |-- TorniRepuestos.png
+|       `-- WayraLogo.png
+|-- scripts/
+|   |-- backup-db.js
+|   |-- build.js
+|   |-- deploy.js
+|   |-- generate-docs.js
+|   `-- seed-db.js
+|-- styles/
+|   |-- global.css
+|   `-- print.css
+|-- tailwind.config.js
+`-- tsconfig.json
+
+182 directories, 323 files

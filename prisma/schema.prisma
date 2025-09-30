@@ -1,0 +1,224 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  SUPER_USUARIO
+  ADMIN_WAYRA_TALLER
+  ADMIN_WAYRA_PRODUCTOS
+  ADMIN_TORNI_REPUESTOS
+  MECANICO
+  VENDEDOR
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum TipoProducto {
+  WAYRA_ENI
+  WAYRA_CALAN
+  TORNI_REPUESTO
+  TORNILLERIA
+}
+
+enum EstadoOrden {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADO
+  CANCELADO
+}
+
+enum Moneda {
+  USD
+  COP
+}
+
+enum TipoPrecio {
+  VENTA
+  MINORISTA
+  MAYORISTA
+}
+
+// Modelos principales
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  password      String
+  role          UserRole @default(MECANICO)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLogin     DateTime?
+
+  // Relaciones
+  ordenes       OrdenServicio[]
+  movimientos   MovimientoInventario[]
+  notificaciones NotificacionUsuario[]
+  
+  @@map("users")
+}
+
+model Producto {
+  id                String        @id @default(cuid())
+  codigo            String        @unique
+  codigoBarras      String?       @unique
+  nombre            String
+  descripcion       String?
+  tipo              TipoProducto
+  categoria         String
+  
+  // Precios de compra
+  precioCompra      Float
+  monedaCompra      Moneda        @default(COP)
+  
+  // Precios calculados automáticamente
+  precioVenta       Float
+  precioMinorista   Float
+  precioMayorista   Float
+  
+  // Configuración de precios
+  aplicaIva         Boolean       @default(false)
+  porcentajeGanancia Float        @default(35)
+  
+  // Stock
+  stock             Int           @default(0)
+  stockMinimo       Int           @default(5)
+  
+  // Estado
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relaciones
+  movimientos       MovimientoInventario[]
+  detallesOrden     DetalleOrden[]
+
+  @@map("productos")
+}
+
+model MovimientoInventario {
+  id          String          @id @default(cuid())
+  tipo        TipoMovimiento
+  cantidad    Int
+  motivo      String?
+  precioUnitario Float?
+  total       Float?
+  fecha       DateTime        @default(now())
+  
+  // Relaciones
+  producto    Producto        @relation(fields: [productoId], references: [id])
+  productoId  String
+  usuario     User            @relation(fields: [usuarioId], references: [id])
+  usuarioId   String
+
+  @@map("movimientos_inventario")
+}
+
+model OrdenServicio {
+  id            String        @id @default(cuid())
+  numeroOrden   String        @unique
+  cliente       String
+  vehiculo      String?
+  placa         String?
+  descripcion   String
+  estado        EstadoOrden   @default(PENDIENTE)
+  fechaCreacion DateTime      @default(now())
+  fechaInicio   DateTime?
+  fechaFin      DateTime?
+  
+  // Totales
+  subtotalServicios Float     @default(0)
+  subtotalProductos Float     @default(0)
+  iva               Float     @default(0)
+  total             Float     @default(0)
+  
+  // Relaciones
+  mecanico      User          @relation(fields: [mecanicoId], references: [id])
+  mecanicoId    String
+  detalles      DetalleOrden[]
+  servicios     ServicioOrden[]
+
+  @@map("ordenes_servicio")
+}
+
+model ServicioOrden {
+  id          String        @id @default(cuid())
+  descripcion String
+  precio      Float
+  
+  // Relaciones
+  orden       OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  ordenId     String
+
+  @@map("servicios_orden")
+}
+
+model DetalleOrden {
+  id          String        @id @default(cuid())
+  cantidad    Int
+  precioUnitario Float
+  tipoPrecio  TipoPrecio    @default(VENTA)
+  subtotal    Float
+  
+  // Relaciones
+  orden       OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  ordenId     String
+  producto    Producto      @relation(fields: [productoId], references: [id])
+  productoId  String
+
+  @@map("detalles_orden")
+}
+
+model Configuracion {
+  id          String   @id @default(cuid())
+  clave       String   @unique
+  valor       String
+  descripcion String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("configuracion")
+}
+
+model Notificacion {
+  id          String   @id @default(cuid())
+  titulo      String
+  mensaje     String
+  tipo        String   // 'warning', 'success', 'info', 'error'
+  categoria   String   // 'stock', 'inventory', 'users', 'products'
+  prioridad   String   // 'high', 'medium', 'low'
+  data        Json?    // Datos adicionales
+  createdAt   DateTime @default(now())
+  
+  // Relaciones
+  usuarios    NotificacionUsuario[]
+  
+  @@map("notificaciones")
+}
+
+model NotificacionUsuario {
+  id              String   @id @default(cuid())
+  leida           Boolean  @default(false)
+  fechaLeida      DateTime?
+  
+  // Relaciones
+  notificacion    Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+  notificacionId  String
+  usuario         User         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId       String
+  
+  @@unique([notificacionId, usuarioId])
+  @@map("notificaciones_usuarios")
+}
