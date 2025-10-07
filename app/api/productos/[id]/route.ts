@@ -11,7 +11,14 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Verificar permisos para editar productos
+    const canEdit = [
+      'SUPER_USUARIO',
+      'ADMIN_WAYRA_PRODUCTOS', 
+      'ADMIN_TORNI_REPUESTOS'
+    ].includes(session?.user?.role || '')
+    
+    if (!session || !canEdit) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
@@ -23,7 +30,7 @@ export async function PATCH(
 
     // Solo incluir campos que existen en el modelo
     if (body.codigo) updateData.codigo = body.codigo
-    if (body.codigoBarras) updateData.codigoBarras = body.codigoBarras
+    if (body.codigoBarras !== undefined) updateData.codigoBarras = body.codigoBarras
     if (body.nombre) updateData.nombre = body.nombre
     if (body.descripcion !== undefined) updateData.descripcion = body.descripcion
     if (body.monedaCompra) updateData.monedaCompra = body.monedaCompra
@@ -85,13 +92,20 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Verificar permisos para eliminar productos
+    const canDelete = [
+      'SUPER_USUARIO',
+      'ADMIN_WAYRA_PRODUCTOS', 
+      'ADMIN_TORNI_REPUESTOS'
+    ].includes(session?.user?.role || '')
+    
+    if (!session || !canDelete) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id } = await params
 
-    // marcar como inactivo
+    // Soft delete - marcar como inactivo
     await prisma.producto.update({
       where: { id },
       data: { isActive: false }

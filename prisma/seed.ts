@@ -95,20 +95,35 @@ async function main() {
   })
   console.log('✅ Mecánico creado:', mecanico.email)
 
-  // Vendedor
-  const vendedorPassword = await bcrypt.hash('vendedor123', 12)
-  const vendedor = await prisma.user.upsert({
-    where: { email: 'vendedor@wayra.com' },
+  // Vendedor Wayra
+  const vendedorWayraPassword = await bcrypt.hash('vendedor123', 12)
+  const vendedorWayra = await prisma.user.upsert({
+    where: { email: 'vendedor.wayra@wayra.com' },
     update: {},
     create: {
-      email: 'vendedor@wayra.com',
-      name: 'María Vendedora',
-      password: vendedorPassword,
-      role: UserRole.VENDEDOR,
+      email: 'vendedor.wayra@wayra.com',
+      name: 'María Vendedora Wayra',
+      password: vendedorWayraPassword,
+      role: UserRole.VENDEDOR_WAYRA,
       isActive: true
     }
   })
-  console.log('✅ Vendedor creado:', vendedor.email)
+  console.log('✅ Vendedor Wayra creado:', vendedorWayra.email)
+
+  // Vendedor TorniRepuestos
+  const vendedorTorniPassword = await bcrypt.hash('vendedor123', 12)
+  const vendedorTorni = await prisma.user.upsert({
+    where: { email: 'vendedor.torni@tornirepuestos.com' },
+    update: {},
+    create: {
+      email: 'vendedor.torni@tornirepuestos.com',
+      name: 'Carlos Vendedor TorniRepuestos',
+      password: vendedorTorniPassword,
+      role: UserRole.VENDEDOR_TORNI,
+      isActive: true
+    }
+  })
+  console.log('✅ Vendedor TorniRepuestos creado:', vendedorTorni.email)
 
   // Crear configuraciones básicas del sistema
   console.log('⚙️  Creando configuraciones básicas...')
@@ -258,8 +273,12 @@ async function main() {
   console.log('   📧 Email: mecanico@wayra.com')
   console.log('   🔐 Password: mecanico123')
   console.log('')
-  console.log('🔑 VENDEDOR (Solo salidas y consultas):')
-  console.log('   📧 Email: vendedor@wayra.com')
+  console.log('🔑 VENDEDOR WAYRA (Solo salidas Wayra):')
+  console.log('   📧 Email: vendedor.wayra@wayra.com')
+  console.log('   🔐 Password: vendedor123')
+  console.log('')
+  console.log('🔑 VENDEDOR TORNI (Solo salidas TorniRepuestos):')
+  console.log('   📧 Email: vendedor.torni@tornirepuestos.com')
   console.log('   🔐 Password: vendedor123')
   console.log('')
   console.log('🎯 Sistema listo para Fase 1!')

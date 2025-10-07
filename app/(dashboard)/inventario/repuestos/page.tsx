@@ -188,7 +188,7 @@ export default function RepuestosPage() {
               <Camera className="h-4 w-4 mr-2" />
               Escanear
             </Button>
-            {session?.user?.role === 'ADMIN' && (
+            {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
               <Button
                 onClick={() => setShowProductForm(true)}
                 className="bg-white text-red-600 hover:bg-red-50 shadow-lg"
@@ -280,7 +280,7 @@ export default function RepuestosPage() {
                 <Camera className="h-4 w-4 mr-2" />
                 Escanear
               </Button>
-              {session?.user?.role === 'ADMIN' && (
+              {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                 <Button
                   onClick={() => setShowProductForm(true)}
                   className="flex-1 bg-red-600 hover:bg-red-700"
@@ -401,7 +401,7 @@ export default function RepuestosPage() {
                         >
                           <ArrowUpDown className="h-4 w-4" />
                         </Button>
-                        {session?.user?.role === 'ADMIN' && (
+                        {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                           <>
                             <Button
                               size="sm"
@@ -439,7 +439,7 @@ export default function RepuestosPage() {
                 <p className="text-gray-400 mt-2 max-w-md mx-auto">
                   {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Agrega el primer repuesto automotriz para comenzar'}
                 </p>
-                {!searchTerm && session?.user?.role === 'ADMIN' && (
+                {!searchTerm && ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                   <Button
                     onClick={() => setShowProductForm(true)}
                     className="mt-4 bg-red-600 hover:bg-red-700"

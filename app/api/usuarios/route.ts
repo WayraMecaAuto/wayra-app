@@ -8,7 +8,8 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Solo SUPER_USUARIO puede gestionar usuarios
+    if (!session || session.user.role !== 'SUPER_USUARIO') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Solo SUPER_USUARIO puede crear usuarios
+    if (!session || session.user.role !== 'SUPER_USUARIO') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

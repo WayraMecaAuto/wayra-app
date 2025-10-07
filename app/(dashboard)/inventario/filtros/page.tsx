@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { 
-  Plus, Search, Edit, Trash2, Package, AlertTriangle, 
-  BarChart3, Camera, ArrowUpDown, Eye, Filter, Settings
-} from 'lucide-react'
+import { Plus, Search, CreditCard as Edit, Trash2, Package, AlertTriangle, BarChart3, Camera, ArrowUpDown, Eye, Filter, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -188,7 +185,7 @@ export default function FiltrosPage() {
               <Camera className="h-4 w-4 mr-2" />
               Escanear
             </Button>
-            {session?.user?.role === 'ADMIN' && (
+            {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
               <Button
                 onClick={() => setShowProductForm(true)}
                 className="bg-white text-teal-600 hover:bg-teal-50 shadow-lg"
@@ -280,7 +277,7 @@ export default function FiltrosPage() {
                 <Camera className="h-4 w-4 mr-2" />
                 Escanear
               </Button>
-              {session?.user?.role === 'ADMIN' && (
+              {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                 <Button
                   onClick={() => setShowProductForm(true)}
                   className="flex-1 bg-teal-600 hover:bg-teal-700"
@@ -401,7 +398,7 @@ export default function FiltrosPage() {
                         >
                           <ArrowUpDown className="h-4 w-4" />
                         </Button>
-                        {session?.user?.role === 'ADMIN' && (
+                        {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                           <>
                             <Button
                               size="sm"
@@ -439,7 +436,7 @@ export default function FiltrosPage() {
                 <p className="text-gray-400 mt-2 max-w-md mx-auto">
                   {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Agrega el primer filtro automotriz para comenzar'}
                 </p>
-                {!searchTerm && session?.user?.role === 'ADMIN' && (
+                {!searchTerm && ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                   <Button
                     onClick={() => setShowProductForm(true)}
                     className="mt-4 bg-teal-600 hover:bg-teal-700"
@@ -455,22 +452,26 @@ export default function FiltrosPage() {
       </Card>
 
       {/* Modals */}
-      <ProductForm
-        isOpen={showProductForm}
-        onClose={() => setShowProductForm(false)}
-        onSuccess={fetchProducts}
-        tipo="TORNI_REPUESTO"
-        categoria="FILTROS"
-      />
+      {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
+        <>
+          <ProductForm
+            isOpen={showProductForm}
+            onClose={() => setShowProductForm(false)}
+            onSuccess={fetchProducts}
+            tipo="TORNI_REPUESTO"
+            categoria="FILTROS"
+          />
 
-      <ProductForm
-        isOpen={!!editingProduct}
-        onClose={() => setEditingProduct(null)}
-        onSuccess={fetchProducts}
-        product={editingProduct}
-        tipo="TORNI_REPUESTO"
-        categoria="FILTROS"
-      />
+          <ProductForm
+            isOpen={!!editingProduct}
+            onClose={() => setEditingProduct(null)}
+            onSuccess={fetchProducts}
+            product={editingProduct}
+            tipo="TORNI_REPUESTO"
+            categoria="FILTROS"
+          />
+        </>
+      )}
 
       <MovementForm
         isOpen={showMovementForm}

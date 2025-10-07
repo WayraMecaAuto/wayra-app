@@ -14,14 +14,20 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const tipo = searchParams.get('tipo')
+    const tipoParam = searchParams.get('tipo')
     const categoria = searchParams.get('categoria')
     const search = searchParams.get('search')
 
     let where: any = { isActive: true }
 
-    if (tipo) {
-      where.tipo = tipo
+    // Manejar múltiples tipos separados por coma
+    if (tipoParam) {
+      const tipos = tipoParam.split(',').map(t => t.trim())
+      if (tipos.length > 1) {
+        where.tipo = { in: tipos }
+      } else {
+        where.tipo = tipos[0]
+      }
     }
 
     if (categoria) {
@@ -63,7 +69,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Verificar permisos para crear productos
+    const canCreate = [
+      'SUPER_USUARIO',
+      'ADMIN_WAYRA_PRODUCTOS', 
+      'ADMIN_TORNI_REPUESTOS'
+    ].includes(session?.user?.role || '')
+    
+    if (!session || !canCreate) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

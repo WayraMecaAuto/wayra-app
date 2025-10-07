@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { 
-  Plus, Search, Edit, Trash2, Package, AlertTriangle, 
-  BarChart3, Camera, ArrowUpDown, Eye, Bolt, Settings
-} from 'lucide-react'
+import { Plus, Search, CreditCard as Edit, Trash2, Package, AlertTriangle, BarChart3, Camera, ArrowUpDown, Eye, Bolt, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -148,7 +145,15 @@ export default function TornilleriaPage() {
             </div>
           </div>
           <div className="hidden lg:flex space-x-3">
-            {session?.user?.role === 'ADMIN' && (
+            <Button
+              onClick={() => setShowScanner(true)}
+              variant="outline"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Escanear
+            </Button>
+            {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
               <Button
                 onClick={() => setShowProductForm(true)}
                 className="bg-white text-gray-800 hover:bg-gray-100 shadow-lg"
@@ -240,7 +245,7 @@ export default function TornilleriaPage() {
                 <Camera className="h-4 w-4 mr-2" />
                 Escanear
               </Button>
-              {session?.user?.role === 'ADMIN' && (
+              {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                 <Button
                   onClick={() => setShowProductForm(true)}
                   className="flex-1 bg-gray-700 hover:bg-gray-800"
@@ -358,7 +363,7 @@ export default function TornilleriaPage() {
                         >
                           <ArrowUpDown className="h-4 w-4" />
                         </Button>
-                        {session?.user?.role === 'ADMIN' && (
+                        {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                           <>
                             <Button
                               size="sm"
@@ -396,7 +401,7 @@ export default function TornilleriaPage() {
                 <p className="text-gray-400 mt-2 max-w-md mx-auto">
                   {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Agrega el primer producto de tornillería para comenzar'}
                 </p>
-                {!searchTerm && session?.user?.role === 'ADMIN' && (
+                {!searchTerm && ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                   <Button
                     onClick={() => setShowProductForm(true)}
                     className="mt-4 bg-gray-700 hover:bg-gray-800"
@@ -412,22 +417,26 @@ export default function TornilleriaPage() {
       </Card>
 
       {/* Modals */}
-      <ProductForm
-        isOpen={showProductForm}
-        onClose={() => setShowProductForm(false)}
-        onSuccess={fetchProducts}
-        tipo="TORNILLERIA"
-        categoria="TORNILLERIA"
-      />
+      {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
+        <>
+          <ProductForm
+            isOpen={showProductForm}
+            onClose={() => setShowProductForm(false)}
+            onSuccess={fetchProducts}
+            tipo="TORNILLERIA"
+            categoria="TORNILLERIA"
+          />
 
-      <ProductForm
-        isOpen={!!editingProduct}
-        onClose={() => setEditingProduct(null)}
-        onSuccess={fetchProducts}
-        product={editingProduct}
-        tipo="TORNILLERIA"
-        categoria="TORNILLERIA"
-      />
+          <ProductForm
+            isOpen={!!editingProduct}
+            onClose={() => setEditingProduct(null)}
+            onSuccess={fetchProducts}
+            product={editingProduct}
+            tipo="TORNILLERIA"
+            categoria="TORNILLERIA"
+          />
+        </>
+      )}
 
       <MovementForm
         isOpen={showMovementForm}

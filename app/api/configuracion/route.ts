@@ -7,7 +7,14 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Verificar permisos para ver configuraciones
+    const canView = [
+      'SUPER_USUARIO',
+      'ADMIN_WAYRA_PRODUCTOS',
+      'ADMIN_TORNI_REPUESTOS'
+    ].includes(session?.user?.role || '')
+    
+    if (!session || !canView) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
@@ -26,7 +33,14 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Verificar permisos para modificar configuraciones
+    const canEdit = [
+      'SUPER_USUARIO',
+      'ADMIN_WAYRA_PRODUCTOS',
+      'ADMIN_TORNI_REPUESTOS'
+    ].includes(session?.user?.role || '')
+    
+    if (!session || !canEdit) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
@@ -42,6 +56,9 @@ export async function PATCH(request: NextRequest) {
       create: { clave, valor, descripcion: '' }
     })
 
+    // Actualizar configuraciones de precios en memoria
+    const { updatePricingConfigFromDB } = await import('@/lib/pricing')
+    await updatePricingConfigFromDB()
     return NextResponse.json(configuracion)
   } catch (error) {
     console.error('Error updating configuracion:', error)

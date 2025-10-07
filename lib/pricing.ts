@@ -10,7 +10,8 @@ interface PricingConfig {
   descuentoMayorista: number
 }
 
-const PRICING_CONFIG: Record<string, PricingConfig> = {
+// Configuraciones por defecto que se pueden sobrescribir desde la BD
+let PRICING_CONFIG: Record<string, PricingConfig> = {
   'WAYRA_ENI': {
     margenGanancia: 35,
     ivaObligatorio: false,
@@ -61,6 +62,70 @@ const PRICING_CONFIG: Record<string, PricingConfig> = {
   }
 }
 
+// Función para actualizar configuraciones desde la BD
+export async function updatePricingConfigFromDB() {
+  try {
+    // Importar prisma directamente para uso en servidor
+    const { prisma } = await import('@/lib/db/prisma')
+    const configuraciones = await prisma.configuracion.findMany()
+      
+    // Actualizar configuraciones dinámicamente
+    configuraciones.forEach((config: any) => {
+      const valor = parseFloat(config.valor)
+      
+      switch (config.clave) {
+        case 'WAYRA_MARGEN_ENI':
+          PRICING_CONFIG.WAYRA_ENI.margenGanancia = valor
+          break
+        case 'WAYRA_MARGEN_CALAN':
+          PRICING_CONFIG.WAYRA_CALAN.margenGanancia = valor
+          break
+        case 'WAYRA_DESCUENTO_MINORISTA':
+          PRICING_CONFIG.WAYRA_ENI.descuentoMinorista = valor
+          PRICING_CONFIG.WAYRA_CALAN.descuentoMinorista = valor
+          break
+        case 'WAYRA_DESCUENTO_MAYORISTA':
+          PRICING_CONFIG.WAYRA_ENI.descuentoMayorista = valor
+          PRICING_CONFIG.WAYRA_CALAN.descuentoMayorista = valor
+          break
+        case 'TORNI_MARGEN_REPUESTOS':
+          PRICING_CONFIG.TORNI_REPUESTOS.margenGanancia = valor
+          break
+        case 'TORNI_MARGEN_FILTROS':
+          PRICING_CONFIG.TORNI_FILTROS.margenGanancia = valor
+          break
+        case 'TORNI_MARGEN_LUBRICANTES':
+          PRICING_CONFIG.TORNI_LUBRICANTES.margenGanancia = valor
+          break
+        case 'TORNILLERIA_MARGEN':
+          PRICING_CONFIG.TORNILLERIA.margenGanancia = valor
+          break
+        case 'TORNI_DESCUENTO_MINORISTA':
+          PRICING_CONFIG.TORNI_REPUESTOS.descuentoMinorista = valor
+          PRICING_CONFIG.TORNI_FILTROS.descuentoMinorista = valor
+          PRICING_CONFIG.TORNI_LUBRICANTES.descuentoMinorista = valor
+          break
+        case 'TORNI_DESCUENTO_MAYORISTA':
+          PRICING_CONFIG.TORNI_REPUESTOS.descuentoMayorista = valor
+          PRICING_CONFIG.TORNI_FILTROS.descuentoMayorista = valor
+          PRICING_CONFIG.TORNI_LUBRICANTES.descuentoMayorista = valor
+          break
+        case 'TORNILLERIA_DESCUENTO_MINORISTA':
+          PRICING_CONFIG.TORNILLERIA.descuentoMinorista = valor
+          break
+        case 'TORNILLERIA_DESCUENTO_MAYORISTA':
+          PRICING_CONFIG.TORNILLERIA.descuentoMayorista = valor
+          break
+        case 'IVA_CALAN':
+          PRICING_CONFIG.WAYRA_CALAN.porcentajeIva = valor
+          break
+      }
+    })
+  } catch (error) {
+    console.error('Error updating pricing config:', error)
+  }
+}
+
 export function calculatePrices(
   precioCompra: number,
   tipo: TipoProducto,
@@ -68,6 +133,9 @@ export function calculatePrices(
   aplicaIva: boolean = false,
   tasaUSD: number = 4000
 ) {
+  // Actualizar configuraciones desde BD antes de calcular
+  await updatePricingConfigFromDB()
+  
   const configKey = tipo === 'TORNI_REPUESTO' ? `TORNI_${categoria.toUpperCase()}` : tipo
   const config = PRICING_CONFIG[configKey] || PRICING_CONFIG['TORNI_REPUESTOS']
   
@@ -98,4 +166,9 @@ export function calculatePrices(
 export function getPricingConfig(tipo: TipoProducto, categoria: string) {
   const configKey = tipo === 'TORNI_REPUESTO' ? `TORNI_${categoria.toUpperCase()}` : tipo
   return PRICING_CONFIG[configKey] || PRICING_CONFIG['TORNI_REPUESTOS']
+}
+
+// Función para obtener configuraciones actualizadas
+export function getCurrentPricingConfig() {
+  return PRICING_CONFIG
 }

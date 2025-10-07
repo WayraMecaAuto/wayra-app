@@ -17,7 +17,8 @@ enum UserRole {
   ADMIN_WAYRA_PRODUCTOS
   ADMIN_TORNI_REPUESTOS
   MECANICO
-  VENDEDOR
+  VENDEDOR_WAYRA
+  VENDEDOR_TORNI
 }
 
 enum TipoMovimiento {
@@ -130,28 +131,115 @@ model MovimientoInventario {
 model OrdenServicio {
   id            String        @id @default(cuid())
   numeroOrden   String        @unique
-  cliente       String
-  vehiculo      String?
-  placa         String?
+  clienteId     String
+  vehiculoId    String
   descripcion   String
   estado        EstadoOrden   @default(PENDIENTE)
   fechaCreacion DateTime      @default(now())
   fechaInicio   DateTime?
   fechaFin      DateTime?
+  mes           Int           // Para filtrar por mes
+  anio          Int           // Para filtrar por año
   
   // Totales
   subtotalServicios Float     @default(0)
   subtotalProductos Float     @default(0)
+  subtotalRepuestosExternos Float @default(0)
   iva               Float     @default(0)
   total             Float     @default(0)
+  utilidad          Float     @default(0)
   
   // Relaciones
+  cliente       Cliente       @relation(fields: [clienteId], references: [id])
+  vehiculo      Vehiculo      @relation(fields: [vehiculoId], references: [id])
   mecanico      User          @relation(fields: [mecanicoId], references: [id])
   mecanicoId    String
   detalles      DetalleOrden[]
   servicios     ServicioOrden[]
+  repuestosExternos RepuestoExterno[]
+  facturas      Factura[]
 
   @@map("ordenes_servicio")
+}
+
+model Cliente {
+  id            String   @id @default(cuid())
+  nombre        String
+  telefono      String?
+  email         String?
+  direccion     String?
+  tipoDocumento String   @default("CC") // CC, NIT, CE, etc.
+  numeroDocumento String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relaciones
+  vehiculos     Vehiculo[]
+  ordenes       OrdenServicio[]
+  facturas      Factura[]
+
+  @@map("clientes")
+}
+
+model Vehiculo {
+  id            String   @id @default(cuid())
+  placa         String   @unique
+  marca         String
+  modelo        String
+  anio          Int?     // Cambio: año -> anio
+  color         String?
+  vin           String?
+  motor         String?
+  combustible   String?  // Gasolina, Diesel, Híbrido, etc.
+  kilometraje   Int?
+  observaciones String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relaciones
+  cliente       Cliente  @relation(fields: [clienteId], references: [id])
+  clienteId     String
+  ordenes       OrdenServicio[]
+
+  @@map("vehiculos")
+}
+
+model RepuestoExterno {
+  id            String        @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  cantidad      Int
+  precioUnitario Float
+  subtotal      Float
+  proveedor     String?
+  
+  // Relaciones
+  orden         OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  ordenId       String
+
+  @@map("repuestos_externos")
+}
+
+model Factura {
+  id            String   @id @default(cuid())
+  numeroFactura String   @unique
+  fecha         DateTime @default(now())
+  vencimiento   DateTime?
+  subtotal      Float
+  iva           Float
+  total         Float
+  estado        String   @default("PENDIENTE") // PENDIENTE, PAGADA, VENCIDA, ANULADA
+  observaciones String?
+  
+  // Relaciones
+  cliente       Cliente  @relation(fields: [clienteId], references: [id])
+  clienteId     String
+  orden         OrdenServicio? @relation(fields: [ordenId], references: [id])
+  ordenId       String?
+
+  @@map("facturas")
 }
 
 model ServicioOrden {

@@ -6,16 +6,17 @@ import bcrypt from 'bcryptjs'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Solo SUPER_USUARIO puede editar usuarios
+    if (!session || session.user.role !== 'SUPER_USUARIO') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     // Si se está actualizando la contraseña, encriptarla
@@ -46,16 +47,17 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'ADMIN') {
+    // Solo SUPER_USUARIO puede eliminar usuarios
+    if (!session || session.user.role !== 'SUPER_USUARIO') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
 
     // No permitir eliminar el propio usuario
     if (session.user.id === id) {

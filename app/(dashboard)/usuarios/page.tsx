@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Plus, Search, Edit, Trash2, Eye, EyeOff, UserCheck, UserX } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, UserCheck, UserX, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +16,7 @@ interface User {
   id: string
   name: string
   email: string
-  role: 'ADMIN' | 'MECANICO'
+  role: string
   isActive: boolean
   createdAt: string
   lastLogin?: string
@@ -30,8 +30,8 @@ export default function UsuariosPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
 
-  // Verificar que sea admin
-  if (session?.user?.role !== 'ADMIN') {
+  // Solo SUPER_USUARIO puede acceder
+  if (session?.user?.role !== 'SUPER_USUARIO') {
     redirect('/dashboard')
   }
 
@@ -97,276 +97,409 @@ export default function UsuariosPage() {
     }
   }
 
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'SUPER_USUARIO': return 'Super Usuario'
+      case 'ADMIN_WAYRA_TALLER': return 'Admin Taller'
+      case 'ADMIN_WAYRA_PRODUCTOS': return 'Admin Wayra'
+      case 'ADMIN_TORNI_REPUESTOS': return 'Admin TorniRepuestos'
+      case 'MECANICO': return 'Mecánico'
+      case 'VENDEDOR_WAYRA': return 'Vendedor Wayra'
+      case 'VENDEDOR_TORNI': return 'Vendedor TorniRepuestos'
+      default: return role
+    }
+  }
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'SUPER_USUARIO': return 'bg-blue-600 text-white'
+      case 'ADMIN_WAYRA_TALLER': return 'bg-blue-500 text-white'
+      case 'ADMIN_WAYRA_PRODUCTOS': return 'bg-blue-400 text-white'
+      case 'ADMIN_TORNI_REPUESTOS': return 'bg-indigo-500 text-white'
+      case 'MECANICO': return 'bg-slate-500 text-white'
+      case 'VENDEDOR_WAYRA': return 'bg-cyan-500 text-white'
+      case 'VENDEDOR_TORNI': return 'bg-sky-500 text-white'
+      default: return 'bg-gray-500 text-white'
+    }
+  }
+
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const activeUsers = users.filter(user => user.isActive).length
-  const adminUsers = users.filter(user => user.role === 'ADMIN').length
-  const mechUsers = users.filter(user => user.role === 'MECANICO').length
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-100"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-t-blue-600 absolute top-0 left-0"></div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
-            Gestión de Usuarios
-          </h1>
-          <p className="text-gray-600 mt-1">Administra los usuarios del sistema</p>
-        </div>
-        <Button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Usuario
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <UserCheck className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Usuarios Activos</p>
-              <p className="text-2xl font-semibold text-gray-900">{activeUsers}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <div className="h-6 w-6 text-purple-600 flex items-center justify-center">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Header with animation */}
+        <div className="animate-fade-in-down">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg shadow-lg">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">
+                  Gestión de Usuarios
+                </h1>
               </div>
+              <p className="text-slate-600 ml-14">Administra y controla los usuarios del sistema</p>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Administradores</p>
-              <p className="text-2xl font-semibold text-gray-900">{adminUsers}</p>
-            </div>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-lg px-6 py-6 group"
+            >
+              <Plus className="h-5 w-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
+              Nuevo Usuario
+            </Button>
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <div className="h-6 w-6 text-blue-600 flex items-center justify-center">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                  <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Mecánicos</p>
-              <p className="text-2xl font-semibold text-gray-900">{mechUsers}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-        <Input
-          placeholder="Buscar usuarios por nombre o email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg"
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in">
+          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-600 font-medium">Total Usuarios</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-1">{users.length}</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-600 font-medium">Usuarios Activos</p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">
+                    {users.filter(u => u.isActive).length}
+                  </p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <UserCheck className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-600 font-medium">Usuarios Inactivos</p>
+                  <p className="text-3xl font-bold text-red-600 mt-1">
+                    {users.filter(u => !u.isActive).length}
+                  </p>
+                </div>
+                <div className="p-3 bg-red-100 rounded-full">
+                  <UserX className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search */}
+        <Card className="bg-white border-0 shadow-lg animate-fade-in">
+          <CardContent className="p-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
+              <Input
+                placeholder="Buscar por nombre o email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-12 h-14 text-base border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Users Table */}
+        <Card className="bg-white border-0 shadow-xl animate-fade-in-up overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
+            <CardTitle className="text-xl text-white flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Lista de Usuarios ({filteredUsers.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {/* Mobile View */}
+            <div className="block sm:hidden">
+              {filteredUsers.map((user, index) => (
+                <div 
+                  key={user.id} 
+                  className="p-4 border-b border-slate-100 hover:bg-blue-50 transition-all duration-300 animate-slide-in-right"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="relative group">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                        <span className="text-white font-bold text-lg">
+                          {user.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="absolute inset-0 bg-blue-400 rounded-full blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-slate-800">{user.name}</div>
+                      <div className="text-sm text-slate-500">{user.email}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge className={`${getRoleBadgeColor(user.role)} rounded-full px-3 py-1 shadow-sm`}>
+                      {getRoleDisplayName(user.role)}
+                    </Badge>
+                    <Badge 
+                      className={`rounded-full px-3 py-1 shadow-sm ${
+                        user.isActive 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-red-500 text-white'
+                      }`}
+                    >
+                      {user.isActive ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
+                    Último acceso: {user.lastLogin 
+                      ? new Date(user.lastLogin).toLocaleDateString('es-CO')
+                      : 'Nunca'
+                    }
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setEditingUser(user)}
+                      className="flex-1 bg-white border-2 border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white transition-all duration-300"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => toggleUserStatus(user.id, !user.isActive)}
+                      className={`flex-1 bg-white border-2 transition-all duration-300 ${
+                        user.isActive
+                          ? 'border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white'
+                          : 'border-green-500 text-green-600 hover:bg-green-500 hover:text-white'
+                      }`}
+                    >
+                      {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left py-4 px-6 font-semibold text-slate-700">Usuario</th>
+                    <th className="text-left py-4 px-6 font-semibold text-slate-700">Rol</th>
+                    <th className="text-left py-4 px-6 font-semibold text-slate-700">Estado</th>
+                    <th className="text-left py-4 px-6 font-semibold text-slate-700">Último Acceso</th>
+                    <th className="text-left py-4 px-6 font-semibold text-slate-700">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user, index) => (
+                    <tr 
+                      key={user.id} 
+                      className="border-b border-slate-100 hover:bg-blue-50 transition-all duration-300 animate-slide-in-right group"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <td className="py-4 px-6">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative">
+                            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300">
+                              <span className="text-white font-bold">
+                                {user.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="absolute inset-0 bg-blue-400 rounded-full blur-md opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-800">{user.name}</div>
+                            <div className="text-sm text-slate-500">{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <Badge className={`${getRoleBadgeColor(user.role)} rounded-full px-3 py-1 shadow-sm hover:shadow-md transition-shadow duration-300`}>
+                          {getRoleDisplayName(user.role)}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-6">
+                        <Badge 
+                          className={`rounded-full px-3 py-1 shadow-sm hover:shadow-md transition-all duration-300 ${
+                            user.isActive 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-red-500 text-white'
+                          }`}
+                        >
+                          {user.isActive ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-6 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
+                          {user.lastLogin 
+                            ? new Date(user.lastLogin).toLocaleDateString('es-CO', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'Nunca'
+                          }
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => setEditingUser(user)}
+                            className="bg-white border-2 border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md"
+                            title="Editar usuario"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => toggleUserStatus(user.id, !user.isActive)}
+                            className={`bg-white border-2 hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md ${
+                              user.isActive 
+                                ? 'border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white' 
+                                : 'border-green-500 text-green-600 hover:bg-green-500 hover:text-white'
+                            }`}
+                            title={user.isActive ? 'Desactivar usuario' : 'Activar usuario'}
+                          >
+                            {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => deleteUser(user.id)}
+                            className="bg-white border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            title="Eliminar usuario"
+                            disabled={session?.user?.id === user.id}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {filteredUsers.length === 0 && (
+              <div className="text-center py-16 animate-fade-in">
+                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-10 w-10 text-slate-400" />
+                </div>
+                <div className="text-slate-600 text-lg font-medium">No se encontraron usuarios</div>
+                <p className="text-slate-400 mt-2">
+                  {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Crea el primer usuario del sistema'}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Modals */}
+        <CreateUserModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={fetchUsers}
+        />
+
+        <EditUserModal
+          isOpen={!!editingUser}
+          onClose={() => setEditingUser(null)}
+          onSuccess={fetchUsers}
+          user={editingUser}
         />
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <h2 className="text-lg font-medium text-gray-900">
-            Usuarios del Sistema ({filteredUsers.length})
-          </h2>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Usuario</th>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Rol</th>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Estado</th>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Último Acceso</th>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredUsers.map((user, index) => (
-                <tr 
-                  key={user.id} 
-                  className={`hover:bg-blue-50/30 transition-colors duration-150 ${
-                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                  }`}
-                >
-                  <td className="py-5 px-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="relative">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-lg shadow-sm">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
-                          user.isActive ? 'bg-green-500' : 'bg-gray-400'
-                        }`}></div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-base">{user.name}</div>
-                        <div className="text-gray-600 text-sm">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className="flex items-center">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                        user.role === 'ADMIN' 
-                          ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                          : 'bg-blue-100 text-blue-800 border border-blue-200'
-                      }`}>
-                        {user.role === 'ADMIN' ? (
-                          <>
-                            <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Administrador
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                              <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-                            </svg>
-                            Mecánico
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
-                      user.isActive 
-                        ? 'bg-green-50 text-green-800 border-green-200' 
-                        : 'bg-red-50 text-red-800 border-red-200'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full mr-2 ${
-                        user.isActive ? 'bg-green-500' : 'bg-red-500'
-                      }`}></span>
-                      {user.isActive ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className="text-gray-700 font-medium">
-                      {user.lastLogin 
-                        ? (
-                            <div>
-                              <div className="text-sm">
-                                {new Date(user.lastLogin).toLocaleDateString('es-CO', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {new Date(user.lastLogin).toLocaleTimeString('es-CO', {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </div>
-                            </div>
-                          )
-                        : <span className="text-gray-500 italic text-sm">Nunca</span>
-                      }
-                    </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingUser(user)}
-                        className="h-9 w-9 p-0 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                        title="Editar usuario"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => toggleUserStatus(user.id, !user.isActive)}
-                        className={`h-9 w-9 p-0 text-gray-500 rounded-lg transition-all duration-200 ${
-                          user.isActive 
-                            ? 'hover:text-orange-700 hover:bg-orange-50' 
-                            : 'hover:text-green-700 hover:bg-green-50'
-                        }`}
-                        title={user.isActive ? 'Desactivar usuario' : 'Activar usuario'}
-                      >
-                        {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteUser(user.id)}
-                        className="h-9 w-9 p-0 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                        title="Eliminar usuario"
-                        disabled={session?.user?.id === user.id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron usuarios</h3>
-              <p className="text-gray-500">
-                {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Crea el primer usuario del sistema'}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <style jsx global>{`
+        @keyframes fade-in-down {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
 
-      {/* Modals */}
-      <CreateUserModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={fetchUsers}
-      />
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
 
-      <EditUserModal
-        isOpen={!!editingUser}
-        onClose={() => setEditingUser(null)}
-        onSuccess={fetchUsers}
-        user={editingUser}
-      />
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes slide-in-right {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        .animate-fade-in-down {
+          animation: fade-in-down 0.6s ease-out;
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out 0.2s both;
+        }
+
+        .animate-fade-in-up {
+          animation: fade-in-up 0.6s ease-out 0.4s both;
+        }
+
+        .animate-slide-in-right {
+          animation: slide-in-right 0.4s ease-out both;
+        }
+      `}</style>
     </div>
   )
 }
