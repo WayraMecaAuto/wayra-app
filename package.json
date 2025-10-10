@@ -32,7 +32,6 @@
     "prisma": "^5.8.1",
     "quagga": "^0.12.1",
     "react": "19.1.0",
-    "react-barcode-generator": "^1.0.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.62.0",
     "react-hot-toast": "^2.6.0",

@@ -11,6 +11,17 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Obtener notificaciones leídas del usuario
+    const readNotifications = await prisma.notificacionUsuario.findMany({
+      where: {
+        usuarioId: session.user.id,
+        leida: true
+      },
+      select: { notificacionId: true }
+    })
+    
+    const readNotificationIds = new Set(readNotifications.map(n => n.notificacionId))
+
     const notifications = []
     const userRole = session.user.role
 
@@ -45,15 +56,16 @@ export async function GET() {
 
       lowStockProducts.forEach(product => {
         const timeAgo = Math.floor((Date.now() - new Date(product.updatedAt).getTime()) / (1000 * 60))
+        const notificationId = `stock-${product.id}`
         notifications.push({
-          id: `stock-${product.id}`,
+          id: notificationId,
           title: '⚠️ Stock Bajo',
           message: `${product.nombre} - Solo quedan ${product.stock} unidades`,
           time: timeAgo < 60 ? `${timeAgo} min` : `${Math.floor(timeAgo / 60)} h`,
           type: 'warning',
           category: 'stock',
           priority: 'high',
-          read: false,
+          read: readNotificationIds.has(notificationId),
           data: {
             productId: product.id,
             currentStock: product.stock,
@@ -95,15 +107,16 @@ export async function GET() {
       recentMovements.forEach(movement => {
         const timeAgo = Math.floor((Date.now() - new Date(movement.fecha).getTime()) / (1000 * 60))
         const icon = movement.tipo === 'ENTRADA' ? '📦' : movement.tipo === 'SALIDA' ? '📤' : '⚙️'
+        const notificationId = `movement-${movement.id}`
         notifications.push({
-          id: `movement-${movement.id}`,
+          id: notificationId,
           title: `${icon} ${movement.tipo === 'ENTRADA' ? 'Entrada' : movement.tipo === 'SALIDA' ? 'Salida' : 'Ajuste'} de Inventario`,
           message: `${movement.producto.nombre} - ${movement.cantidad} unidades por ${movement.usuario.name}`,
           time: timeAgo < 60 ? `${timeAgo} min` : `${Math.floor(timeAgo / 60)} h`,
           type: movement.tipo === 'ENTRADA' ? 'success' : movement.tipo === 'SALIDA' ? 'info' : 'warning',
           category: 'inventory',
           priority: 'medium',
-          read: false,
+          read: readNotificationIds.has(notificationId),
           data: {
             movementId: movement.id,
             productName: movement.producto.nombre,
@@ -133,15 +146,16 @@ export async function GET() {
 
       newUsers.forEach(user => {
         const timeAgo = Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60))
+        const notificationId = `user-${user.id}`
         notifications.push({
-          id: `user-${user.id}`,
+          id: notificationId,
           title: '👤 Nuevo Usuario',
           message: `${user.name} se registró como ${user.role}`,
           time: timeAgo < 1 ? 'Hace poco' : `${timeAgo} h`,
           type: 'info',
           category: 'users',
           priority: 'low',
-          read: false,
+          read: readNotificationIds.has(notificationId),
           data: {
             userId: user.id,
             userName: user.name,
@@ -182,6 +196,28 @@ export async function PATCH(request: NextRequest) {
     const { notificationIds, action } = await request.json()
 
     if (action === 'mark_read') {
+      // Crear o actualizar registros de notificaciones leídas
+      for (const notificationId of notificationIds) {
+        await prisma.notificacionUsuario.upsert({
+          where: {
+            notificacionId_usuarioId: {
+              notificacionId,
+              usuarioId: session.user.id
+            }
+          },
+          update: {
+            leida: true,
+            fechaLeida: new Date()
+          },
+          create: {
+            notificacionId,
+            usuarioId: session.user.id,
+            leida: true,
+            fechaLeida: new Date()
+          }
+        })
+      }
+      
       return NextResponse.json({ 
         success: true, 
         message: `${notificationIds.length} notificaciones marcadas como leídas` 

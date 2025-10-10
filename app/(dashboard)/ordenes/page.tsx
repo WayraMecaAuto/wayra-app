@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Search, Eye, CreditCard as Edit, CheckCircle, Clock, AlertTriangle, Car, User, Calendar, DollarSign, Wrench, FileText, Filter, ChevronDown } from 'lucide-react'
+import { Search, Eye, CreditCard as Edit, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, Car, User, Calendar, DollarSign, Wrench, FileText, ListFilter as Filter, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -393,9 +393,11 @@ export default function OrdenesPage() {
                       <div className="font-bold text-emerald-600">${orden.utilidad.toLocaleString()}</div>
                     </td>
                     <td className="py-4 px-6">
+                          onClick={() => window.location.href = `/ordenes/${orden.id}`}
                       <div className="flex space-x-2">
                         <Button size="sm" variant="outline" className="hover:bg-blue-50">
                           <Eye className="h-4 w-4" />
+                          onClick={() => window.location.href = `/ordenes/${orden.id}/edit`}
                         </Button>
                         <Button size="sm" variant="outline" className="hover:bg-green-50">
                           <Edit className="h-4 w-4" />

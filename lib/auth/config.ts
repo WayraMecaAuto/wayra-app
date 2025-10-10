@@ -28,9 +28,9 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // Verificar que el usuario esté activo
+        // Verificar que el usuario esté activo (doble verificación)
         if (!user.isActive) {
-          throw new Error('Usuario inactivo')
+          return null
         }
 
         const isPasswordValid = await bcrypt.compare(

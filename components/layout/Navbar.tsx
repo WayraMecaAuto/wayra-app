@@ -295,10 +295,32 @@ export function Navbar({ onMenuClick }: NavbarProps) {
     }
   }
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     const unreadIds = notifications.filter(n => !n.read).map(n => n.id)
     if (unreadIds.length > 0) {
-      markAsRead(unreadIds)
+      try {
+        const response = await fetch('/api/notifications', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notificationIds: unreadIds, action: 'mark_read' })
+        })
+        
+        if (response.ok) {
+          // Actualizar estado local
+          const newReadNotifications = new Set([...readNotifications, ...unreadIds])
+          setReadNotifications(newReadNotifications)
+          
+          setNotifications(prev => 
+            prev.map(notif => 
+              unreadIds.includes(notif.id) 
+                ? { ...notif, read: true }
+                : notif
+            )
+          )
+        }
+      } catch (error) {
+        console.error('Error marking all notifications as read:', error)
+      }
     }
   }
 
@@ -523,7 +545,18 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                     {session?.user?.name}
                   </div>
                   <div className="text-xs text-gray-500 capitalize font-medium">
-                    {session?.user?.role === 'ADMIN' ? 'Administrador' : 'Mecánico'}
+                    {(() => {
+                      switch(session?.user?.role) {
+                        case 'SUPER_USUARIO': return 'Super Usuario'
+                        case 'ADMIN_WAYRA_TALLER': return 'Admin Taller'
+                        case 'ADMIN_WAYRA_PRODUCTOS': return 'Admin Productos'
+                        case 'ADMIN_TORNI_REPUESTOS': return 'Admin Repuestos'
+                        case 'MECANICO': return 'Mecánico'
+                        case 'VENDEDOR_WAYRA': return 'Vendedor Wayra'
+                        case 'VENDEDOR_TORNI': return 'Vendedor TorniRepuestos'
+                        default: return 'Usuario'
+                      }
+                    })()}
                   </div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block" />
@@ -556,7 +589,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                       <span>Mi Perfil</span>
                     </button>
                     
-                    {session?.user?.role === 'ADMIN' && (
+                    {['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'ADMIN_WAYRA_PRODUCTOS', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
                       <button className="w-full flex items-center space-x-3 px-4 sm:px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors touch-manipulation">
                         <Shield className="h-4 w-4 flex-shrink-0" />
                         <span>Administración</span>

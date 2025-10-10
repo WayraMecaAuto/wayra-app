@@ -14,6 +14,7 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
+      where: { isActive: true }, // Solo usuarios activos
       select: {
         id: true,
         name: true,

@@ -4,16 +4,15 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import { 
-  Plus, Search, Trash2, Car, User, Calendar, DollarSign, 
-  Wrench, FileText, Package, Calculator, Save, Camera,
-  Scan, ShoppingCart, AlertTriangle, CheckCircle
-} from 'lucide-react'
+import { Plus, Search, Trash2, Car, User, Calendar, DollarSign, Wrench, FileText, Package, Calculator, Save, Camera, Scan, ShoppingCart, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarcodeScanner } from '@/components/ui/barcode-scanner'
 import { Modal } from '@/components/ui/modal'
+import { ClienteForm } from '@/components/forms/ClienteForm'
+import { VehiculoForm } from '@/components/forms/VehiculoForm'
+import { LubricacionModal } from '@/components/forms/LubricacionModal'
 import toast from 'react-hot-toast'
 
 interface OrdenForm {
@@ -21,12 +20,14 @@ interface OrdenForm {
   vehiculoId: string
   descripcion: string
   mecanicoId: string
+  manoDeObra: string
 }
 
 interface Servicio {
   clave: string
   descripcion: string
   precio: number
+  requiereLubricacion?: boolean
 }
 
 interface ProductoOrden {
@@ -45,8 +46,10 @@ interface RepuestoExterno {
   nombre: string
   descripcion: string
   cantidad: number
-  precioUnitario: number
+  precioCompra: number
+  precioVenta: number
   subtotal: number
+  utilidad: number
   proveedor: string
 }
 
@@ -66,13 +69,18 @@ interface Vehiculo {
   clienteId: string
 }
 
+interface ServicioConLubricacion extends Servicio {
+  aceiteId?: string
+  filtroId?: string
+}
+
 export default function NuevaOrdenPage() {
   const { data: session } = useSession()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([])
   const [mecanicos, setMecanicos] = useState<any[]>([])
   const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>([])
-  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<Servicio[]>([])
+  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<ServicioConLubricacion[]>([])
   const [productosSeleccionados, setProductosSeleccionados] = useState<ProductoOrden[]>([])
   const [repuestosExternos, setRepuestosExternos] = useState<RepuestoExterno[]>([])
   const [loading, setLoading] = useState(false)
@@ -80,12 +88,19 @@ export default function NuevaOrdenPage() {
   const [showClienteModal, setShowClienteModal] = useState(false)
   const [showVehiculoModal, setShowVehiculoModal] = useState(false)
   const [showRepuestoModal, setShowRepuestoModal] = useState(false)
+  const [showLubricacionModal, setShowLubricacionModal] = useState(false)
+  const [servicioLubricacionTemp, setServicioLubricacionTemp] = useState<Servicio | null>(null)
 
   // Verificar permisos
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<OrdenForm>()
+  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<OrdenForm>({
+    defaultValues: {
+      manoDeObra: '0'
+    }
+  })
   const selectedClienteId = watch('clienteId')
+  const manoDeObra = parseFloat(watch('manoDeObra') || '0')
 
   useEffect(() => {
     if (hasAccess) {
@@ -98,6 +113,9 @@ export default function NuevaOrdenPage() {
   useEffect(() => {
     if (selectedClienteId) {
       fetchVehiculos(selectedClienteId)
+    } else {
+      setVehiculos([])
+      setValue('vehiculoId', '')
     }
   }, [selectedClienteId])
 
@@ -127,7 +145,7 @@ export default function NuevaOrdenPage() {
 
   const fetchMecanicos = async () => {
     try {
-      const response = await fetch('/api/usuarios?role=MECANICO')
+      const response = await fetch('/api/mecanicos')
       if (response.ok) {
         const data = await response.json()
         setMecanicos(data)
@@ -145,13 +163,24 @@ export default function NuevaOrdenPage() {
         const servicios = data.map((s: any) => ({
           clave: s.clave,
           descripcion: s.descripcion,
-          precio: parseFloat(s.valor)
+          precio: parseFloat(s.valor),
+          requiereLubricacion: s.clave === 'LUBRICACION' // Identificar servicio de lubricación
         }))
         setServiciosDisponibles(servicios)
       }
     } catch (error) {
       console.error('Error fetching servicios:', error)
     }
+  }
+
+  const handleClienteCreated = (cliente: Cliente) => {
+    setClientes([...clientes, cliente])
+    setValue('clienteId', cliente.id)
+  }
+
+  const handleVehiculoCreated = (vehiculo: Vehiculo) => {
+    setVehiculos([...vehiculos, vehiculo])
+    setValue('vehiculoId', vehiculo.id)
   }
 
   const handleBarcodeScanned = async (code: string) => {
@@ -161,14 +190,12 @@ export default function NuevaOrdenPage() {
       if (response.ok) {
         const product = await response.json()
         
-        // Verificar si ya está agregado
         const exists = productosSeleccionados.find(p => p.id === product.id)
         if (exists) {
           toast.error('Este producto ya está agregado a la orden')
           return
         }
 
-        // Agregar producto con precio de venta por defecto
         const nuevoProducto: ProductoOrden = {
           id: product.id,
           nombre: product.nombre,
@@ -192,9 +219,28 @@ export default function NuevaOrdenPage() {
   }
 
   const agregarServicio = (servicio: Servicio) => {
-    const existe = serviciosSeleccionados.find(s => s.clave === servicio.clave)
-    if (!existe) {
-      setServiciosSeleccionados([...serviciosSeleccionados, servicio])
+    if (servicio.requiereLubricacion) {
+      // Si es servicio de lubricación, abrir modal para seleccionar aceite y filtro
+      setServicioLubricacionTemp(servicio)
+      setShowLubricacionModal(true)
+    } else {
+      const existe = serviciosSeleccionados.find(s => s.clave === servicio.clave)
+      if (!existe) {
+        setServiciosSeleccionados([...serviciosSeleccionados, servicio])
+        toast.success('Servicio agregado')
+      }
+    }
+  }
+
+  const handleLubricacionAdded = (aceiteId: string, filtroId: string) => {
+    if (servicioLubricacionTemp) {
+      const servicioConLubricacion: ServicioConLubricacion = {
+        ...servicioLubricacionTemp,
+        aceiteId,
+        filtroId
+      }
+      setServiciosSeleccionados([...serviciosSeleccionados, servicioConLubricacion])
+      setServicioLubricacionTemp(null)
     }
   }
 
@@ -229,15 +275,18 @@ export default function NuevaOrdenPage() {
     const totalServicios = serviciosSeleccionados.reduce((sum, s) => sum + s.precio, 0)
     const totalProductos = productosSeleccionados.reduce((sum, p) => sum + p.subtotal, 0)
     const totalRepuestosExternos = repuestosExternos.reduce((sum, r) => sum + r.subtotal, 0)
-    const subtotal = totalServicios + totalProductos + totalRepuestosExternos
+    const subtotal = totalServicios + totalProductos + totalRepuestosExternos + manoDeObra
     const total = subtotal
+    const utilidadRepuestos = repuestosExternos.reduce((sum, r) => sum + r.utilidad, 0)
 
     return {
       totalServicios,
       totalProductos,
       totalRepuestosExternos,
+      manoDeObra,
       subtotal,
-      total
+      total,
+      utilidadRepuestos
     }
   }
 
@@ -254,6 +303,7 @@ export default function NuevaOrdenPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
+          manoDeObra: parseFloat(data.manoDeObra) || 0,
           servicios: serviciosSeleccionados,
           productos: productosSeleccionados,
           repuestosExternos
@@ -262,7 +312,6 @@ export default function NuevaOrdenPage() {
 
       if (response.ok) {
         toast.success('Orden creada exitosamente')
-        // Redirigir a órdenes activas
         window.location.href = '/ordenes'
       } else {
         const error = await response.json()
@@ -323,6 +372,7 @@ export default function NuevaOrdenPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setShowClienteModal(true)}
+                  title="Agregar nuevo cliente"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -347,8 +397,15 @@ export default function NuevaOrdenPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowVehiculoModal(true)}
+                  onClick={() => {
+                    if (!selectedClienteId) {
+                      toast.error('Primero selecciona un cliente');
+                      return;
+                    }
+                    setShowVehiculoModal(true);
+                  }}
                   disabled={!selectedClienteId}
+                  title="Agregar nuevo vehículo"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -372,6 +429,23 @@ export default function NuevaOrdenPage() {
                 {errors.mecanicoId && (
                   <p className="text-sm text-red-600">{errors.mecanicoId.message}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mano de Obra (Opcional)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                  <Input
+                    {...register('manoDeObra')}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className="pl-8"
+                  />
+                </div>
               </div>
 
               <div>
@@ -424,9 +498,14 @@ export default function NuevaOrdenPage() {
                   <div className="space-y-2">
                     {serviciosSeleccionados.map(servicio => (
                       <div key={servicio.clave} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                        <div>
+                        <div className="flex-1">
                           <span className="font-medium text-green-800">{servicio.descripcion}</span>
                           <span className="text-sm text-green-600 ml-2">${servicio.precio.toLocaleString()}</span>
+                          {servicio.aceiteId && servicio.filtroId && (
+                            <div className="text-xs text-green-600 mt-1">
+                              ✓ Con aceite y filtro seleccionados
+                            </div>
+                          )}
                         </div>
                         <Button
                           type="button"
@@ -509,7 +588,6 @@ export default function NuevaOrdenPage() {
                             onChange={(e) => {
                               const tipoPrecio = e.target.value as 'VENTA' | 'MINORISTA' | 'MAYORISTA'
                               actualizarProducto(index, 'tipoPrecio', tipoPrecio)
-                              // Aquí necesitarías obtener el precio correcto del producto
                             }}
                             className="text-sm border border-gray-300 rounded px-2 py-1"
                           >
@@ -581,7 +659,9 @@ export default function NuevaOrdenPage() {
                       <th className="text-left py-2 px-4 font-medium text-gray-700">Repuesto</th>
                       <th className="text-left py-2 px-4 font-medium text-gray-700">Proveedor</th>
                       <th className="text-left py-2 px-4 font-medium text-gray-700">Cantidad</th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">Precio Unit.</th>
+                      <th className="text-left py-2 px-4 font-medium text-gray-700">P. Compra</th>
+                      <th className="text-left py-2 px-4 font-medium text-gray-700">P. Venta</th>
+                      <th className="text-left py-2 px-4 font-medium text-gray-700">Utilidad</th>
                       <th className="text-left py-2 px-4 font-medium text-gray-700">Subtotal</th>
                       <th className="text-left py-2 px-4 font-medium text-gray-700">Acciones</th>
                     </tr>
@@ -597,10 +677,16 @@ export default function NuevaOrdenPage() {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">{repuesto.proveedor}</td>
+                        <td className="py-3 px-4 text-sm text-gray-600">{repuesto.proveedor || '-'}</td>
                         <td className="py-3 px-4 font-medium">{repuesto.cantidad}</td>
+                        <td className="py-3 px-4 text-sm text-gray-600">
+                          ${repuesto.precioCompra.toLocaleString()}
+                        </td>
                         <td className="py-3 px-4 font-medium text-orange-600">
-                          ${repuesto.precioUnitario.toLocaleString()}
+                          ${repuesto.precioVenta.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-green-600">
+                          ${repuesto.utilidad.toLocaleString()}
                         </td>
                         <td className="py-3 px-4 font-bold text-orange-600">
                           ${repuesto.subtotal.toLocaleString()}
@@ -640,7 +726,7 @@ export default function NuevaOrdenPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
               <div className="text-center p-4 bg-white rounded-xl shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Servicios</div>
                 <div className="text-2xl font-bold text-green-600">
@@ -659,6 +745,12 @@ export default function NuevaOrdenPage() {
                   ${totales.totalRepuestosExternos.toLocaleString()}
                 </div>
               </div>
+              <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Mano de Obra</div>
+                <div className="text-2xl font-bold text-indigo-600">
+                  ${totales.manoDeObra.toLocaleString()}
+                </div>
+              </div>
               <div className="text-center p-4 bg-white rounded-xl shadow-sm border-2 border-purple-200">
                 <div className="text-sm text-gray-600 mb-1">Total</div>
                 <div className="text-3xl font-bold text-purple-600">
@@ -667,14 +759,16 @@ export default function NuevaOrdenPage() {
               </div>
             </div>
             
-            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">${totales.subtotal.toLocaleString()}</span>
+            {totales.utilidadRepuestos > 0 && (
+              <div className="mt-6 p-4 bg-green-50 rounded-xl border border-green-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700 font-medium">Utilidad Repuestos Externos:</span>
+                  <span className="text-xl font-bold text-green-600">
+                    ${totales.utilidadRepuestos.toLocaleString()}
+                  </span>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -712,11 +806,34 @@ export default function NuevaOrdenPage() {
         title="Escanear Producto para Orden"
       />
 
-      {/* Modal para agregar repuesto externo */}
+      <ClienteForm
+        isOpen={showClienteModal}
+        onClose={() => setShowClienteModal(false)}
+        onSuccess={handleClienteCreated}
+      />
+
+      {selectedClienteId && (
+        <VehiculoForm
+          isOpen={showVehiculoModal}
+          onClose={() => setShowVehiculoModal(false)}
+          onSuccess={handleVehiculoCreated}
+          clienteId={selectedClienteId}
+        />
+      )}
+
       <RepuestoExternoModal
         isOpen={showRepuestoModal}
         onClose={() => setShowRepuestoModal(false)}
         onAdd={agregarRepuestoExterno}
+      />
+
+      <LubricacionModal
+        isOpen={showLubricacionModal}
+        onClose={() => {
+          setShowLubricacionModal(false)
+          setServicioLubricacionTemp(null)
+        }}
+        onAdd={handleLubricacionAdded}
       />
     </div>
   )
@@ -736,30 +853,46 @@ function RepuestoExternoModal({
     nombre: '',
     descripcion: '',
     cantidad: 1,
-    precioUnitario: 0,
+    precioCompra: 0,
+    precioVenta: 0,
     proveedor: ''
   })
+
+  const calcularUtilidad = () => {
+    const totalCompra = formData.cantidad * formData.precioCompra
+    const totalVenta = formData.cantidad * formData.precioVenta
+    return totalVenta - totalCompra
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.nombre || formData.precioUnitario <= 0) {
+    if (!formData.nombre || formData.precioCompra <= 0 || formData.precioVenta <= 0) {
       toast.error('Completa todos los campos requeridos')
       return
     }
+
+    if (formData.precioVenta < formData.precioCompra) {
+      toast.error('El precio de venta debe ser mayor al precio de compra')
+      return
+    }
+
+    const utilidad = calcularUtilidad()
 
     const repuesto: RepuestoExterno = {
       id: Date.now().toString(),
       nombre: formData.nombre,
       descripcion: formData.descripcion,
       cantidad: formData.cantidad,
-      precioUnitario: formData.precioUnitario,
-      subtotal: formData.cantidad * formData.precioUnitario,
+      precioCompra: formData.precioCompra,
+      precioVenta: formData.precioVenta,
+      subtotal: formData.cantidad * formData.precioVenta,
+      utilidad: utilidad,
       proveedor: formData.proveedor
     }
 
     onAdd(repuesto)
-    setFormData({ nombre: '', descripcion: '', cantidad: 1, precioUnitario: 0, proveedor: '' })
+    setFormData({ nombre: '', descripcion: '', cantidad: 1, precioCompra: 0, precioVenta: 0, proveedor: '' })
     onClose()
     toast.success('Repuesto externo agregado')
   }
@@ -790,7 +923,18 @@ function RepuestoExternoModal({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Proveedor
+          </label>
+          <Input
+            value={formData.proveedor}
+            onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+            placeholder="Nombre del proveedor"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cantidad *
@@ -805,35 +949,49 @@ function RepuestoExternoModal({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Precio Unitario *
+              Precio Compra *
             </label>
             <Input
               type="number"
               step="0.01"
               min="0"
-              value={formData.precioUnitario}
-              onChange={(e) => setFormData({ ...formData, precioUnitario: parseFloat(e.target.value) || 0 })}
+              value={formData.precioCompra}
+              onChange={(e) => setFormData({ ...formData, precioCompra: parseFloat(e.target.value) || 0 })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Precio Venta *
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.precioVenta}
+              onChange={(e) => setFormData({ ...formData, precioVenta: parseFloat(e.target.value) || 0 })}
               required
             />
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Proveedor
-          </label>
-          <Input
-            value={formData.proveedor}
-            onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-            placeholder="Nombre del proveedor"
-          />
-        </div>
-
-        <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
           <div className="flex justify-between items-center">
-            <span className="font-medium text-gray-700">Subtotal:</span>
-            <span className="text-xl font-bold text-orange-600">
-              ${(formData.cantidad * formData.precioUnitario).toLocaleString()}
+            <span className="text-sm text-gray-600">Total Compra:</span>
+            <span className="font-medium text-gray-800">
+              ${(formData.cantidad * formData.precioCompra).toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Total Venta:</span>
+            <span className="font-medium text-orange-600">
+              ${(formData.cantidad * formData.precioVenta).toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between items-center border-t pt-2">
+            <span className="font-medium text-gray-700">Utilidad:</span>
+            <span className="text-xl font-bold text-green-600">
+              ${calcularUtilidad().toLocaleString()}
             </span>
           </div>
         </div>

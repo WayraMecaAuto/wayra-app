@@ -133,8 +133,8 @@ export function calculatePrices(
   aplicaIva: boolean = false,
   tasaUSD: number = 4000
 ) {
-  // Actualizar configuraciones desde BD antes de calcular
-  await updatePricingConfigFromDB()
+  // Las configuraciones se cargan desde PRICING_CONFIG
+  // Para actualizaciones dinámicas, usar calculatePricesAsync
   
   const configKey = tipo === 'TORNI_REPUESTO' ? `TORNI_${categoria.toUpperCase()}` : tipo
   const config = PRICING_CONFIG[configKey] || PRICING_CONFIG['TORNI_REPUESTOS']
@@ -171,4 +171,19 @@ export function getPricingConfig(tipo: TipoProducto, categoria: string) {
 // Función para obtener configuraciones actualizadas
 export function getCurrentPricingConfig() {
   return PRICING_CONFIG
+}
+
+// Versión async de calculatePrices que actualiza desde BD
+export async function calculatePricesAsync(
+  precioCompra: number,
+  tipo: TipoProducto,
+  categoria: string,
+  aplicaIva: boolean = false,
+  tasaUSD: number = 4000
+) {
+  // Actualizar configuraciones desde BD antes de calcular
+  await updatePricingConfigFromDB()
+
+  // Usar la función síncrona con las configuraciones actualizadas
+  return calculatePrices(precioCompra, tipo, categoria, aplicaIva, tasaUSD)
 }

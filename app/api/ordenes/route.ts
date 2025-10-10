@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       vehiculoId,
       descripcion,
       mecanicoId,
+      manoDeObra,
       servicios,
       productos,
       repuestosExternos
@@ -120,7 +121,8 @@ export async function POST(request: NextRequest) {
     }
 
     const subtotal = subtotalServicios + subtotalProductos + subtotalRepuestosExternos
-    const total = subtotal
+    const manoDeObraNum = parseFloat(manoDeObra) || 0
+    const total = subtotal + manoDeObraNum
 
     // Calcular utilidad (solo sobre productos internos)
     let utilidad = 0
@@ -147,6 +149,7 @@ export async function POST(request: NextRequest) {
         mecanicoId,
         mes,
         anio,
+        manoDeObra: manoDeObraNum,
         subtotalServicios,
         subtotalProductos,
         subtotalRepuestosExternos,
@@ -161,6 +164,7 @@ export async function POST(request: NextRequest) {
         data: servicios.map((s: any) => ({
           descripcion: s.descripcion,
           precio: parseFloat(s.precio),
+          aplicaIva: false, // Los servicios NO aplican IVA
           ordenId: orden.id
         }))
       })

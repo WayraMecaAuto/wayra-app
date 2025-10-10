@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { Plus, Search, CreditCard as Edit, Trash2, Package, AlertTriangle, BarChart3, Camera, ArrowUpDown, Eye, Filter, Settings } from 'lucide-react'
+import { Plus, Search, CreditCard as Edit, Trash2, Package, TriangleAlert as AlertTriangle, ChartBar as BarChart3, Camera, ArrowUpDown, Eye, ListFilter as Filter, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -481,6 +481,7 @@ export default function FiltrosPage() {
         }}
         onSuccess={fetchProducts}
         product={selectedProduct}
+        userRole={session?.user?.role}
       />
 
       <BarcodeScanner

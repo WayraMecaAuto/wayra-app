@@ -140,7 +140,10 @@ model OrdenServicio {
   fechaFin      DateTime?
   mes           Int           // Para filtrar por mes
   anio          Int           // Para filtrar por año
-  
+
+  // Mano de obra
+  manoDeObra    Float?        @default(0) // Costo de mano de obra (opcional)
+
   // Totales
   subtotalServicios Float     @default(0)
   subtotalProductos Float     @default(0)
@@ -148,7 +151,7 @@ model OrdenServicio {
   iva               Float     @default(0)
   total             Float     @default(0)
   utilidad          Float     @default(0)
-  
+
   // Relaciones
   cliente       Cliente       @relation(fields: [clienteId], references: [id])
   vehiculo      Vehiculo      @relation(fields: [vehiculoId], references: [id])
@@ -211,10 +214,13 @@ model RepuestoExterno {
   nombre        String
   descripcion   String?
   cantidad      Int
-  precioUnitario Float
+  precioCompra  Float         // Precio de compra
+  precioVenta   Float         // Precio de venta
+  precioUnitario Float        // Deprecated - usar precioVenta
   subtotal      Float
+  utilidad      Float         @default(0) // Utilidad calculada
   proveedor     String?
-  
+
   // Relaciones
   orden         OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
   ordenId       String
@@ -246,7 +252,12 @@ model ServicioOrden {
   id          String        @id @default(cuid())
   descripcion String
   precio      Float
-  
+  aplicaIva   Boolean       @default(false) // Los servicios NO aplican IVA
+
+  // Para servicios específicos que requieren productos
+  aceiteId    String?       // ID del aceite usado (para lubricación)
+  filtroId    String?       // ID del filtro usado (para lubricación)
+
   // Relaciones
   orden       OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
   ordenId     String

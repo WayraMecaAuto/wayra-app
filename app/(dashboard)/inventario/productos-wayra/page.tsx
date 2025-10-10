@@ -49,7 +49,7 @@ export default function ProductosWayraPage() {
   const [newProductType, setNewProductType] = useState<'WAYRA_ENI' | 'WAYRA_CALAN'>('WAYRA_ENI')
 
   // Verificar permisos
-  const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR'].includes(session?.user?.role || '')
+  const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA'].includes(session?.user?.role || '')
   const canEdit = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
 
   useEffect(() => {
