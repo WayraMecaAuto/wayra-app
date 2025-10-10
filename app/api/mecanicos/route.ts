@@ -12,7 +12,6 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // CORRECCIÓN: Usar prisma.user en lugar de prisma.mecanico
     const mecanicos = await prisma.user.findMany({
       where: { 
         role: 'MECANICO',
