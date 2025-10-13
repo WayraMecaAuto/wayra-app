@@ -20,6 +20,7 @@ export async function GET() {
         }
       }
     })
+    
 
     // Servicios por defecto si no hay configuraciones
     const serviciosDefault = [

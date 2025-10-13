@@ -72,6 +72,8 @@ interface Vehiculo {
 interface ServicioConLubricacion extends Servicio {
   aceiteId?: string
   filtroId?: string
+  aceiteNombre?: string
+  filtroNombre?: string
 }
 
 export default function NuevaOrdenPage() {
@@ -164,7 +166,7 @@ export default function NuevaOrdenPage() {
           clave: s.clave,
           descripcion: s.descripcion,
           precio: parseFloat(s.valor),
-          requiereLubricacion: s.clave === 'LUBRICACION' // Identificar servicio de lubricación
+          requiereLubricacion: s.clave === 'SERVICIO_LUBRICACION' // Identificar servicio de lubricación
         }))
         setServiciosDisponibles(servicios)
       }
@@ -235,7 +237,7 @@ export default function NuevaOrdenPage() {
   const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
     if (servicioLubricacionTemp) {
       try {
-        // Obtener precios de aceite y filtro
+        // Obtener información completa de aceite y filtro
         const [aceiteResponse, filtroResponse] = await Promise.all([
           fetch(`/api/productos/${aceiteId}`),
           fetch(`/api/productos/${filtroId}`)
@@ -252,11 +254,25 @@ export default function NuevaOrdenPage() {
             ...servicioLubricacionTemp,
             precio: precioTotal, // Actualizar con el precio calculado
             aceiteId,
-            filtroId
+            filtroId,
+            aceiteNombre: aceite.nombre,
+            filtroNombre: filtro.nombre
           }
+          
           setServiciosSeleccionados([...serviciosSeleccionados, servicioConLubricacion])
           setServicioLubricacionTemp(null)
-          toast.success(`Servicio de lubricación agregado - Total: $${precioTotal.toLocaleString()}`)
+          
+          toast.success(
+            <div>
+              <div className="font-semibold">Servicio de lubricación agregado</div>
+              <div className="text-sm mt-1">
+                <div>• {aceite.nombre}</div>
+                <div>• {filtro.nombre}</div>
+                <div className="font-semibold mt-1">Total: ${precioTotal.toLocaleString()}</div>
+              </div>
+            </div>,
+            { duration: 4000 }
+          )
         } else {
           toast.error('Error al obtener los precios de los productos')
         }
@@ -269,6 +285,7 @@ export default function NuevaOrdenPage() {
 
   const removerServicio = (servicioId: string) => {
     setServiciosSeleccionados(serviciosSeleccionados.filter(s => s.clave !== servicioId))
+    toast.success('Servicio removido')
   }
 
   const actualizarProducto = (index: number, campo: string, valor: any) => {
@@ -502,6 +519,11 @@ export default function NuevaOrdenPage() {
                       {!servicio.requiereLubricacion && (
                         <div className="text-sm text-gray-500">${servicio.precio.toLocaleString()}</div>
                       )}
+                      {servicio.requiereLubricacion && (
+                        <div className="text-xs text-blue-600 mt-1">
+                          Precio según productos seleccionados
+                        </div>
+                      )}
                     </div>
                     <Button
                       type="button"
@@ -522,13 +544,22 @@ export default function NuevaOrdenPage() {
                   <h4 className="font-semibold text-gray-800 mb-3">Servicios Seleccionados:</h4>
                   <div className="space-y-2">
                     {serviciosSeleccionados.map(servicio => (
-                      <div key={servicio.clave} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                      <div key={servicio.clave} className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                         <div className="flex-1">
-                          <span className="font-medium text-green-800">{servicio.descripcion}</span>
-                          <span className="text-sm text-green-600 ml-2">${servicio.precio.toLocaleString()}</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-green-800">{servicio.descripcion}</span>
+                            <span className="text-sm font-bold text-green-700">${servicio.precio.toLocaleString()}</span>
+                          </div>
                           {servicio.aceiteId && servicio.filtroId && (
-                            <div className="text-xs text-green-600 mt-1">
-                              ✓ Con aceite y filtro seleccionados
+                            <div className="text-xs text-green-600 space-y-0.5 mt-2">
+                              <div className="flex items-center">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                <span>Aceite: {servicio.aceiteNombre}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                <span>Filtro: {servicio.filtroNombre}</span>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -537,7 +568,7 @@ export default function NuevaOrdenPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => removerServicio(servicio.clave)}
-                          className="text-red-600 hover:bg-red-50"
+                          className="text-red-600 hover:bg-red-50 ml-2"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
