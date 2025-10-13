@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
-import { SelectImproved } from '@/components/ui/select-improved'
-import { Droplets, ListFilter as Filter } from 'lucide-react'
+import { BarcodeScanner } from '@/components/ui/barcode-scanner'
+import { Droplets, Filter, Camera, Package, AlertCircle, CheckCircle2, Scan, Box, ShoppingCart } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface LubricacionModalProps {
@@ -16,14 +16,23 @@ interface Producto {
   nombre: string
   codigo: string
   stock: number
+  precioVenta: number
+  tipo?: 'WAYRA' | 'TORNI_REPUESTO'
+  categoria?: string
 }
+
+type ScanMode = 'aceite' | 'filtro' | null
 
 export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalProps) {
   const [aceites, setAceites] = useState<Producto[]>([])
   const [filtros, setFiltros] = useState<Producto[]>([])
-  const [selectedAceite, setSelectedAceite] = useState('')
-  const [selectedFiltro, setSelectedFiltro] = useState('')
+  const [selectedAceite, setSelectedAceite] = useState<Producto | null>(null)
+  const [selectedFiltro, setSelectedFiltro] = useState<Producto | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
+  const [scanMode, setScanMode] = useState<ScanMode>(null)
+  const [searchAceite, setSearchAceite] = useState('')
+  const [searchFiltro, setSearchFiltro] = useState('')
 
   useEffect(() => {
     if (isOpen) {
@@ -34,133 +43,472 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
   const fetchProductos = async () => {
     setLoading(true)
     try {
-      // Obtener aceites (lubricantes)
-      const aceitesResponse = await fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=LUBRICANTES')
-      if (aceitesResponse.ok) {
-        const aceitesData = await aceitesResponse.json()
-        setAceites(aceitesData.filter((p: any) => p.stock > 0))
-      }
+      // Obtener aceites (lubricantes) de ambos inventarios
+      const [wayraAceites, torniAceites] = await Promise.all([
+        fetch('/api/productos?tipo=WAYRA&categoria=LUBRICANTES').then(r => r.ok ? r.json() : []),
+        fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=LUBRICANTES').then(r => r.ok ? r.json() : [])
+      ])
 
-      // Obtener filtros
-      const filtrosResponse = await fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=FILTROS')
-      if (filtrosResponse.ok) {
-        const filtrosData = await filtrosResponse.json()
-        setFiltros(filtrosData.filter((p: any) => p.stock > 0))
-      }
+      const allAceites = [
+        ...wayraAceites.map((p: any) => ({ ...p, tipo: 'WAYRA' as const })),
+        ...torniAceites.map((p: any) => ({ ...p, tipo: 'TORNI_REPUESTO' as const }))
+      ].filter(p => p.stock > 0)
+
+      setAceites(allAceites)
+
+      // Obtener filtros de ambos inventarios
+      const [wayraFiltros, torniFiltros] = await Promise.all([
+        fetch('/api/productos?tipo=WAYRA&categoria=FILTROS').then(r => r.ok ? r.json() : []),
+        fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=FILTROS').then(r => r.ok ? r.json() : [])
+      ])
+
+      const allFiltros = [
+        ...wayraFiltros.map((p: any) => ({ ...p, tipo: 'WAYRA' as const })),
+        ...torniFiltros.map((p: any) => ({ ...p, tipo: 'TORNI_REPUESTO' as const }))
+      ].filter(p => p.stock > 0)
+
+      setFiltros(allFiltros)
     } catch (error) {
-      toast.error('Error al cargar productos')
+      console.error('Error fetching productos:', error)
+      toast.error('Error al cargar productos del inventario')
     } finally {
       setLoading(false)
     }
   }
 
+  const handleBarcodeScanned = async (code: string) => {
+    try {
+      // Buscar en ambos inventarios
+      const [wayraResponse, torniResponse] = await Promise.all([
+        fetch(`/api/productos/barcode/${encodeURIComponent(code)}?tipo=WAYRA`),
+        fetch(`/api/productos/barcode/${encodeURIComponent(code)}?tipo=TORNI_REPUESTO`)
+      ])
+
+      let product = null
+      let tipo: 'WAYRA' | 'TORNI_REPUESTO' = 'WAYRA'
+
+      if (wayraResponse.ok) {
+        product = await wayraResponse.json()
+        tipo = 'WAYRA'
+      } else if (torniResponse.ok) {
+        product = await torniResponse.json()
+        tipo = 'TORNI_REPUESTO'
+      }
+
+      if (!product) {
+        toast.error('Producto no encontrado en el inventario')
+        return
+      }
+
+      const productoConTipo = { ...product, tipo }
+
+      if (scanMode === 'aceite') {
+        if (product.categoria?.toUpperCase().includes('LUBRICANTE') || 
+            product.nombre.toLowerCase().includes('aceite')) {
+          setSelectedAceite(productoConTipo)
+          toast.success(`Aceite seleccionado: ${product.nombre}`)
+        } else {
+          toast.error('El producto escaneado no es un lubricante')
+        }
+      } else if (scanMode === 'filtro') {
+        if (product.categoria?.toUpperCase().includes('FILTRO') || 
+            product.nombre.toLowerCase().includes('filtro')) {
+          setSelectedFiltro(productoConTipo)
+          toast.success(`Filtro seleccionado: ${product.nombre}`)
+        } else {
+          toast.error('El producto escaneado no es un filtro')
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning barcode:', error)
+      toast.error('Error al buscar producto')
+    } finally {
+      setShowScanner(false)
+      setScanMode(null)
+    }
+  }
+
+  const openScanner = (mode: 'aceite' | 'filtro') => {
+    setScanMode(mode)
+    setShowScanner(true)
+  }
+
   const handleSubmit = () => {
     if (!selectedAceite || !selectedFiltro) {
-      toast.error('Selecciona aceite y filtro para el servicio')
+      toast.error('Debes seleccionar tanto el aceite como el filtro')
       return
     }
 
-    onAdd(selectedAceite, selectedFiltro)
+    onAdd(selectedAceite.id, selectedFiltro.id)
     handleClose()
-    toast.success('Servicio de lubricación agregado')
+    toast.success('Servicio de lubricación agregado correctamente')
   }
 
   const handleClose = () => {
-    setSelectedAceite('')
-    setSelectedFiltro('')
+    setSelectedAceite(null)
+    setSelectedFiltro(null)
+    setSearchAceite('')
+    setSearchFiltro('')
     onClose()
   }
 
-  const aceiteOptions = aceites.map(aceite => ({
-    value: aceite.id,
-    label: aceite.nombre,
-    subtitle: `Stock: ${aceite.stock} - Código: ${aceite.codigo}`,
-    icon: <Droplets className="h-4 w-4 text-blue-600" />
-  }))
+  const filteredAceites = aceites.filter(a => 
+    a.nombre.toLowerCase().includes(searchAceite.toLowerCase()) ||
+    a.codigo.toLowerCase().includes(searchAceite.toLowerCase())
+  )
 
-  const filtroOptions = filtros.map(filtro => ({
-    value: filtro.id,
-    label: filtro.nombre,
-    subtitle: `Stock: ${filtro.stock} - Código: ${filtro.codigo}`,
-    icon: <Filter className="h-4 w-4 text-green-600" />
-  }))
+  const filteredFiltros = filtros.filter(f => 
+    f.nombre.toLowerCase().includes(searchFiltro.toLowerCase()) ||
+    f.codigo.toLowerCase().includes(searchFiltro.toLowerCase())
+  )
+
+  const getInventarioLabel = (tipo: 'WAYRA' | 'TORNI_REPUESTO') => {
+    return tipo === 'WAYRA' ? 'Wayra' : 'TorniRepuestos'
+  }
+
+  const getInventarioColor = (tipo: 'WAYRA' | 'TORNI_REPUESTO') => {
+    return tipo === 'WAYRA' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+  }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Servicio de Lubricación" size="md">
-      <div className="space-y-6">
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <h4 className="font-semibold text-blue-800 mb-2">Servicio de Lubricación</h4>
-          <p className="text-sm text-blue-600">
-            Este servicio requiere seleccionar el aceite y filtro específicos que se utilizarán.
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2">Cargando productos...</p>
+    <>
+      <Modal isOpen={isOpen} onClose={handleClose} title="Servicio de Lubricación" size="lg">
+        <div className="space-y-6">
+          {/* Información del servicio */}
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 p-5 rounded-xl border-2 border-blue-200 shadow-sm">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                <Droplets className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-blue-900 mb-2 text-lg">Servicio de Lubricación</h4>
+                <p className="text-sm text-blue-700 leading-relaxed">
+                  Selecciona el <span className="font-semibold">aceite</span> y el <span className="font-semibold">filtro de aceite</span> específicos que se utilizarán en este servicio. 
+                  Puedes escanear el código de barras o seleccionarlos manualmente del inventario.
+                </p>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Aceite a Utilizar *
-              </label>
-              <SelectImproved
-                options={aceiteOptions}
-                value={selectedAceite}
-                onChange={setSelectedAceite}
-                placeholder="Seleccionar aceite..."
-                searchable
-                error={!selectedAceite ? 'Selecciona un aceite' : undefined}
-              />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filtro de Aceite a Utilizar *
-              </label>
-              <SelectImproved
-                options={filtroOptions}
-                value={selectedFiltro}
-                onChange={setSelectedFiltro}
-                placeholder="Seleccionar filtro..."
-                searchable
-                error={!selectedFiltro ? 'Selecciona un filtro' : undefined}
-              />
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="inline-flex flex-col items-center space-y-4">
+                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                <p className="text-gray-600 font-medium">Cargando productos del inventario...</p>
+                <p className="text-sm text-gray-500">Wayra y TorniRepuestos</p>
+              </div>
             </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Selección de Aceite */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Droplets className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <label className="text-base font-semibold text-gray-800">
+                      1. Aceite Lubricante *
+                    </label>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => openScanner('aceite')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all"
+                    size="sm"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Escanear Aceite
+                  </Button>
+                </div>
 
-            {selectedAceite && selectedFiltro && (
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h5 className="font-medium text-green-800 mb-2">Productos Seleccionados:</h5>
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span>Aceite:</span>
-                    <span className="font-medium">{aceites.find(a => a.id === selectedAceite)?.nombre}</span>
+                {selectedAceite ? (
+                  <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-3 flex-1">
+                        <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <CheckCircle2 className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h5 className="font-bold text-green-900 mb-1">{selectedAceite.nombre}</h5>
+                          <div className="flex flex-wrap gap-2 text-sm">
+                            <span className="text-green-700">Código: <span className="font-mono font-medium">{selectedAceite.codigo}</span></span>
+                            <span className="text-green-700">Stock: <span className="font-semibold">{selectedAceite.stock}</span></span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedAceite.tipo!)}`}>
+                              {getInventarioLabel(selectedAceite.tipo!)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedAceite(null)}
+                        className="text-green-700 hover:text-green-900 hover:bg-green-100"
+                      >
+                        Cambiar
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span>Filtro:</span>
-                    <span className="font-medium">{filtros.find(f => f.id === selectedFiltro)?.nombre}</span>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar aceite por nombre o código..."
+                        value={searchAceite}
+                        onChange={(e) => setSearchAceite(e.target.value)}
+                        className="w-full px-4 py-3 pl-10 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    </div>
+                    
+                    <div className="max-h-64 overflow-y-auto border-2 border-gray-200 rounded-xl bg-gray-50">
+                      {filteredAceites.length > 0 ? (
+                        <div className="divide-y divide-gray-200">
+                          {filteredAceites.map(aceite => (
+                            <button
+                              key={aceite.id}
+                              onClick={() => setSelectedAceite(aceite)}
+                              className="w-full text-left p-4 hover:bg-blue-50 transition-colors group"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h5 className="font-semibold text-gray-900 group-hover:text-blue-700 mb-1">
+                                    {aceite.nombre}
+                                  </h5>
+                                  <div className="flex flex-wrap gap-2 text-sm">
+                                    <span className="text-gray-600">
+                                      Código: <span className="font-mono">{aceite.codigo}</span>
+                                    </span>
+                                    <span className={`font-medium ${aceite.stock <= 5 ? 'text-red-600' : 'text-green-600'}`}>
+                                      Stock: {aceite.stock}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(aceite.tipo!)}`}>
+                                      {getInventarioLabel(aceite.tipo!)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Scan className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <Box className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-500 font-medium">No se encontraron aceites</p>
+                          <p className="text-sm text-gray-400 mt-1">
+                            {searchAceite ? 'Intenta con otra búsqueda' : 'No hay aceites disponibles en stock'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                )}
+              </div>
+
+              {/* Separador visual */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="px-4 bg-white text-gray-500 font-medium">y</span>
                 </div>
               </div>
-            )}
-          </div>
-        )}
 
-        <div className="flex justify-end space-x-3 pt-4">
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleSubmit} 
-            disabled={!selectedAceite || !selectedFiltro || loading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Agregar Servicio
-          </Button>
+              {/* Selección de Filtro */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Filter className="h-4 w-4 text-green-600" />
+                    </div>
+                    <label className="text-base font-semibold text-gray-800">
+                      2. Filtro de Aceite *
+                    </label>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => openScanner('filtro')}
+                    className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all"
+                    size="sm"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Escanear Filtro
+                  </Button>
+                </div>
+
+                {selectedFiltro ? (
+                  <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-3 flex-1">
+                        <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <CheckCircle2 className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h5 className="font-bold text-green-900 mb-1">{selectedFiltro.nombre}</h5>
+                          <div className="flex flex-wrap gap-2 text-sm">
+                            <span className="text-green-700">Código: <span className="font-mono font-medium">{selectedFiltro.codigo}</span></span>
+                            <span className="text-green-700">Stock: <span className="font-semibold">{selectedFiltro.stock}</span></span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedFiltro.tipo!)}`}>
+                              {getInventarioLabel(selectedFiltro.tipo!)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedFiltro(null)}
+                        className="text-green-700 hover:text-green-900 hover:bg-green-100"
+                      >
+                        Cambiar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar filtro por nombre o código..."
+                        value={searchFiltro}
+                        onChange={(e) => setSearchFiltro(e.target.value)}
+                        className="w-full px-4 py-3 pl-10 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                      />
+                      <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    </div>
+                    
+                    <div className="max-h-64 overflow-y-auto border-2 border-gray-200 rounded-xl bg-gray-50">
+                      {filteredFiltros.length > 0 ? (
+                        <div className="divide-y divide-gray-200">
+                          {filteredFiltros.map(filtro => (
+                            <button
+                              key={filtro.id}
+                              onClick={() => setSelectedFiltro(filtro)}
+                              className="w-full text-left p-4 hover:bg-green-50 transition-colors group"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h5 className="font-semibold text-gray-900 group-hover:text-green-700 mb-1">
+                                    {filtro.nombre}
+                                  </h5>
+                                  <div className="flex flex-wrap gap-2 text-sm">
+                                    <span className="text-gray-600">
+                                      Código: <span className="font-mono">{filtro.codigo}</span>
+                                    </span>
+                                    <span className={`font-medium ${filtro.stock <= 5 ? 'text-red-600' : 'text-green-600'}`}>
+                                      Stock: {filtro.stock}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(filtro.tipo!)}`}>
+                                      {getInventarioLabel(filtro.tipo!)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Scan className="h-5 w-5 text-gray-400 group-hover:text-green-600 transition-colors" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <Box className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-500 font-medium">No se encontraron filtros</p>
+                          <p className="text-sm text-gray-400 mt-1">
+                            {searchFiltro ? 'Intenta con otra búsqueda' : 'No hay filtros disponibles en stock'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Resumen de selección */}
+              {selectedAceite && selectedFiltro && (
+                <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 border-2 border-green-300 rounded-xl p-5 shadow-md">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                      <ShoppingCart className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-bold text-green-900 mb-3 text-lg">Productos Seleccionados:</h5>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
+                          <div className="flex items-center space-x-2">
+                            <Droplets className="h-4 w-4 text-blue-600" />
+                            <span className="font-medium text-gray-700">Aceite:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900">{selectedAceite.nombre}</span>
+                        </div>
+                        <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
+                          <div className="flex items-center space-x-2">
+                            <Filter className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-gray-700">Filtro:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900">{selectedFiltro.nombre}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mensaje de advertencia si falta selección */}
+              {(!selectedAceite || !selectedFiltro) && (
+                <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-900">
+                        Selección incompleta
+                      </p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        Debes seleccionar tanto el aceite como el filtro para continuar
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botones de acción */}
+          <div className="flex justify-end space-x-3 pt-4 border-t-2 border-gray-200">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleClose}
+              className="px-6 py-3 border-2 hover:bg-gray-50"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={!selectedAceite || !selectedFiltro || loading}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-3 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Agregar Servicio
+            </Button>
+          </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+
+      {/* Scanner Modal */}
+      <BarcodeScanner
+        isOpen={showScanner}
+        onClose={() => {
+          setShowScanner(false)
+          setScanMode(null)
+        }}
+        onScan={handleBarcodeScanned}
+        title={scanMode === 'aceite' ? 'Escanear Aceite' : 'Escanear Filtro'}
+      />
+    </>
   )
 }

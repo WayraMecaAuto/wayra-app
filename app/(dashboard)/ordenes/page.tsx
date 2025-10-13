@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Search, Eye, CreditCard as Edit, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, Car, User, Calendar, DollarSign, Wrench, FileText, ListFilter as Filter, ChevronDown } from 'lucide-react'
+import { Search, Eye, Edit, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, Car, User, Calendar, DollarSign, Wrench, FileText, ListFilter as Filter, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EditarOrdenModal } from '@/components/forms/EditarOrdenModal'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
@@ -47,6 +48,8 @@ export default function OrdenesPage() {
   const [filterEstado, setFilterEstado] = useState<string>('ALL')
   const [filterMes, setFilterMes] = useState<string>(new Date().getMonth() + 1 + '')
   const [filterAño, setFilterAño] = useState<string>(new Date().getFullYear() + '')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedOrdenId, setSelectedOrdenId] = useState<string | null>(null)
 
   // Verificar permisos
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
@@ -78,6 +81,15 @@ export default function OrdenesPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleEditOrden = (ordenId: string) => {
+    setSelectedOrdenId(ordenId)
+    setShowEditModal(true)
+  }
+
+  const handleEditSuccess = () => {
+    fetchOrdenes()
   }
 
   if (!hasAccess) {
@@ -144,9 +156,9 @@ export default function OrdenesPage() {
               <Wrench className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2">Órdenes Activas</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">Órdenes de Trabajo</h1>
               <p className="text-blue-100 text-base sm:text-lg">
-                Gestión de órdenes de trabajo - {filterMes !== 'ALL' ? `${filterMes}/${filterAño}` : 'Todos los meses'}
+                Gestión de órdenes de servicio - {filterMes !== 'ALL' ? `${filterMes}/${filterAño}` : 'Todos los meses'}
               </p>
             </div>
           </div>
@@ -318,11 +330,21 @@ export default function OrdenesPage() {
                   </div>
                 </div>
                 <div className="flex space-x-2 mt-3">
-                  <Button size="sm" variant="outline" className="flex-1">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => window.location.href = `/ordenes/${orden.id}`}
+                  >
                     <Eye className="h-4 w-4 mr-1" />
                     Ver
                   </Button>
-                  <Button size="sm" variant="outline" className="flex-1">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => handleEditOrden(orden.id)}
+                  >
                     <Edit className="h-4 w-4 mr-1" />
                     Editar
                   </Button>
@@ -393,13 +415,21 @@ export default function OrdenesPage() {
                       <div className="font-bold text-emerald-600">${orden.utilidad.toLocaleString()}</div>
                     </td>
                     <td className="py-4 px-6">
-                          onClick={() => window.location.href = `/ordenes/${orden.id}`}
                       <div className="flex space-x-2">
-                        <Button size="sm" variant="outline" className="hover:bg-blue-50">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="hover:bg-blue-50"
+                          onClick={() => window.location.href = `/ordenes/${orden.id}`}
+                        >
                           <Eye className="h-4 w-4" />
-                          onClick={() => window.location.href = `/ordenes/${orden.id}/edit`}
                         </Button>
-                        <Button size="sm" variant="outline" className="hover:bg-green-50">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="hover:bg-green-50"
+                          onClick={() => handleEditOrden(orden.id)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                       </div>
@@ -429,6 +459,19 @@ export default function OrdenesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Edición */}
+      {selectedOrdenId && (
+        <EditarOrdenModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false)
+            setSelectedOrdenId(null)
+          }}
+          ordenId={selectedOrdenId}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </div>
   )
 }

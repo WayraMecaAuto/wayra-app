@@ -232,15 +232,38 @@ export default function NuevaOrdenPage() {
     }
   }
 
-  const handleLubricacionAdded = (aceiteId: string, filtroId: string) => {
+  const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
     if (servicioLubricacionTemp) {
-      const servicioConLubricacion: ServicioConLubricacion = {
-        ...servicioLubricacionTemp,
-        aceiteId,
-        filtroId
+      try {
+        // Obtener precios de aceite y filtro
+        const [aceiteResponse, filtroResponse] = await Promise.all([
+          fetch(`/api/productos/${aceiteId}`),
+          fetch(`/api/productos/${filtroId}`)
+        ])
+
+        if (aceiteResponse.ok && filtroResponse.ok) {
+          const aceite = await aceiteResponse.json()
+          const filtro = await filtroResponse.json()
+          
+          // Calcular precio total del servicio de lubricación
+          const precioTotal = aceite.precioVenta + filtro.precioVenta
+
+          const servicioConLubricacion: ServicioConLubricacion = {
+            ...servicioLubricacionTemp,
+            precio: precioTotal, // Actualizar con el precio calculado
+            aceiteId,
+            filtroId
+          }
+          setServiciosSeleccionados([...serviciosSeleccionados, servicioConLubricacion])
+          setServicioLubricacionTemp(null)
+          toast.success(`Servicio de lubricación agregado - Total: $${precioTotal.toLocaleString()}`)
+        } else {
+          toast.error('Error al obtener los precios de los productos')
+        }
+      } catch (error) {
+        console.error('Error calculating lubrication price:', error)
+        toast.error('Error al calcular el precio del servicio')
       }
-      setServiciosSeleccionados([...serviciosSeleccionados, servicioConLubricacion])
-      setServicioLubricacionTemp(null)
     }
   }
 
@@ -476,7 +499,9 @@ export default function NuevaOrdenPage() {
                   <div key={servicio.clave} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                     <div>
                       <div className="font-medium text-gray-900">{servicio.descripcion}</div>
-                      <div className="text-sm text-gray-500">${servicio.precio.toLocaleString()}</div>
+                      {!servicio.requiereLubricacion && (
+                        <div className="text-sm text-gray-500">${servicio.precio.toLocaleString()}</div>
+                      )}
                     </div>
                     <Button
                       type="button"
@@ -953,7 +978,7 @@ function RepuestoExternoModal({
             </label>
             <Input
               type="number"
-              step="0.01"
+              step="100"
               min="0"
               value={formData.precioCompra}
               onChange={(e) => setFormData({ ...formData, precioCompra: parseFloat(e.target.value) || 0 })}
@@ -966,7 +991,7 @@ function RepuestoExternoModal({
             </label>
             <Input
               type="number"
-              step="0.01"
+              step="100"
               min="0"
               value={formData.precioVenta}
               onChange={(e) => setFormData({ ...formData, precioVenta: parseFloat(e.target.value) || 0 })}

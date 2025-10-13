@@ -1,5 +1,5 @@
 .
-|-- .env.local
+|-- .env
 |-- .gitignore
 |-- README.md
 |-- app/
@@ -9,6 +9,8 @@
 |   |   `-- register/
 |   |       `-- page.tsx
 |   |-- (dashboard)/
+|   |   |-- clientes/
+|   |   |   `-- page.tsx
 |   |   |-- codigos-barras/
 |   |   |   |-- generador/
 |   |   |   |   `-- page.tsx
@@ -56,45 +58,26 @@
 |   |   |   |   `-- page.tsx
 |   |   |   `-- page.tsx
 |   |   |-- inventario/
+|   |   |   |-- filtros/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- lubricantes/
+|   |   |   |   `-- page.tsx
 |   |   |   |-- page.tsx
-|   |   |   |-- tornilleria/
-|   |   |   |   |-- [categoria]/
-|   |   |   |   |   `-- page.tsx
-|   |   |   |   |-- [id]/
-|   |   |   |   |   |-- edit/
-|   |   |   |   |   |   `-- page.tsx
-|   |   |   |   |   `-- page.tsx
-|   |   |   |   |-- nuevo/
-|   |   |   |   |   `-- page.tsx
+|   |   |   |-- productos-wayra/
 |   |   |   |   `-- page.tsx
-|   |   |   |-- tornirepuestos/
-|   |   |   |   |-- [categoria]/
-|   |   |   |   |   `-- page.tsx
-|   |   |   |   |-- [id]/
-|   |   |   |   |   |-- edit/
-|   |   |   |   |   |   `-- page.tsx
-|   |   |   |   |   `-- page.tsx
-|   |   |   |   |-- nuevo/
-|   |   |   |   |   `-- page.tsx
+|   |   |   |-- repuestos/
 |   |   |   |   `-- page.tsx
-|   |   |   `-- wayra/
-|   |   |       |-- calan/
-|   |   |       |   |-- [id]/
-|   |   |       |   |   |-- edit/
-|   |   |       |   |   |   `-- page.tsx
-|   |   |       |   |   `-- page.tsx
-|   |   |       |   |-- nuevo/
-|   |   |       |   |   `-- page.tsx
-|   |   |       |   `-- page.tsx
-|   |   |       |-- eni/
-|   |   |       |   |-- [id]/
-|   |   |       |   |   |-- edit/
-|   |   |       |   |   |   `-- page.tsx
-|   |   |       |   |   `-- page.tsx
-|   |   |       |   |-- nuevo/
-|   |   |       |   |   `-- page.tsx
-|   |   |       |   `-- page.tsx
+|   |   |   `-- tornilleria/
 |   |   |       `-- page.tsx
+|   |   |-- layout.tsx
+|   |   |-- ordenes/
+|   |   |   |-- [id]/
+|   |   |   |   |-- edit/
+|   |   |   |   |   `-- page.tsx
+|   |   |   |   `-- page.tsx
+|   |   |   |-- nueva/
+|   |   |   |   `-- page.tsx
+|   |   |   `-- page.tsx
 |   |   |-- personal/
 |   |   |   |-- nominas/
 |   |   |   |   |-- [periodo]/
@@ -128,16 +111,38 @@
 |   |   |   |-- page.tsx
 |   |   |   `-- tipos/
 |   |   |       `-- page.tsx
-|   |   `-- tornirepuestos/
-|   |       |-- [categoria]/
+|   |   |-- taller/
+|   |   |   `-- configuracion/
+|   |   |       `-- page.tsx
+|   |   |-- tornirepuestos/
+|   |   |   |-- [categoria]/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- configuracion/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- contabilidad/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- nuevo/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- page.tsx
+|   |   |   `-- reportes/
+|   |   |       `-- page.tsx
+|   |   |-- usuarios/
+|   |   |   `-- page.tsx
+|   |   |-- vehiculos/
+|   |   |   `-- page.tsx
+|   |   `-- wayra/
+|   |       |-- configuracion/
 |   |       |   `-- page.tsx
-|   |       |-- nuevo/
+|   |       |-- contabilidad/
 |   |       |   `-- page.tsx
-|   |       `-- page.tsx
+|   |       `-- reportes/
+|   |           `-- page.tsx
 |   |-- api/
 |   |   |-- auth/
 |   |   |   `-- [...nextauth]/
 |   |   |       `-- route.ts
+|   |   |-- clientes/
+|   |   |   `-- route.ts
 |   |   |-- codigos-barras/
 |   |   |   |-- generar/
 |   |   |   |   `-- route.ts
@@ -179,6 +184,9 @@
 |   |   |   |   |   `-- route.ts
 |   |   |   |   `-- route.ts
 |   |   |   `-- utilidades/
+|   |   |       `-- route.ts
+|   |   |-- dashboard/
+|   |   |   `-- stats/
 |   |   |       `-- route.ts
 |   |   |-- facturacion/
 |   |   |   |-- [id]/
@@ -227,6 +235,16 @@
 |   |   |       |   |   `-- route.ts
 |   |   |       |   `-- route.ts
 |   |   |       `-- route.ts
+|   |   |-- mecanicos/
+|   |   |   `-- route.ts
+|   |   |-- movimientos/
+|   |   |   `-- route.ts
+|   |   |-- notifications/
+|   |   |   `-- route.ts
+|   |   |-- ordenes/
+|   |   |   |-- [id]/
+|   |   |   |   `-- route.ts
+|   |   |   `-- route.ts
 |   |   |-- personal/
 |   |   |   |-- [id]/
 |   |   |   |   `-- route.ts
@@ -241,6 +259,13 @@
 |   |   |       |   `-- servicios/
 |   |   |       |       `-- route.ts
 |   |   |       `-- route.ts
+|   |   |-- productos/
+|   |   |   |-- [id]/
+|   |   |   |   `-- route.ts
+|   |   |   |-- barcode/
+|   |   |   |   `-- [code]/
+|   |   |   |       `-- route.ts
+|   |   |   `-- route.ts
 |   |   |-- reportes/
 |   |   |   |-- dashboard/
 |   |   |   |   `-- route.ts
@@ -264,23 +289,17 @@
 |   |   |       |-- export/
 |   |   |       |   `-- route.ts
 |   |   |       `-- route.tsx
-|   |   |-- servicios/
-|   |   |   |-- [id]/
-|   |   |   |   |-- estado/
-|   |   |   |   |   `-- route.ts
-|   |   |   |   |-- facturar/
-|   |   |   |   |   `-- route.ts
-|   |   |   |   `-- route.ts
-|   |   |   |-- route.ts
-|   |   |   |-- tecnicos/
-|   |   |   |   `-- route.ts
-|   |   |   `-- tipos/
-|   |   |       |-- [id]/
-|   |   |       |   `-- route.ts
+|   |   |-- servicios-taller/
+|   |   |   `-- route.ts
+|   |   |-- upload/
+|   |   |   `-- excel/
 |   |   |       `-- route.ts
-|   |   `-- upload/
-|   |       `-- excel/
-|   |           `-- route.ts
+|   |   |-- usuarios/
+|   |   |   |-- [id]/
+|   |   |   |   `-- route.ts
+|   |   |   `-- route.ts
+|   |   `-- vehiculos/
+|   |       `-- route.ts
 |   |-- error.tsx
 |   |-- globals.css
 |   |-- layout.tsx
@@ -323,20 +342,24 @@
 |   |   `-- TotalCalculator.tsx
 |   |-- forms/
 |   |   |-- CategoriaForm.tsx
+|   |   |-- ClienteForm.tsx
 |   |   |-- ConfigForm.tsx
 |   |   |-- FacturaForm.tsx
+|   |   |-- LubricacionModal.tsx
 |   |   |-- MovimientoForm.tsx
 |   |   |-- OrdenTrabajo.tsx
 |   |   |-- ProductoWayraForm.tsx
 |   |   |-- RepuestoForm.tsx
 |   |   |-- TecnicoForm.tsx
 |   |   |-- TornilleriaForm.tsx
-|   |   `-- UserForm.tsx
+|   |   |-- UserForm.tsx
+|   |   `-- VehiculoForm.tsx
 |   |-- inventario/
 |   |   |-- CategoryFilter.tsx
-|   |   |-- MovimientosList.tsx
+|   |   |-- MovimientosForm.tsx
 |   |   |-- PriceDisplay.tsx
 |   |   |-- ProductCard.tsx
+|   |   |-- ProductForm.tsx
 |   |   |-- ProductSearch.tsx
 |   |   |-- ProductTable.tsx
 |   |   |-- RepuestosTable.tsx
@@ -378,22 +401,28 @@
 |   |   |-- ServiciosSelector.tsx
 |   |   |-- TecnicoSelect.tsx
 |   |   `-- TiempoEstimado.tsx
-|   `-- ui/
-|       |-- accordation.tsx
-|       |-- badge.tsx
-|       |-- button.tsx
-|       |-- calendar.tsx
-|       |-- card.tsx
-|       |-- checkbox.tsx
-|       |-- input.tsx
-|       |-- modal.tsx
-|       |-- progress.tsx
-|       |-- select.tsx
-|       |-- spinner.tsx
-|       |-- table.tsx
-|       |-- tabs.tsx
-|       |-- toast.tsx
-|       `-- tooltip.tsx
+|   |-- ui/
+|   |   |-- accordation.tsx
+|   |   |-- badge.tsx
+|   |   |-- barcode-display.tsx
+|   |   |-- barcode-scanner.tsx
+|   |   |-- button.tsx
+|   |   |-- calendar.tsx
+|   |   |-- card.tsx
+|   |   |-- checkbox.tsx
+|   |   |-- input.tsx
+|   |   |-- modal.tsx
+|   |   |-- progress.tsx
+|   |   |-- select-improved.tsx
+|   |   |-- select.tsx
+|   |   |-- spinner.tsx
+|   |   |-- table.tsx
+|   |   |-- tabs.tsx
+|   |   |-- toast.tsx
+|   |   `-- tooltip.tsx
+|   `-- usuarios/
+|       |-- CreateUserModal.tsx
+|       `-- EditUserModal.tsx
 |-- config/
 |   |-- barcode.ts
 |   |-- database.ts
@@ -408,6 +437,7 @@
 |   |   |-- middleware.ts
 |   |   |-- permissions.ts
 |   |   `-- providers.ts
+|   |-- barcode.ts
 |   |-- db/
 |   |   |-- connection.ts
 |   |   |-- migrations/
@@ -432,6 +462,7 @@
 |   |   |-- useServices.ts
 |   |   |-- useTornilleria.ts
 |   |   `-- useWayraProducts.ts
+|   |-- pricing.ts
 |   |-- types/
 |   |   |-- api.ts
 |   |   |-- barcode.ts
@@ -458,6 +489,7 @@
 |   |   |-- pdf-generator.ts
 |   |   |-- search-utils.ts
 |   |   `-- validators.ts
+|   |-- utils.ts
 |   `-- validations/
 |       |-- configuracion.ts
 |       |-- factura.ts
@@ -474,7 +506,7 @@
 |-- next.config.ts
 |-- package-lock.json
 |-- package.json
-|-- postcss.config.mjs
+|-- postcss.config.js
 |-- prisma/
 |   |-- migrations/
 |   |-- schema.prisma
@@ -492,7 +524,8 @@
 |   |   `-- reportes/
 |   `-- images/
 |       |-- TorniRepuestos.png
-|       `-- WayraLogo.png
+|       |-- WayraLogo.png
+|       `-- eni-logo.png
 |-- scripts/
 |   |-- backup-db.js
 |   |-- build.js
@@ -503,6 +536,8 @@
 |   |-- global.css
 |   `-- print.css
 |-- tailwind.config.js
-`-- tsconfig.json
+|-- tsconfig.json
+`-- types/
+    `-- next-auth.d.ts
 
-182 directories, 323 files
+195 directories, 345 files
