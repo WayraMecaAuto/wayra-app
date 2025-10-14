@@ -26,7 +26,6 @@ export async function GET() {
     const serviciosDefault = [
       { clave: 'SERVICIO_COMPLETO', valor: '150000', descripcion: 'Servicio Completo' },
       { clave: 'SERVICIO_ALINEACION', valor: '50000', descripcion: 'Alineación' },
-      { clave: 'SERVICIO_ESCANNER', valor: '30000', descripcion: 'Escáner' },
       { clave: 'SERVICIO_BALANCEO', valor: '40000', descripcion: 'Balanceo' },
       { clave: 'SERVICIO_MONTAJE', valor: '25000', descripcion: 'Montaje' },
       { clave: 'SERVICIO_ROTACION', valor: '20000', descripcion: 'Rotación de llantas' },

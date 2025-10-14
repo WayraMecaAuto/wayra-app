@@ -321,3 +321,41 @@ model NotificacionUsuario {
   @@unique([notificacionId, usuarioId])
   @@map("notificaciones_usuarios")
 }
+
+enum TipoMovimientoContable {
+  INGRESO
+  EGRESO
+}
+
+enum ConceptoContable {
+  VENTA_SERVICIO
+  VENTA_PRODUCTO
+  COMPRA_PRODUCTO
+  GASTO_OPERATIVO
+  GASTO_NOMINA
+  OTRO
+}
+
+enum EntidadContable {
+  WAYRA
+  TORNIREPUESTOS
+}
+
+model MovimientoContable {
+  id          String                @id @default(cuid())
+  tipo        TipoMovimientoContable
+  concepto    ConceptoContable
+  monto       Float
+  fecha       DateTime              @default(now())
+  descripcion String
+  entidad     EntidadContable
+  referencia  String?               // ID de la orden, factura, etc.
+  
+  // Relaciones
+  usuario     User                  @relation(fields: [usuarioId], references: [id])
+  usuarioId   String
+  
+  createdAt   DateTime              @default(now())
+  
+  @@map("movimientos_contables")
+}

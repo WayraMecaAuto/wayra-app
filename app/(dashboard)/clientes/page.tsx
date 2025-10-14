@@ -83,7 +83,7 @@ export default function ClientesPage() {
   const onSubmit = async (data: ClienteForm) => {
     try {
       const url = editingCliente ? `/api/clientes/${editingCliente.id}` : '/api/clientes'
-      const method = editingCliente ? 'PATCH' : 'POST'
+      const method = editingCliente ? 'PATCH' : 'PATCH'
 
       const response = await fetch(url, {
         method,

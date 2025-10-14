@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
-import { BarcodeScanner } from '@/components/ui/barcode-scanner'
-import { Droplets, Filter, Camera, Package, AlertCircle, CheckCircle2, Scan, Box, ShoppingCart } from 'lucide-react'
+import { Droplets, Filter, Package, AlertCircle, CheckCircle2, Scan, Box, ShoppingCart } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface LubricacionModalProps {
@@ -17,11 +16,9 @@ interface Producto {
   codigo: string
   stock: number
   precioVenta: number
-  tipo?: 'WAYRA' | 'TORNI_REPUESTO'
+  tipo?: string
   categoria?: string
 }
-
-type ScanMode = 'aceite' | 'filtro' | null
 
 export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalProps) {
   const [aceites, setAceites] = useState<Producto[]>([])
@@ -29,8 +26,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
   const [selectedAceite, setSelectedAceite] = useState<Producto | null>(null)
   const [selectedFiltro, setSelectedFiltro] = useState<Producto | null>(null)
   const [loading, setLoading] = useState(false)
-  const [showScanner, setShowScanner] = useState(false)
-  const [scanMode, setScanMode] = useState<ScanMode>(null)
   const [searchAceite, setSearchAceite] = useState('')
   const [searchFiltro, setSearchFiltro] = useState('')
 
@@ -43,31 +38,39 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
   const fetchProductos = async () => {
     setLoading(true)
     try {
-      // Obtener aceites (lubricantes) de ambos inventarios
-      const [wayraAceites, torniAceites] = await Promise.all([
-        fetch('/api/productos?tipo=WAYRA&categoria=LUBRICANTES').then(r => r.ok ? r.json() : []),
-        fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=LUBRICANTES').then(r => r.ok ? r.json() : [])
-      ])
-
-      const allAceites = [
-        ...wayraAceites.map((p: any) => ({ ...p, tipo: 'WAYRA' as const })),
-        ...torniAceites.map((p: any) => ({ ...p, tipo: 'TORNI_REPUESTO' as const }))
-      ].filter(p => p.stock > 0)
-
-      setAceites(allAceites)
-
-      // Obtener filtros de ambos inventarios
-      const [wayraFiltros, torniFiltros] = await Promise.all([
-        fetch('/api/productos?tipo=WAYRA&categoria=FILTROS').then(r => r.ok ? r.json() : []),
+      // Obtener productos de WAYRA_ENI, WAYRA_CALAN y TorniRepuesto
+      const [wayraEniResponse, wayraCalanResponse, torniLubricantesResponse, torniFiltrosResponse] = await Promise.all([
+        fetch('/api/productos?tipo=WAYRA_ENI').then(r => r.ok ? r.json() : []),
+        fetch('/api/productos?tipo=WAYRA_CALAN').then(r => r.ok ? r.json() : []),
+        fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=LUBRICANTES').then(r => r.ok ? r.json() : []),
         fetch('/api/productos?tipo=TORNI_REPUESTO&categoria=FILTROS').then(r => r.ok ? r.json() : [])
       ])
 
-      const allFiltros = [
-        ...wayraFiltros.map((p: any) => ({ ...p, tipo: 'WAYRA' as const })),
-        ...torniFiltros.map((p: any) => ({ ...p, tipo: 'TORNI_REPUESTO' as const }))
-      ].filter(p => p.stock > 0)
+      // Para WAYRA_ENI y WAYRA_CALAN, filtrar por nombre/categoría
+      const wayraEniProductos = wayraEniResponse.map((p: any) => ({ ...p, tipo: 'WAYRA_ENI' }))
+      const wayraCalanProductos = wayraCalanResponse.map((p: any) => ({ ...p, tipo: 'WAYRA_CALAN' }))
 
-      setFiltros(allFiltros)
+      // Separar lubricantes de WAYRA (los que NO son filtros)
+      const wayraLubricantes = [...wayraEniProductos, ...wayraCalanProductos].filter(p => {
+        const nombre = p.nombre?.toLowerCase() || ''
+        const categoria = p.categoria?.toLowerCase() || ''
+        return !nombre.includes('filtro') && !categoria.includes('filtro') && p.stock > 0
+      })
+
+      // Separar filtros de WAYRA (los que SÍ son filtros)
+      const wayraFiltros = [...wayraEniProductos, ...wayraCalanProductos].filter(p => {
+        const nombre = p.nombre?.toLowerCase() || ''
+        const categoria = p.categoria?.toLowerCase() || ''
+        return (nombre.includes('filtro') || categoria.includes('filtro')) && p.stock > 0
+      })
+
+      // TorniRepuesto ya viene filtrado por categoría desde el API
+      const torniLubricantes = torniLubricantesResponse.map((p: any) => ({ ...p, tipo: 'TORNI_REPUESTO' })).filter((p: any) => p.stock > 0)
+      const torniFiltros = torniFiltrosResponse.map((p: any) => ({ ...p, tipo: 'TORNI_REPUESTO' })).filter((p: any) => p.stock > 0)
+
+      // Combinar todos los lubricantes y filtros
+      setAceites([...wayraLubricantes, ...torniLubricantes])
+      setFiltros([...wayraFiltros, ...torniFiltros])
     } catch (error) {
       console.error('Error fetching productos:', error)
       toast.error('Error al cargar productos del inventario')
@@ -76,62 +79,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
     }
   }
 
-  const handleBarcodeScanned = async (code: string) => {
-    try {
-      // Buscar en ambos inventarios
-      const [wayraResponse, torniResponse] = await Promise.all([
-        fetch(`/api/productos/barcode/${encodeURIComponent(code)}?tipo=WAYRA`),
-        fetch(`/api/productos/barcode/${encodeURIComponent(code)}?tipo=TORNI_REPUESTO`)
-      ])
-
-      let product = null
-      let tipo: 'WAYRA' | 'TORNI_REPUESTO' = 'WAYRA'
-
-      if (wayraResponse.ok) {
-        product = await wayraResponse.json()
-        tipo = 'WAYRA'
-      } else if (torniResponse.ok) {
-        product = await torniResponse.json()
-        tipo = 'TORNI_REPUESTO'
-      }
-
-      if (!product) {
-        toast.error('Producto no encontrado en el inventario')
-        return
-      }
-
-      const productoConTipo = { ...product, tipo }
-
-      if (scanMode === 'aceite') {
-        if (product.categoria?.toUpperCase().includes('LUBRICANTE') || 
-            product.nombre.toLowerCase().includes('aceite')) {
-          setSelectedAceite(productoConTipo)
-          toast.success(`Aceite seleccionado: ${product.nombre}`)
-        } else {
-          toast.error('El producto escaneado no es un lubricante')
-        }
-      } else if (scanMode === 'filtro') {
-        if (product.categoria?.toUpperCase().includes('FILTRO') || 
-            product.nombre.toLowerCase().includes('filtro')) {
-          setSelectedFiltro(productoConTipo)
-          toast.success(`Filtro seleccionado: ${product.nombre}`)
-        } else {
-          toast.error('El producto escaneado no es un filtro')
-        }
-      }
-    } catch (error) {
-      console.error('Error scanning barcode:', error)
-      toast.error('Error al buscar producto')
-    } finally {
-      setShowScanner(false)
-      setScanMode(null)
-    }
-  }
-
-  const openScanner = (mode: 'aceite' | 'filtro') => {
-    setScanMode(mode)
-    setShowScanner(true)
-  }
 
   const handleSubmit = () => {
     if (!selectedAceite || !selectedFiltro) {
@@ -162,12 +109,16 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
     f.codigo.toLowerCase().includes(searchFiltro.toLowerCase())
   )
 
-  const getInventarioLabel = (tipo: 'WAYRA' | 'TORNI_REPUESTO') => {
-    return tipo === 'WAYRA' ? 'Wayra' : 'TorniRepuestos'
+  const getInventarioLabel = (tipo: string) => {
+    if (tipo === 'WAYRA_ENI') return 'Wayra Eni'
+    if (tipo === 'WAYRA_CALAN') return 'Wayra Calán'
+    return 'TorniRepuestos'
   }
 
-  const getInventarioColor = (tipo: 'WAYRA' | 'TORNI_REPUESTO') => {
-    return tipo === 'WAYRA' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+  const getInventarioColor = (tipo: string) => {
+    if (tipo === 'WAYRA_ENI') return 'bg-blue-100 text-blue-700'
+    if (tipo === 'WAYRA_CALAN') return 'bg-cyan-100 text-cyan-700'
+    return 'bg-purple-100 text-purple-700'
   }
 
   return (
@@ -183,8 +134,8 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
               <div className="flex-1">
                 <h4 className="font-bold text-blue-900 mb-2 text-lg">Servicio de Lubricación</h4>
                 <p className="text-sm text-blue-700 leading-relaxed">
-                  Selecciona el <span className="font-semibold">aceite</span> y el <span className="font-semibold">filtro de aceite</span> específicos que se utilizarán en este servicio. 
-                  Puedes escanear el código de barras o seleccionarlos manualmente del inventario.
+                  Selecciona el <span className="font-semibold">aceite</span> y el <span className="font-semibold">filtro de aceite</span> específicos que se utilizarán en este servicio.
+                  Selecciónalos manualmente del inventario disponible.
                 </p>
               </div>
             </div>
@@ -195,7 +146,7 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
               <div className="inline-flex flex-col items-center space-y-4">
                 <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                 <p className="text-gray-600 font-medium">Cargando productos del inventario...</p>
-                <p className="text-sm text-gray-500">Wayra y TorniRepuestos</p>
+                <p className="text-sm text-gray-500">Wayra Eni, Wayra Calán y TorniRepuestos</p>
               </div>
             </div>
           ) : (
@@ -211,15 +162,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                       1. Aceite Lubricante *
                     </label>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => openScanner('aceite')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all"
-                    size="sm"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Escanear Aceite
-                  </Button>
                 </div>
 
                 {selectedAceite ? (
@@ -234,9 +176,11 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                           <div className="flex flex-wrap gap-2 text-sm">
                             <span className="text-green-700">Código: <span className="font-mono font-medium">{selectedAceite.codigo}</span></span>
                             <span className="text-green-700">Stock: <span className="font-semibold">{selectedAceite.stock}</span></span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedAceite.tipo!)}`}>
-                              {getInventarioLabel(selectedAceite.tipo!)}
-                            </span>
+                            {selectedAceite.tipo && (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedAceite.tipo)}`}>
+                                {getInventarioLabel(selectedAceite.tipo)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -285,9 +229,11 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                                     <span className={`font-medium ${aceite.stock <= 5 ? 'text-red-600' : 'text-green-600'}`}>
                                       Stock: {aceite.stock}
                                     </span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(aceite.tipo!)}`}>
-                                      {getInventarioLabel(aceite.tipo!)}
-                                    </span>
+                                    {aceite.tipo && (
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(aceite.tipo)}`}>
+                                        {getInventarioLabel(aceite.tipo)}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <Scan className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
@@ -330,15 +276,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                       2. Filtro de Aceite *
                     </label>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => openScanner('filtro')}
-                    className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all"
-                    size="sm"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Escanear Filtro
-                  </Button>
                 </div>
 
                 {selectedFiltro ? (
@@ -353,9 +290,11 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                           <div className="flex flex-wrap gap-2 text-sm">
                             <span className="text-green-700">Código: <span className="font-mono font-medium">{selectedFiltro.codigo}</span></span>
                             <span className="text-green-700">Stock: <span className="font-semibold">{selectedFiltro.stock}</span></span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedFiltro.tipo!)}`}>
-                              {getInventarioLabel(selectedFiltro.tipo!)}
-                            </span>
+                            {selectedFiltro.tipo && (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedFiltro.tipo)}`}>
+                                {getInventarioLabel(selectedFiltro.tipo)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -404,9 +343,11 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                                     <span className={`font-medium ${filtro.stock <= 5 ? 'text-red-600' : 'text-green-600'}`}>
                                       Stock: {filtro.stock}
                                     </span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(filtro.tipo!)}`}>
-                                      {getInventarioLabel(filtro.tipo!)}
-                                    </span>
+                                    {filtro.tipo && (
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(filtro.tipo)}`}>
+                                        {getInventarioLabel(filtro.tipo)}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <Scan className="h-5 w-5 text-gray-400 group-hover:text-green-600 transition-colors" />
@@ -498,17 +439,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
           </div>
         </div>
       </Modal>
-
-      {/* Scanner Modal */}
-      <BarcodeScanner
-        isOpen={showScanner}
-        onClose={() => {
-          setShowScanner(false)
-          setScanMode(null)
-        }}
-        onScan={handleBarcodeScanned}
-        title={scanMode === 'aceite' ? 'Escanear Aceite' : 'Escanear Filtro'}
-      />
     </>
   )
 }

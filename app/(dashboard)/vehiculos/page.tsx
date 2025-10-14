@@ -17,7 +17,7 @@ interface Vehiculo {
   placa: string
   marca: string
   modelo: string
-  año?: number
+  anio?: number  // ✅ Cambiado de año a anio
   color?: string
   vin?: string
   motor?: string
@@ -42,7 +42,7 @@ interface VehiculoForm {
   placa: string
   marca: string
   modelo: string
-  año: string
+  anio: string  // ✅ Cambiado de año a anio
   color: string
   vin: string
   motor: string
@@ -78,7 +78,7 @@ export default function VehiculosPage() {
       setValue('placa', editingVehiculo.placa)
       setValue('marca', editingVehiculo.marca)
       setValue('modelo', editingVehiculo.modelo)
-      setValue('año', editingVehiculo.año?.toString() || '')
+      setValue('anio', editingVehiculo.anio?.toString() || '')  // ✅ Cambiado de año a anio
       setValue('color', editingVehiculo.color || '')
       setValue('vin', editingVehiculo.vin || '')
       setValue('motor', editingVehiculo.motor || '')
@@ -262,8 +262,8 @@ export default function VehiculosPage() {
                           <div className="text-sm text-gray-600">
                             {vehiculo.marca} {vehiculo.modelo}
                           </div>
-                          {vehiculo.año && (
-                            <div className="text-xs text-gray-500">Año {vehiculo.año}</div>
+                          {vehiculo.anio && (  // ✅ Cambiado de año a anio
+                            <div className="text-xs text-gray-500">Año {vehiculo.anio}</div>
                           )}
                         </div>
                       </div>
@@ -394,7 +394,7 @@ export default function VehiculosPage() {
                 Año
               </label>
               <Input
-                {...register('año')}
+                {...register('anio')}  // ✅ Cambiado de año a anio
                 type="number"
                 placeholder="2024"
                 min="1900"
