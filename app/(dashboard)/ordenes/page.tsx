@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Search, Eye, Edit, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, Car, User, Calendar, DollarSign, Wrench, FileText, ListFilter as Filter, ChevronDown } from 'lucide-react'
+import { Search, Eye, Edit, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, Car, User, Calendar, Wrench, FileText, ListFilter as Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -51,8 +51,9 @@ export default function OrdenesPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedOrdenId, setSelectedOrdenId] = useState<string | null>(null)
 
-  // Verificar permisos
-  const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
+  // Verificar permisos - Mecánicos ahora pueden ver
+  const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
+  const canEdit = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
 
   useEffect(() => {
     if (hasAccess) {
@@ -84,6 +85,10 @@ export default function OrdenesPage() {
   }
 
   const handleEditOrden = (ordenId: string) => {
+    if (!canEdit) {
+      toast.error('No tienes permisos para editar órdenes')
+      return
+    }
     setSelectedOrdenId(ordenId)
     setShowEditModal(true)
   }
@@ -133,9 +138,7 @@ export default function OrdenesPage() {
   const stats = {
     pendientes: ordenes.filter(o => o.estado === 'PENDIENTE').length,
     enProceso: ordenes.filter(o => o.estado === 'EN_PROCESO').length,
-    completadas: ordenes.filter(o => o.estado === 'COMPLETADO').length,
-    totalVentas: ordenes.reduce((sum, o) => sum + o.total, 0),
-    totalUtilidad: ordenes.reduce((sum, o) => sum + o.utilidad, 0)
+    completadas: ordenes.filter(o => o.estado === 'COMPLETADO').length
   }
 
   if (loading) {
@@ -166,7 +169,7 @@ export default function OrdenesPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-yellow-700">Pendientes</CardTitle>
@@ -197,32 +200,6 @@ export default function OrdenesPage() {
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-xl sm:text-3xl font-bold text-green-800">{stats.completadas}</div>
             <p className="text-xs text-green-600 mt-1">Este período</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-purple-700">Ventas</CardTitle>
-            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-purple-800">
-              ${stats.totalVentas.toLocaleString()}
-            </div>
-            <p className="text-xs text-purple-600 mt-1">Total</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-emerald-700">Utilidad</CardTitle>
-            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-emerald-800">
-              ${stats.totalUtilidad.toLocaleString()}
-            </div>
-            <p className="text-xs text-emerald-600 mt-1">Ganancia</p>
           </CardContent>
         </Card>
       </div>
@@ -290,12 +267,14 @@ export default function OrdenesPage() {
         <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl text-gray-800 flex items-center justify-between">
             <span>Órdenes de Trabajo ({filteredOrdenes.length})</span>
-            <Link href="/ordenes/nueva">
-              <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg">
-                <Wrench className="h-4 w-4 mr-2" />
-                Nueva Orden
-              </Button>
-            </Link>
+            {canEdit && (
+              <Link href="/ordenes/nueva">
+                <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg">
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Nueva Orden
+                </Button>
+              </Link>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -321,10 +300,6 @@ export default function OrdenesPage() {
                     <span><strong>Mecánico:</strong> {orden.mecanico.name}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <DollarSign className="h-4 w-4 text-gray-400" />
-                    <span><strong>Total:</strong> ${orden.total.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     <span><strong>Fecha:</strong> {new Date(orden.fechaCreacion).toLocaleDateString('es-CO')}</span>
                   </div>
@@ -339,15 +314,17 @@ export default function OrdenesPage() {
                     <Eye className="h-4 w-4 mr-1" />
                     Ver
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => handleEditOrden(orden.id)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
+                  {canEdit && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleEditOrden(orden.id)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -363,8 +340,6 @@ export default function OrdenesPage() {
                   <th className="text-left py-4 px-6 font-semibold text-gray-700">Vehículo</th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-700">Estado</th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-700">Mecánico</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Total</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Utilidad</th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-700">Acciones</th>
                 </tr>
               </thead>
@@ -409,12 +384,6 @@ export default function OrdenesPage() {
                       <div className="font-medium text-gray-900">{orden.mecanico.name}</div>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="font-bold text-green-600">${orden.total.toLocaleString()}</div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="font-bold text-emerald-600">${orden.utilidad.toLocaleString()}</div>
-                    </td>
-                    <td className="py-4 px-6">
                       <div className="flex space-x-2">
                         <Button 
                           size="sm" 
@@ -424,14 +393,16 @@ export default function OrdenesPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="hover:bg-green-50"
-                          onClick={() => handleEditOrden(orden.id)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        {canEdit && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="hover:bg-green-50"
+                            onClick={() => handleEditOrden(orden.id)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -449,19 +420,21 @@ export default function OrdenesPage() {
               <p className="text-gray-400 mt-2">
                 {searchTerm ? 'Intenta con otros términos de búsqueda' : 'No hay órdenes para este período'}
               </p>
-              <Link href="/ordenes/nueva">
-                <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Crear Primera Orden
-                </Button>
-              </Link>
+              {canEdit && (
+                <Link href="/ordenes/nueva">
+                  <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Crear Primera Orden
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Modal de Edición */}
-      {selectedOrdenId && (
+      {selectedOrdenId && canEdit && (
         <EditarOrdenModal
           isOpen={showEditModal}
           onClose={() => {

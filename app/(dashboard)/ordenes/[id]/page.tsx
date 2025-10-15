@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, User, Car, Wrench, Package, DollarSign, FileText, Calendar, CreditCard as Edit } from 'lucide-react'
+import { ArrowLeft, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, User, Car, Wrench, Package, DollarSign, FileText, Calendar, CreditCard as Edit, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AnimatedCheckbox as Checkbox } from '@/components/ui/animated-checkbox'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
@@ -38,6 +39,10 @@ export default function OrdenDetallePage() {
   const [orden, setOrden] = useState<OrdenDetalle | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [serviciosCompletados, setServiciosCompletados] = useState<{[key: string]: boolean}>({})
+
+  const canEdit = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
+  const isMecanico = session?.user?.role === 'MECANICO'
 
   useEffect(() => {
     if (params.id) {
@@ -51,6 +56,13 @@ export default function OrdenDetallePage() {
       if (response.ok) {
         const data = await response.json()
         setOrden(data)
+        
+        // Inicializar estado de servicios completados
+        const completados: {[key: string]: boolean} = {}
+        data.servicios.forEach((s: any) => {
+          completados[s.id] = s.completado || false
+        })
+        setServiciosCompletados(completados)
       } else {
         toast.error('Error al cargar orden')
       }
@@ -90,6 +102,30 @@ export default function OrdenDetallePage() {
       toast.error('Error al actualizar estado')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const toggleServicioCompletado = async (servicioId: string) => {
+    try {
+      const nuevoEstado = !serviciosCompletados[servicioId]
+      
+      const response = await fetch(`/api/ordenes/servicios/${servicioId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completado: nuevoEstado })
+      })
+
+      if (response.ok) {
+        setServiciosCompletados({
+          ...serviciosCompletados,
+          [servicioId]: nuevoEstado
+        })
+        toast.success(nuevoEstado ? 'Servicio marcado como completado' : 'Servicio marcado como pendiente')
+      } else {
+        toast.error('Error al actualizar servicio')
+      }
+    } catch (error) {
+      toast.error('Error al actualizar servicio')
     }
   }
 
@@ -157,17 +193,19 @@ export default function OrdenDetallePage() {
         </div>
         <div className="flex items-center space-x-3">
           {getEstadoBadge(orden.estado)}
-          <Link href={`/ordenes/${orden.id}/edit`}>
-            <Button variant="outline">
-              <Edit className="h-4 w-4 mr-2" />
-              Editar
-            </Button>
-          </Link>
+          {canEdit && (
+            <Link href={`/ordenes/${orden.id}/edit`}>
+              <Button variant="outline">
+                <Edit className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
       {/* Estado Actions */}
-      {orden.estado !== 'COMPLETADO' && orden.estado !== 'CANCELADO' && (
+      {canEdit && orden.estado !== 'COMPLETADO' && orden.estado !== 'CANCELADO' && (
         <Card>
           <CardHeader>
             <CardTitle>Cambiar Estado</CardTitle>
@@ -286,21 +324,58 @@ export default function OrdenDetallePage() {
         </Card>
       </div>
 
-      {/* Servicios */}
+      {/* Servicios con Checklist */}
       {orden.servicios.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Wrench className="h-5 w-5 text-green-600" />
-              <span>Servicios</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Wrench className="h-5 w-5 text-green-600" />
+                <span>Servicios</span>
+              </div>
+              <div className="text-sm text-gray-600">
+                {Object.values(serviciosCompletados).filter(Boolean).length} de {orden.servicios.length} completados
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {orden.servicios.map((servicio: any) => (
-                <div key={servicio.id} className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                  <span className="font-medium">{servicio.descripcion}</span>
-                  <span className="font-bold text-green-600">${servicio.precio.toLocaleString()}</span>
+                <div 
+                  key={servicio.id} 
+                  className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                    serviciosCompletados[servicio.id]
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3 flex-1">
+                    <Checkbox
+                      checked={serviciosCompletados[servicio.id] || false}
+                      onCheckedChange={() => toggleServicioCompletado(servicio.id)}
+                      className="h-5 w-5"
+                    />
+                    <div className="flex-1">
+                      <span className={`font-medium ${
+                        serviciosCompletados[servicio.id] 
+                          ? 'text-green-800 line-through' 
+                          : 'text-gray-900'
+                      }`}>
+                        {servicio.descripcion}
+                      </span>
+                      {serviciosCompletados[servicio.id] && (
+                        <div className="flex items-center mt-1">
+                          <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
+                          <span className="text-xs text-green-600 font-medium">Completado</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!isMecanico && (
+                    <span className="font-bold text-green-600 ml-4">
+                      ${servicio.precio.toLocaleString()}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -324,8 +399,12 @@ export default function OrdenDetallePage() {
                   <tr>
                     <th className="text-left py-2 px-4 font-medium text-gray-700">Producto</th>
                     <th className="text-left py-2 px-4 font-medium text-gray-700">Cantidad</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Precio Unit.</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Subtotal</th>
+                    {!isMecanico && (
+                      <>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Precio Unit.</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Subtotal</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -338,12 +417,16 @@ export default function OrdenDetallePage() {
                         </div>
                       </td>
                       <td className="py-3 px-4 font-medium">{detalle.cantidad}</td>
-                      <td className="py-3 px-4 font-medium text-blue-600">
-                        ${detalle.precioUnitario.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-blue-600">
-                        ${detalle.subtotal.toLocaleString()}
-                      </td>
+                      {!isMecanico && (
+                        <>
+                          <td className="py-3 px-4 font-medium text-blue-600">
+                            ${detalle.precioUnitario.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-blue-600">
+                            ${detalle.subtotal.toLocaleString()}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -368,10 +451,16 @@ export default function OrdenDetallePage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left py-2 px-4 font-medium text-gray-700">Repuesto</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Proveedor</th>
+                    {!isMecanico && (
+                      <th className="text-left py-2 px-4 font-medium text-gray-700">Proveedor</th>
+                    )}
                     <th className="text-left py-2 px-4 font-medium text-gray-700">Cantidad</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Precio Unit.</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Subtotal</th>
+                    {!isMecanico && (
+                      <>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Precio Unit.</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Subtotal</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -385,14 +474,20 @@ export default function OrdenDetallePage() {
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{repuesto.proveedor}</td>
+                      {!isMecanico && (
+                        <td className="py-3 px-4 text-sm text-gray-600">{repuesto.proveedor}</td>
+                      )}
                       <td className="py-3 px-4 font-medium">{repuesto.cantidad}</td>
-                      <td className="py-3 px-4 font-medium text-orange-600">
-                        ${repuesto.precioUnitario.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-orange-600">
-                        ${repuesto.subtotal.toLocaleString()}
-                      </td>
+                      {!isMecanico && (
+                        <>
+                          <td className="py-3 px-4 font-medium text-orange-600">
+                            ${repuesto.precioUnitario.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-orange-600">
+                            ${repuesto.subtotal.toLocaleString()}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -402,60 +497,62 @@ export default function OrdenDetallePage() {
         </Card>
       )}
 
-      {/* Totales */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <DollarSign className="h-5 w-5 text-purple-600" />
-            <span>Resumen Financiero</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">Servicios</div>
-              <div className="text-xl font-bold text-green-600">
-                ${orden.subtotalServicios.toLocaleString()}
-              </div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">Productos</div>
-              <div className="text-xl font-bold text-blue-600">
-                ${orden.subtotalProductos.toLocaleString()}
-              </div>
-            </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">Repuestos Ext.</div>
-              <div className="text-xl font-bold text-orange-600">
-                ${orden.subtotalRepuestosExternos.toLocaleString()}
-              </div>
-            </div>
-            {orden.manoDeObra > 0 && (
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-sm text-gray-600 mb-1">Mano de Obra</div>
-                <div className="text-xl font-bold text-purple-600">
-                  ${orden.manoDeObra.toLocaleString()}
+      {/* Totales - Solo para Admin */}
+      {!isMecanico && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <DollarSign className="h-5 w-5 text-purple-600" />
+              <span>Resumen Financiero</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-sm text-gray-600 mb-1">Servicios</div>
+                <div className="text-xl font-bold text-green-600">
+                  ${orden.subtotalServicios.toLocaleString()}
                 </div>
               </div>
-            )}
-          </div>
-          
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <div className="flex justify-between items-center text-lg">
-              <span className="font-semibold text-gray-700">Total:</span>
-              <span className="text-2xl font-bold text-purple-600">
-                ${orden.total.toLocaleString()}
-              </span>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-sm text-gray-600 mb-1">Productos</div>
+                <div className="text-xl font-bold text-blue-600">
+                  ${orden.subtotalProductos.toLocaleString()}
+                </div>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-sm text-gray-600 mb-1">Repuestos Ext.</div>
+                <div className="text-xl font-bold text-orange-600">
+                  ${orden.subtotalRepuestosExternos.toLocaleString()}
+                </div>
+              </div>
+              {orden.manoDeObra > 0 && (
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <div className="text-sm text-gray-600 mb-1">Mano de Obra</div>
+                  <div className="text-xl font-bold text-purple-600">
+                    ${orden.manoDeObra.toLocaleString()}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex justify-between items-center text-sm mt-2">
-              <span className="text-gray-600">Utilidad:</span>
-              <span className="font-bold text-green-600">
-                ${orden.utilidad.toLocaleString()}
-              </span>
+            
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center text-lg">
+                <span className="font-semibold text-gray-700">Total:</span>
+                <span className="text-2xl font-bold text-purple-600">
+                  ${orden.total.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-2">
+                <span className="text-gray-600">Utilidad:</span>
+                <span className="font-bold text-green-600">
+                  ${orden.utilidad.toLocaleString()}
+                </span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

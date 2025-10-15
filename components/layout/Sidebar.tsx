@@ -107,7 +107,7 @@ const menuItems: MenuItem[] = [
     icon: Stethoscope,
     roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'],
     children: [
-      { title: 'Órdenes Activas', href: '/ordenes', icon: ClipboardCheck, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
+      { title: 'Órdenes Activas', href: '/ordenes', icon: ClipboardCheck, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] },
       { title: 'Nueva Orden', href: '/ordenes/nueva', icon: Plus, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Historial', href: '/ordenes/historial', icon: History, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Clientes', href: '/clientes', icon: Users, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
