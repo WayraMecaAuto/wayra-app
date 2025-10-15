@@ -8,8 +8,8 @@ import Link from 'next/link'
 interface Orden {
   id: string
   numeroOrden: string
+  clienteId: string
   cliente: {
-    id: string
     nombre: string
     numeroDocumento: string
     email: string | null
@@ -92,13 +92,12 @@ export default function NuevaFacturaPage() {
       setGeneratingFactura(true)
       
       console.log('🔍 Orden seleccionada completa:', selectedOrden)
-      console.log('🔍 Cliente de la orden:', selectedOrden.cliente)
-      console.log('🔍 ID del cliente:', selectedOrden.cliente?.id)
+      console.log('🔍 Cliente ID de la orden:', selectedOrden.clienteId)
 
       // Verificar que tenemos el clienteId
-      if (!selectedOrden.cliente?.id) {
+      if (!selectedOrden.clienteId) {
         alert('Error: No se pudo obtener el ID del cliente de la orden')
-        console.error('❌ selectedOrden.cliente.id está undefined')
+        console.error('❌ selectedOrden.clienteId está undefined')
         console.error('Orden completa:', JSON.stringify(selectedOrden, null, 2))
         return
       }
@@ -117,7 +116,7 @@ export default function NuevaFacturaPage() {
 
       const facturaData = {
         ordenId: selectedOrden.id,
-        clienteId: selectedOrden.cliente.id,
+        clienteId: selectedOrden.clienteId, // Usar clienteId directamente de la orden
         subtotal: subtotalTotal,
         iva: iva,
         total: total,
