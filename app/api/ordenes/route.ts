@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     // Verificar permisos
-    const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+    const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER", 'MECANICO'].includes(
       session?.user?.role || ""
     );
     if (!session || !hasAccess) {

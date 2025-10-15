@@ -112,14 +112,14 @@ export default function UsuariosPage() {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'SUPER_USUARIO': return 'bg-blue-600 text-white'
-      case 'ADMIN_WAYRA_TALLER': return 'bg-blue-500 text-white'
-      case 'ADMIN_WAYRA_PRODUCTOS': return 'bg-blue-400 text-white'
-      case 'ADMIN_TORNI_REPUESTOS': return 'bg-indigo-500 text-white'
-      case 'MECANICO': return 'bg-slate-500 text-white'
-      case 'VENDEDOR_WAYRA': return 'bg-cyan-500 text-white'
-      case 'VENDEDOR_TORNI': return 'bg-sky-500 text-white'
-      default: return 'bg-gray-500 text-white'
+      case 'SUPER_USUARIO': return 'bg-blue-500 text-white hover:bg-blue-800'
+      case 'ADMIN_WAYRA_TALLER': return 'bg-gray-400 text-white hover:bg-gray-600'
+      case 'ADMIN_WAYRA_PRODUCTOS': return 'bg-purple-500 text-white hover:bg-purple-800'
+      case 'ADMIN_TORNI_REPUESTOS': return 'bg-indigo-500 text-white hover:bg-indigo-800'
+      case 'MECANICO': return 'bg-slate-500 text-white hover:bg-slate-800'
+      case 'VENDEDOR_WAYRA': return 'bg-cyan-500 text-white hover:bg-cyan-700'
+      case 'VENDEDOR_TORNI': return 'bg-sky-500 text-white hover:bg-sky-700'
+      default: return 'bg-gray-500 text-white hover:bg-blue-800'
     }
   }
 
@@ -351,8 +351,8 @@ export default function UsuariosPage() {
                         <Badge 
                           className={`rounded-full px-3 py-1 shadow-sm hover:shadow-md transition-all duration-300 ${
                             user.isActive 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-red-500 text-white'
+                              ? 'bg-green-500 text-white hover:bg-green-700' 
+                              : 'bg-red-500 text-white hover:bg-red-700'
                           }`}
                         >
                           {user.isActive ? 'Activo' : 'Inactivo'}

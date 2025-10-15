@@ -10,7 +10,7 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
+    const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
     if (!session || !hasAccess) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }

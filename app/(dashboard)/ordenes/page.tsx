@@ -104,7 +104,7 @@ export default function OrdenesPage() {
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case 'PENDIENTE':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-400">
           <Clock className="h-3 w-3 mr-1" />
           Pendiente
         </Badge>
@@ -114,12 +114,12 @@ export default function OrdenesPage() {
           En Proceso
         </Badge>
       case 'COMPLETADO':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">
+        return <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-400">
           <CheckCircle className="h-3 w-3 mr-1" />
           Completado
         </Badge>
       case 'CANCELADO':
-        return <Badge className="bg-red-100 text-red-800 border-red-300">
+        return <Badge className="bg-red-100 text-red-800 border-red-300 hover:bg-red-400">
           <AlertTriangle className="h-3 w-3 mr-1" />
           Cancelado
         </Badge>
