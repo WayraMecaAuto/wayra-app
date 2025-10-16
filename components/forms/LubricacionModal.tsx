@@ -79,7 +79,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
     }
   }
 
-
   const handleSubmit = () => {
     if (!selectedAceite || !selectedFiltro) {
       toast.error('Debes seleccionar tanto el aceite como el filtro')
@@ -88,7 +87,6 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
 
     onAdd(selectedAceite.id, selectedFiltro.id)
     handleClose()
-    toast.success('Servicio de lubricación agregado correctamente')
   }
 
   const handleClose = () => {
@@ -121,6 +119,11 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
     return 'bg-purple-100 text-purple-700'
   }
 
+  const calcularPrecioTotal = () => {
+    if (!selectedAceite || !selectedFiltro) return 0
+    return selectedAceite.precioVenta + selectedFiltro.precioVenta
+  }
+
   return (
     <>
       <Modal isOpen={isOpen} onClose={handleClose} title="Servicio de Lubricación" size="lg">
@@ -135,7 +138,7 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                 <h4 className="font-bold text-blue-900 mb-2 text-lg">Servicio de Lubricación</h4>
                 <p className="text-sm text-blue-700 leading-relaxed">
                   Selecciona el <span className="font-semibold">aceite</span> y el <span className="font-semibold">filtro de aceite</span> específicos que se utilizarán en este servicio.
-                  Selecciónalos manualmente del inventario disponible.
+                  El precio del servicio será la suma de ambos productos.
                 </p>
               </div>
             </div>
@@ -176,6 +179,7 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                           <div className="flex flex-wrap gap-2 text-sm">
                             <span className="text-green-700">Código: <span className="font-mono font-medium">{selectedAceite.codigo}</span></span>
                             <span className="text-green-700">Stock: <span className="font-semibold">{selectedAceite.stock}</span></span>
+                            <span className="text-green-700 font-bold">Precio: ${selectedAceite.precioVenta.toLocaleString()}</span>
                             {selectedAceite.tipo && (
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedAceite.tipo)}`}>
                                 {getInventarioLabel(selectedAceite.tipo)}
@@ -228,6 +232,9 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                                     </span>
                                     <span className={`font-medium ${aceite.stock <= 5 ? 'text-red-600' : 'text-green-600'}`}>
                                       Stock: {aceite.stock}
+                                    </span>
+                                    <span className="font-bold text-blue-600">
+                                      ${aceite.precioVenta.toLocaleString()}
                                     </span>
                                     {aceite.tipo && (
                                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(aceite.tipo)}`}>
@@ -290,6 +297,7 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                           <div className="flex flex-wrap gap-2 text-sm">
                             <span className="text-green-700">Código: <span className="font-mono font-medium">{selectedFiltro.codigo}</span></span>
                             <span className="text-green-700">Stock: <span className="font-semibold">{selectedFiltro.stock}</span></span>
+                            <span className="text-green-700 font-bold">Precio: ${selectedFiltro.precioVenta.toLocaleString()}</span>
                             {selectedFiltro.tipo && (
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(selectedFiltro.tipo)}`}>
                                 {getInventarioLabel(selectedFiltro.tipo)}
@@ -343,6 +351,9 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                                     <span className={`font-medium ${filtro.stock <= 5 ? 'text-red-600' : 'text-green-600'}`}>
                                       Stock: {filtro.stock}
                                     </span>
+                                    <span className="font-bold text-green-600">
+                                      ${filtro.precioVenta.toLocaleString()}
+                                    </span>
                                     {filtro.tipo && (
                                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getInventarioColor(filtro.tipo)}`}>
                                         {getInventarioLabel(filtro.tipo)}
@@ -369,7 +380,7 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                 )}
               </div>
 
-              {/* Resumen de selección */}
+              {/* Resumen de selección con precio total */}
               {selectedAceite && selectedFiltro && (
                 <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 border-2 border-green-300 rounded-xl p-5 shadow-md">
                   <div className="flex items-start space-x-3">
@@ -384,14 +395,24 @@ export function LubricacionModal({ isOpen, onClose, onAdd }: LubricacionModalPro
                             <Droplets className="h-4 w-4 text-blue-600" />
                             <span className="font-medium text-gray-700">Aceite:</span>
                           </div>
-                          <span className="font-semibold text-gray-900">{selectedAceite.nombre}</span>
+                          <div className="text-right">
+                            <div className="font-semibold text-gray-900">{selectedAceite.nombre}</div>
+                            <div className="text-sm text-blue-600 font-bold">${selectedAceite.precioVenta.toLocaleString()}</div>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
                           <div className="flex items-center space-x-2">
                             <Filter className="h-4 w-4 text-green-600" />
                             <span className="font-medium text-gray-700">Filtro:</span>
                           </div>
-                          <span className="font-semibold text-gray-900">{selectedFiltro.nombre}</span>
+                          <div className="text-right">
+                            <div className="font-semibold text-gray-900">{selectedFiltro.nombre}</div>
+                            <div className="text-sm text-green-600 font-bold">${selectedFiltro.precioVenta.toLocaleString()}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-4 border-2 border-green-300 mt-3">
+                          <span className="font-bold text-green-900 text-lg">Precio Total del Servicio:</span>
+                          <span className="text-2xl font-bold text-green-700">${calcularPrecioTotal().toLocaleString()}</span>
                         </div>
                       </div>
                     </div>

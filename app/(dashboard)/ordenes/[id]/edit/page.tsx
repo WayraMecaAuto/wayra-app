@@ -8,6 +8,7 @@ import { ArrowLeft, Save, RefreshCw, Plus, Trash2, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { LubricacionModal } from '@/components/forms/LubricacionModal'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
@@ -23,6 +24,7 @@ interface ServicioEditable {
   descripcion: string
   precio: number
   isNew?: boolean
+  requiereLubricacion?: boolean
 }
 
 export default function EditOrdenPage() {
@@ -35,6 +37,8 @@ export default function EditOrdenPage() {
   const [serviciosOrden, setServiciosOrden] = useState<ServicioEditable[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showLubricacionModal, setShowLubricacionModal] = useState(false)
+  const [servicioLubricacionTemp, setServicioLubricacionTemp] = useState<any>(null)
 
   const canEdit = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
   const canEditServicios = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
@@ -94,22 +98,65 @@ export default function EditOrdenPage() {
       const response = await fetch('/api/servicios-taller')
       if (response.ok) {
         const data = await response.json()
-        setServiciosDisponibles(data)
+        setServiciosDisponibles(data.map((s: any) => ({
+          ...s,
+          requiereLubricacion: s.clave === 'SERVICIO_LUBRICACION'
+        })))
       }
     } catch (error) {
       console.error('Error fetching servicios:', error)
     }
   }
 
-  const agregarServicio = (servicio: any) => {
-    const nuevoServicio: ServicioEditable = {
-      clave: servicio.clave,
-      descripcion: servicio.descripcion,
-      precio: parseFloat(servicio.valor),
-      isNew: true
+  const agregarServicio = async (servicio: any) => {
+    if (servicio.requiereLubricacion) {
+      setServicioLubricacionTemp(servicio)
+      setShowLubricacionModal(true)
+    } else {
+      const nuevoServicio: ServicioEditable = {
+        clave: servicio.clave,
+        descripcion: servicio.descripcion,
+        precio: parseFloat(servicio.valor),
+        isNew: true
+      }
+      setServiciosOrden([...serviciosOrden, nuevoServicio])
+      toast.success('Servicio agregado')
     }
-    setServiciosOrden([...serviciosOrden, nuevoServicio])
-    toast.success('Servicio agregado')
+  }
+
+  const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
+    if (!servicioLubricacionTemp) return
+
+    try {
+      const [aceiteResponse, filtroResponse] = await Promise.all([
+        fetch(`/api/productos/${aceiteId}`),
+        fetch(`/api/productos/${filtroId}`)
+      ])
+
+      if (aceiteResponse.ok && filtroResponse.ok) {
+        const aceite = await aceiteResponse.json()
+        const filtro = await filtroResponse.json()
+        
+        const precioTotal = aceite.precioVenta + filtro.precioVenta
+        const descripcion = `${servicioLubricacionTemp.descripcion} (${aceite.nombre} + ${filtro.nombre})`
+
+        const nuevoServicio: ServicioEditable = {
+          clave: servicioLubricacionTemp.clave,
+          descripcion,
+          precio: precioTotal,
+          isNew: true
+        }
+
+        setServiciosOrden([...serviciosOrden, nuevoServicio])
+        toast.success('Servicio de lubricación agregado')
+      } else {
+        toast.error('Error al obtener los precios de los productos')
+      }
+    } catch (error) {
+      toast.error('Error al agregar servicio')
+    } finally {
+      setServicioLubricacionTemp(null)
+    }
   }
 
   const removerServicio = (index: number) => {
@@ -284,7 +331,14 @@ export default function EditOrdenPage() {
                     >
                       <div className="flex-1">
                         <div className="font-medium text-gray-900">{servicio.descripcion}</div>
-                        <div className="text-sm text-gray-500">${parseFloat(servicio.valor).toLocaleString()}</div>
+                        {!servicio.requiereLubricacion && (
+                          <div className="text-sm text-gray-500">${parseFloat(servicio.valor).toLocaleString()}</div>
+                        )}
+                        {servicio.requiereLubricacion && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            Precio según productos seleccionados
+                          </div>
+                        )}
                       </div>
                       <Button
                         type="button"
@@ -385,6 +439,16 @@ export default function EditOrdenPage() {
           </Button>
         </div>
       </form>
+
+      {/* Modal de lubricación */}
+      <LubricacionModal
+        isOpen={showLubricacionModal}
+        onClose={() => {
+          setShowLubricacionModal(false)
+          setServicioLubricacionTemp(null)
+        }}
+        onAdd={handleLubricacionAdded}
+      />
     </div>
   )
 }

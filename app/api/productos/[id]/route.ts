@@ -4,6 +4,46 @@ import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
 import { calculatePrices } from '@/lib/pricing'
 
+// ✅ AGREGAR ESTE MÉTODO GET
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    const producto = await prisma.producto.findUnique({
+      where: { id },
+      include: {
+        movimientos: {
+          take: 5,
+          orderBy: { fecha: 'desc' },
+          include: {
+            usuario: {
+              select: { name: true }
+            }
+          }
+        }
+      }
+    })
+
+    if (!producto) {
+      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json(producto)
+  } catch (error) {
+    console.error('Error fetching producto:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
