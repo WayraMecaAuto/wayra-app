@@ -61,20 +61,99 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
+    // Separar servicios del resto de datos
+    const { servicios, ...ordenData } = body
+
+    // Si hay servicios para actualizar
+    if (servicios && Array.isArray(servicios)) {
+      // Obtener servicios actuales
+      const serviciosActuales = await prisma.servicioOrden.findMany({
+        where: { ordenId: id }
+      })
+
+      // Identificar servicios nuevos y existentes
+      const serviciosNuevos = servicios.filter((s: any) => s.isNew && !s.id)
+      const serviciosExistentes = servicios.filter((s: any) => !s.isNew && s.id)
+
+      // IDs de servicios que deben permanecer
+      const idsServiciosActualizados = serviciosExistentes.map((s: any) => s.id)
+      
+      // Eliminar servicios que ya no están en la lista
+      const serviciosAEliminar = serviciosActuales
+        .filter(s => !idsServiciosActualizados.includes(s.id))
+        .map(s => s.id)
+
+      if (serviciosAEliminar.length > 0) {
+        await prisma.servicioOrden.deleteMany({
+          where: {
+            id: { in: serviciosAEliminar }
+          }
+        })
+      }
+
+      // Actualizar servicios existentes (por si cambió el precio)
+      for (const servicio of serviciosExistentes) {
+        await prisma.servicioOrden.update({
+          where: { id: servicio.id },
+          data: {
+            descripcion: servicio.descripcion,
+            precio: parseFloat(servicio.precio)
+          }
+        })
+      }
+
+      // Crear nuevos servicios
+      if (serviciosNuevos.length > 0) {
+        await prisma.servicioOrden.createMany({
+          data: serviciosNuevos.map((s: any) => ({
+            descripcion: s.descripcion,
+            precio: parseFloat(s.precio),
+            aplicaIva: false,
+            ordenId: id
+          }))
+        })
+      }
+
+      // Recalcular totales
+      const todosLosServicios = await prisma.servicioOrden.findMany({
+        where: { ordenId: id }
+      })
+      
+      const subtotalServicios = todosLosServicios.reduce((sum, s) => sum + s.precio, 0)
+      ordenData.subtotalServicios = subtotalServicios
+      
+      // Obtener productos y repuestos para calcular total
+      const detalles = await prisma.detalleOrden.findMany({
+        where: { ordenId: id }
+      })
+      const repuestos = await prisma.repuestoExterno.findMany({
+        where: { ordenId: id }
+      })
+      
+      const subtotalProductos = detalles.reduce((sum, d) => sum + d.subtotal, 0)
+      const subtotalRepuestos = repuestos.reduce((sum, r) => sum + r.subtotal, 0)
+      
+      ordenData.subtotalProductos = subtotalProductos
+      ordenData.subtotalRepuestosExternos = subtotalRepuestos
+      ordenData.total = subtotalServicios + subtotalProductos + subtotalRepuestos + (ordenData.manoDeObra || 0)
+    }
+
+    // Actualizar la orden
     const orden = await prisma.ordenServicio.update({
       where: { id },
-      data: body,
+      data: ordenData,
       include: {
         cliente: true,
         vehiculo: true,
         mecanico: {
           select: { name: true }
-        }
+        },
+        servicios: true
       }
     })
 
     // Si se marca como completada, registrar ingreso en contabilidad
-    if (body.estado === 'COMPLETADO' && body.estado !== orden.estado) {
+    if (ordenData.estado === 'COMPLETADO' && ordenData.estado !== orden.estado) {
       // Registrar en contabilidad Wayra
       await prisma.movimientoContable.create({
         data: {
@@ -87,7 +166,7 @@ export async function PATCH(
           referencia: orden.id,
           usuarioId: session.user.id
         }
-      });
+      })
       
       // Registrar en contabilidad Tornirepuestos si hay productos
       if (orden.subtotalProductos > 0) {
@@ -102,7 +181,7 @@ export async function PATCH(
             referencia: orden.id,
             usuarioId: session.user.id
           }
-        });
+        })
       }
     }
 

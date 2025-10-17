@@ -54,21 +54,22 @@ enum TipoPrecio {
 
 // Modelos principales
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String
-  password      String
-  role          UserRole @default(MECANICO)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastLogin     DateTime?
+  id             String                 @id @default(cuid())
+  email          String                 @unique
+  name           String
+  password       String
+  role           UserRole               @default(MECANICO)
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  lastLogin      DateTime?
 
   // Relaciones
-  ordenes       OrdenServicio[]
-  movimientos   MovimientoInventario[]
+  ordenes        OrdenServicio[]
+  movimientos    MovimientoInventario[]
   notificaciones NotificacionUsuario[]
-  
+  movimientosContables MovimientoContable[]  // 👈 Agrega esta línea
+
   @@map("users")
 }
 
@@ -253,6 +254,7 @@ model ServicioOrden {
   descripcion String
   precio      Float
   aplicaIva   Boolean       @default(false) // Los servicios NO aplican IVA
+  completado  Boolean       @default(false) // Estado de completitud del servicio
 
   // Para servicios específicos que requieren productos
   aceiteId    String?       // ID del aceite usado (para lubricación)

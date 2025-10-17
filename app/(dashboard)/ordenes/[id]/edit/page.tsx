@@ -116,11 +116,11 @@ export default function EditOrdenPage() {
       const nuevoServicio: ServicioEditable = {
         clave: servicio.clave,
         descripcion: servicio.descripcion,
-        precio: parseFloat(servicio.valor),
+        precio: parseFloat(servicio.valor), // Precio inicial del catálogo
         isNew: true
       }
       setServiciosOrden([...serviciosOrden, nuevoServicio])
-      toast.success('Servicio agregado')
+      toast.success('Servicio agregado - Puedes editar el precio')
     }
   }
 
@@ -143,12 +143,12 @@ export default function EditOrdenPage() {
         const nuevoServicio: ServicioEditable = {
           clave: servicioLubricacionTemp.clave,
           descripcion,
-          precio: precioTotal,
+          precio: precioTotal, // Precio inicial calculado
           isNew: true
         }
 
         setServiciosOrden([...serviciosOrden, nuevoServicio])
-        toast.success('Servicio de lubricación agregado')
+        toast.success('Servicio de lubricación agregado - Puedes editar el precio')
       } else {
         toast.error('Error al obtener los precios de los productos')
       }
@@ -180,7 +180,7 @@ export default function EditOrdenPage() {
       // Preparar datos según el rol
       const updateData: any = {
         descripcion: data.descripcion,
-        servicios: serviciosOrden
+        servicios: serviciosOrden // Enviar los servicios con sus precios editados
       }
 
       // Solo admin puede cambiar mecánico y mano de obra
@@ -332,7 +332,9 @@ export default function EditOrdenPage() {
                       <div className="flex-1">
                         <div className="font-medium text-gray-900">{servicio.descripcion}</div>
                         {!servicio.requiereLubricacion && (
-                          <div className="text-sm text-gray-500">${parseFloat(servicio.valor).toLocaleString()}</div>
+                          <div className="text-sm text-gray-500">
+                            Precio base: ${parseFloat(servicio.valor).toLocaleString()}
+                          </div>
                         )}
                         {servicio.requiereLubricacion && (
                           <div className="text-xs text-blue-600 mt-1">
@@ -344,7 +346,6 @@ export default function EditOrdenPage() {
                         type="button"
                         size="sm"
                         onClick={() => agregarServicio(servicio)}
-                        disabled={serviciosOrden.some(s => s.clave === servicio.clave && !s.isNew)}
                         className="bg-green-600 hover:bg-green-700 ml-2"
                       >
                         <Plus className="h-4 w-4" />
@@ -368,7 +369,7 @@ export default function EditOrdenPage() {
                           servicio.isNew ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="font-medium text-gray-900 mb-2">
                               {servicio.descripcion}
@@ -378,19 +379,29 @@ export default function EditOrdenPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center space-x-3">
-                              <label className="text-sm text-gray-600">Precio:</label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={servicio.precio}
-                                onChange={(e) => actualizarPrecioServicio(index, parseFloat(e.target.value) || 0)}
-                                className="w-32 h-9"
-                              />
-                              <span className="text-sm font-semibold text-green-600">
-                                ${servicio.precio.toLocaleString()}
-                              </span>
+                            <div className="space-y-2">
+                              <div>
+                                <label className="text-sm text-gray-600 block mb-1">
+                                  Precio para esta orden:
+                                </label>
+                                <div className="flex items-center space-x-3">
+                                  <span className="text-sm text-gray-500">$</span>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={servicio.precio}
+                                    onChange={(e) => actualizarPrecioServicio(index, parseFloat(e.target.value) || 0)}
+                                    className="w-40 h-9 text-base font-semibold"
+                                  />
+                                  <span className="text-base font-bold text-green-600">
+                                    ${servicio.precio.toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  💡 Este precio solo aplica para esta orden específica
+                                </p>
+                              </div>
                             </div>
                           </div>
                           <Button
