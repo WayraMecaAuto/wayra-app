@@ -8,7 +8,7 @@ import {
   Home, Package, Users, Settings, ChevronRight, X,
   ChevronLeft, Plus, History, Filter, Droplets, Car, Bolt,
   FileText, ClipboardCheck, Wrench, Calculator, TrendingUp, DollarSign,
-  PieChart, Building, Stethoscope, BarChart3, Activity
+  PieChart, Building, Stethoscope, BarChart3, Activity, Briefcase
 } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
@@ -41,7 +41,7 @@ const menuItems: MenuItem[] = [
     roles: ['SUPER_USUARIO']
   },
   {
-    title: 'Wayra',
+    title: 'Wayra Productos',
     icon: Package,
     logo: '/images/WayraLogo.png',
     roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA', 'ADMIN_WAYRA_TALLER'],
@@ -65,9 +65,9 @@ const menuItems: MenuItem[] = [
         roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS']
       },
       { 
-        title: 'Contabilidad', 
-        href: '/wayra/contabilidad', 
-        icon: Calculator,
+        title: 'Contabilidad Wayra', 
+        href: '/contabilidad/wayra-productos', 
+        icon: DollarSign,
         roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS']
       }
     ]
@@ -95,16 +95,16 @@ const menuItems: MenuItem[] = [
         roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS']
       },
       { 
-        title: 'Contabilidad', 
-        href: '/tornirepuestos/contabilidad', 
-        icon: DollarSign,
+        title: 'Contabilidad TorniRepuestos', 
+        href: '/contabilidad/torni-repuestos', 
+        icon: Briefcase,
         roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS']
       }
     ]
   },
   {
     title: 'Wayra Taller',
-    icon: Stethoscope,
+    icon: Car,
     roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'],
     children: [
       { title: 'Órdenes Activas', href: '/ordenes', icon: ClipboardCheck, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] },
@@ -114,7 +114,13 @@ const menuItems: MenuItem[] = [
       { title: 'Vehículos', href: '/vehiculos', icon: Car, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Facturación', href: '/facturacion', icon: FileText, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Config. Servicios', href: '/taller/configuracion', icon: Settings, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
-      { title: 'Reportes Mecánicos', href: '/reportes/mecanicos', icon: PieChart, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] }
+      { title: 'Reportes Mecánicos', href: '/reportes/mecanicos', icon: PieChart, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] },
+      { 
+        title: 'Contabilidad Taller', 
+        href: '/contabilidad/wayra-taller', 
+        icon: Calculator,
+        roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER']
+      }
     ]
   },
   {
@@ -143,7 +149,6 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
     pathname.startsWith(child.href || '')
   )
 
-  // Verificar permisos de rol
   if (item.roles && !item.roles.includes(session?.user?.role || '')) {
     return null
   }
@@ -151,7 +156,6 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
   const handleClick = () => {
     if (item.children) {
       setIsExpanded(!isExpanded)
-      // Si está colapsado, capturar la posición del botón al hacer click
       if (isCollapsed && buttonRef[0]) {
         const rect = buttonRef[0].getBoundingClientRect()
         setButtonRect(rect)
@@ -187,7 +191,6 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
   }
 
   if (item.children) {
-    // Filtrar hijos según permisos
     const visibleChildren = item.children.filter(child => 
       !child.roles || child.roles.includes(session?.user?.role || '')
     )
@@ -241,7 +244,6 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
           )}
         </button>
 
-        {/* Tooltip para sidebar colapsado - Solo si no está expandido */}
         {isCollapsed && showTooltip && !isExpanded && buttonRect && typeof window !== 'undefined' && (
           <div 
             className="fixed z-[9999] px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap shadow-xl pointer-events-none"
@@ -255,7 +257,6 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
           </div>
         )}
 
-        {/* Submenú expandido */}
         {isExpanded && !isCollapsed && (
           <div className="space-y-1 ml-6 border-l-2 border-blue-200 pl-4 animate-in slide-in-from-top-2 duration-200">
             {visibleChildren.map((child, index) => (
@@ -264,10 +265,8 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
           </div>
         )}
 
-        {/* Submenú para sidebar colapsado - Se mantiene abierto al hacer click */}
         {isCollapsed && isExpanded && buttonRect && typeof window !== 'undefined' && (
           <>
-            {/* Backdrop transparente para cerrar al hacer click fuera */}
             <div 
               className="fixed inset-0 z-[9998]"
               onClick={() => {
@@ -357,7 +356,6 @@ function MenuItem({ item, level = 0, isCollapsed, onItemClick }: {
         </div>
       </Link>
 
-      {/* Tooltip para sidebar colapsado */}
       {isCollapsed && showTooltip && buttonRect && typeof window !== 'undefined' && (
         <div 
           className="fixed z-[9999] px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap shadow-xl pointer-events-none"
@@ -393,7 +391,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity lg:hidden z-20"
@@ -401,14 +398,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         />
       )}
       
-      {/* Sidebar */}
       <div className={cn(
         'fixed inset-y-0 left-0 flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out z-30 shadow-xl',
         isOpen ? 'translate-x-0' : '-translate-x-full',
         'lg:translate-x-0 lg:static lg:inset-0',
         isCollapsed ? 'w-20' : 'w-72'
       )}>
-        {/* Header */}
         <div className={cn(
           'flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white',
           isCollapsed && 'px-3 justify-center'
@@ -425,7 +420,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           )}
           
           <div className="flex items-center space-x-2">
-            {/* Collapse button for desktop */}
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="hidden lg:flex p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
@@ -436,7 +430,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               )} />
             </button>
             
-            {/* Close button for mobile */}
             <button
               onClick={() => setIsOpen(false)}
               className="lg:hidden p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -446,7 +439,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
           {menuItems.map((item, index) => (
             <MenuItem 
@@ -458,7 +450,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           ))}
         </nav>
 
-        {/* Footer */}
         {!isCollapsed && (
           <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-blue-50 to-white">
             <div className="text-xs text-gray-500 text-center">
@@ -469,7 +460,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         )}
       </div>
 
-      {/* CSS para animaciones y scrollbar */}
       <style jsx global>{`
         @keyframes slide-in-from-top-2 {
           from {

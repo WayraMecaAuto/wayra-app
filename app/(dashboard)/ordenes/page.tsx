@@ -314,17 +314,6 @@ export default function OrdenesPage() {
                     <Eye className="h-4 w-4 mr-1" />
                     Ver
                   </Button>
-                  {canEdit && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => handleEditOrden(orden.id)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar
-                    </Button>
-                  )}
                 </div>
               </div>
             ))}
@@ -393,16 +382,6 @@ export default function OrdenesPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {canEdit && (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="hover:bg-green-50"
-                            onClick={() => handleEditOrden(orden.id)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                     </td>
                   </tr>

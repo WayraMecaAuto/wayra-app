@@ -22,21 +22,19 @@ interface MovementFormData {
   cantidad: string
   motivo: string
   precioUnitario?: string
+  precioVentaManual?: string
 }
 
 export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSales = false }: MovementFormProps) {
   const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
 
-  // Roles con permisos para cada tipo de movimiento
   const ROLES_ENTRADA = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'ADMIN_WAYRA_PRODUCTOS', 'ADMIN_TORNI_REPUESTOS']
   const ROLES_SALIDA = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'ADMIN_WAYRA_PRODUCTOS', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_WAYRA', 'VENDEDOR_TORNI']
 
   const userRole = session?.user?.role || ''
   const canEnter = ROLES_ENTRADA.includes(userRole)
   const canExit = ROLES_SALIDA.includes(userRole)
-
-  // Si no tiene permisos de entrada, solo puede hacer salidas
   const onlySales = !canEnter || restrictToSales
 
   const { register, handleSubmit, formState: { errors }, watch, reset } = useForm<MovementFormData>({
@@ -44,17 +42,20 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
       tipo: onlySales ? 'SALIDA' : 'ENTRADA',
       cantidad: '1',
       motivo: '',
-      precioUnitario: ''
+      precioUnitario: '',
+      precioVentaManual: product?.precioVenta?.toString() || ''
     }
   })
 
   const tipo = watch('tipo')
   const cantidad = watch('cantidad')
+  const precioVentaManual = watch('precioVentaManual')
 
   const onSubmit = async (data: MovementFormData) => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/movimientos', {
+      // Crear movimiento de inventario
+      const movResponse = await fetch('/api/movimientos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -66,15 +67,50 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
         })
       })
 
-      if (response.ok) {
-        toast.success('Movimiento registrado exitosamente')
-        onSuccess()
-        handleClose()
-      } else {
-        const error = await response.json()
+      if (!movResponse.ok) {
+        const error = await movResponse.json()
         toast.error(error.error || 'Error al registrar movimiento')
+        setIsLoading(false)
+        return
       }
+
+      // Si es salida/venta, registrar en contabilidad
+      if (data.tipo === 'SALIDA') {
+        const precioVenta = data.precioVentaManual ? parseFloat(data.precioVentaManual) : product.precioVenta
+        const cantidadNum = parseInt(data.cantidad)
+
+        // Determinar entidad según el tipo de producto
+        let entidad = 'WAYRA_PRODUCTOS'
+        if (product.tipo === 'TORNI_REPUESTO') {
+          entidad = 'TORNI_REPUESTOS'
+        } else if (product.tipo === 'TORNILLERIA') {
+          entidad = 'TORNI_REPUESTOS'
+        }
+
+        const contabilidadResponse = await fetch('/api/contabilidad/crear-ingreso', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productoId: product.id,
+            cantidad: cantidadNum,
+            precioCompra: product.precioCompra,
+            precioVenta: precioVenta,
+            descripcion: data.motivo,
+            entidad: entidad,
+            esDesdeOrden: false
+          })
+        })
+
+        if (!contabilidadResponse.ok) {
+          console.error('Error al registrar contabilidad:', await contabilidadResponse.json())
+        }
+      }
+
+      toast.success('Movimiento registrado exitosamente')
+      onSuccess()
+      handleClose()
     } catch (error) {
+      console.error('Error:', error)
       toast.error('Error al registrar movimiento')
     } finally {
       setIsLoading(false)
@@ -112,7 +148,7 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
       size="lg"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
-        {/* Información del producto - Más compacto */}
+        {/* Información del producto */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-blue-200">
           <div className="flex items-start sm:items-center space-x-3 sm:space-x-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
@@ -133,7 +169,7 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
           </div>
         </div>
 
-        {/* Tipo de movimiento - Mejorado para móviles */}
+        {/* Tipo de movimiento */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
             Tipo de Movimiento *
@@ -198,26 +234,14 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
             )}
           </div>
 
-          {/* Mensajes informativos */}
           {onlySales && (
             <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-start space-x-2">
                 <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <span className="text-xs sm:text-sm font-medium text-blue-800 leading-relaxed">
                   {['VENDEDOR_WAYRA', 'VENDEDOR_TORNI'].includes(userRole)
-                    ? 'Como vendedor, solo puedes registrar salidas de inventario (ventas)'
-                    : 'Solo puedes realizar salidas de inventario'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {!canExit && !canEnter && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <span className="text-xs sm:text-sm font-medium text-red-800 leading-relaxed">
-                  No tienes permisos para registrar movimientos de inventario
+                    ? 'Como vendedor, solo puedes registrar salidas (ventas)'
+                    : 'Solo puedes realizar salidas'}
                 </span>
               </div>
             </div>
@@ -231,9 +255,8 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
           )}
         </div>
 
-        {/* Campos de entrada - Grid responsivo */}
+        {/* Campos de entrada */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-          {/* Cantidad */}
           <div className={tipo === 'ENTRADA' && canEnter ? '' : 'sm:col-span-2'}>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cantidad *
@@ -267,7 +290,6 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
             )}
           </div>
 
-          {/* Precio unitario (opcional para entradas) */}
           {tipo === 'ENTRADA' && canEnter && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -280,6 +302,22 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
                 placeholder="0.00"
                 className="h-11 sm:h-12 text-base sm:text-lg font-semibold border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
+            </div>
+          )}
+
+          {tipo === 'SALIDA' && onlySales && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Precio Venta <span className="text-gray-400 text-xs">(Editable)</span>
+              </label>
+              <Input
+                {...register('precioVentaManual')}
+                type="number"
+                step="0.01"
+                placeholder={product.precioVenta?.toString()}
+                className="h-11 sm:h-12 text-base sm:text-lg font-semibold border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Por defecto: ${product.precioVenta?.toLocaleString()}</p>
             </div>
           )}
         </div>
@@ -302,7 +340,7 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
           )}
         </div>
 
-        {/* Preview del nuevo stock - Compacto */}
+        {/* Preview del nuevo stock */}
         {cantidad && !isNaN(parseInt(cantidad)) && (
           <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border-2 ${
             tipo === 'ENTRADA' ? 'bg-green-50 border-green-200' : 
@@ -352,7 +390,7 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
           </div>
         )}
 
-        {/* Botones - Mejorados para móvil */}
+        {/* Botones */}
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 sm:pt-5 border-t border-gray-200">
           <Button
             type="button"

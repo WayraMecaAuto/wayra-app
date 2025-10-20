@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, User, Car, Wrench, Package, DollarSign, FileText, Calendar, CreditCard as Edit, Check } from 'lucide-react'
+import { ArrowLeft, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, User, Car, Wrench, Package, DollarSign, FileText, Calendar, CreditCard as Edit, Check, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AnimatedCheckbox as Checkbox } from '@/components/ui/animated-checkbox'
+import { LubricacionModal } from '@/components/forms/LubricacionModal'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
@@ -33,6 +34,13 @@ interface OrdenDetalle {
   repuestosExternos: any[]
 }
 
+interface Servicio {
+  clave: string
+  descripcion: string
+  precio: number
+  requiereLubricacion?: boolean
+}
+
 export default function OrdenDetallePage() {
   const { data: session } = useSession()
   const params = useParams()
@@ -40,13 +48,19 @@ export default function OrdenDetallePage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [serviciosCompletados, setServiciosCompletados] = useState<{[key: string]: boolean}>({})
+  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>([])
+  const [showLubricacionModal, setShowLubricacionModal] = useState(false)
+  const [servicioLubricacionTemp, setServicioLubricacionTemp] = useState<Servicio | null>(null)
+  const [showAgregarServicios, setShowAgregarServicios] = useState(false)
 
   const canEdit = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
+  const canAddServices = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
   const isMecanico = session?.user?.role === 'MECANICO'
 
   useEffect(() => {
     if (params.id) {
       fetchOrden()
+      fetchServicios()
     }
   }, [params.id])
 
@@ -57,7 +71,6 @@ export default function OrdenDetallePage() {
         const data = await response.json()
         setOrden(data)
         
-        // Inicializar estado de servicios completados
         const completados: {[key: string]: boolean} = {}
         data.servicios.forEach((s: any) => {
           completados[s.id] = s.completado || false
@@ -70,6 +83,24 @@ export default function OrdenDetallePage() {
       toast.error('Error al cargar orden')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchServicios = async () => {
+    try {
+      const response = await fetch('/api/servicios-taller')
+      if (response.ok) {
+        const data = await response.json()
+        const servicios = data.map((s: any) => ({
+          clave: s.clave,
+          descripcion: s.descripcion,
+          precio: parseFloat(s.valor),
+          requiereLubricacion: s.clave === 'SERVICIO_LUBRICACION'
+        }))
+        setServiciosDisponibles(servicios)
+      }
+    } catch (error) {
+      console.error('Error fetching servicios:', error)
     }
   }
 
@@ -126,6 +157,97 @@ export default function OrdenDetallePage() {
       }
     } catch (error) {
       toast.error('Error al actualizar servicio')
+    }
+  }
+
+  const agregarServicio = async (servicio: Servicio) => {
+    if (servicio.requiereLubricacion) {
+      setServicioLubricacionTemp(servicio)
+      setShowLubricacionModal(true)
+    } else {
+      await agregarServicioDirecto(servicio)
+    }
+  }
+
+  const agregarServicioDirecto = async (servicio: Servicio) => {
+    try {
+      const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descripcion: servicio.descripcion,
+          precio: servicio.precio
+        })
+      })
+
+      if (response.ok) {
+        toast.success('Servicio agregado')
+        fetchOrden()
+        setShowAgregarServicios(false)
+      } else {
+        toast.error('Error al agregar servicio')
+      }
+    } catch (error) {
+      toast.error('Error al agregar servicio')
+    }
+  }
+
+  const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
+    if (!servicioLubricacionTemp) return
+
+    try {
+      const [aceiteResponse, filtroResponse] = await Promise.all([
+        fetch(`/api/productos/${aceiteId}`),
+        fetch(`/api/productos/${filtroId}`)
+      ])
+
+      if (aceiteResponse.ok && filtroResponse.ok) {
+        const aceite = await aceiteResponse.json()
+        const filtro = await filtroResponse.json()
+        
+        const precioTotal = aceite.precioVenta + filtro.precioVenta
+        const descripcion = `${servicioLubricacionTemp.descripcion} (${aceite.nombre} + ${filtro.nombre})`
+
+        const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            descripcion,
+            precio: precioTotal
+          })
+        })
+
+        if (response.ok) {
+          toast.success('Servicio de lubricación agregado')
+          fetchOrden()
+          setShowAgregarServicios(false)
+        } else {
+          toast.error('Error al agregar servicio')
+        }
+      }
+    } catch (error) {
+      toast.error('Error al agregar servicio')
+    } finally {
+      setServicioLubricacionTemp(null)
+    }
+  }
+
+  const removerServicio = async (servicioId: string) => {
+    if (!confirm('¿Deseas eliminar este servicio?')) return
+
+    try {
+      const response = await fetch(`/api/ordenes/${params.id}/servicios/${servicioId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        toast.success('Servicio removido')
+        fetchOrden()
+      } else {
+        toast.error('Error al eliminar servicio')
+      }
+    } catch (error) {
+      toast.error('Error al eliminar servicio')
     }
   }
 
@@ -324,64 +446,114 @@ export default function OrdenDetallePage() {
         </Card>
       </div>
 
-      {/* Servicios con Checklist */}
-      {orden.servicios.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Wrench className="h-5 w-5 text-green-600" />
-                <span>Servicios</span>
-              </div>
-              <div className="text-sm text-gray-600">
+      {/* Servicios con opción de agregar */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Wrench className="h-5 w-5 text-green-600" />
+              <span>Servicios</span>
+              <span className="text-sm text-gray-600">
                 {Object.values(serviciosCompletados).filter(Boolean).length} de {orden.servicios.length} completados
+              </span>
+            </div>
+            {canAddServices && (
+              <Button
+                size="sm"
+                onClick={() => setShowAgregarServicios(!showAgregarServicios)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Servicio
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Lista de servicios disponibles para agregar */}
+          {showAgregarServicios && canAddServices && (
+            <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+              <h4 className="font-semibold text-gray-800 mb-3">Servicios Disponibles:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                {serviciosDisponibles.map(servicio => (
+                  <button
+                    key={servicio.clave}
+                    onClick={() => agregarServicio(servicio)}
+                    disabled={orden.servicios.some(s => s.descripcion === servicio.descripcion)}
+                    className="flex items-center justify-between p-3 border-2 border-blue-300 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <div className="text-left">
+                      <div className="font-medium text-gray-900">{servicio.descripcion}</div>
+                      {!servicio.requiereLubricacion && (
+                        <div className="text-sm text-gray-500">
+                          ${servicio.precio.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                    <Plus className="h-4 w-4 text-green-600" />
+                  </button>
+                ))}
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {orden.servicios.map((servicio: any) => (
-                <div 
-                  key={servicio.id} 
-                  className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                    serviciosCompletados[servicio.id]
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3 flex-1">
+            </div>
+          )}
+
+          {/* Servicios de la orden */}
+          <div className="space-y-3">
+            {orden.servicios.map((servicio: any) => (
+              <div 
+                key={servicio.id} 
+                className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                  serviciosCompletados[servicio.id]
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3 flex-1">
+                  {!isMecanico && (
                     <Checkbox
                       checked={serviciosCompletados[servicio.id] || false}
                       onCheckedChange={() => toggleServicioCompletado(servicio.id)}
                       className="h-5 w-5"
                     />
-                    <div className="flex-1">
-                      <span className={`font-medium ${
-                        serviciosCompletados[servicio.id] 
-                          ? 'text-green-800 line-through' 
-                          : 'text-gray-900'
-                      }`}>
-                        {servicio.descripcion}
-                      </span>
-                      {serviciosCompletados[servicio.id] && (
-                        <div className="flex items-center mt-1">
-                          <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
-                          <span className="text-xs text-green-600 font-medium">Completado</span>
-                        </div>
-                      )}
-                    </div>
+                  )}
+                  <div className="flex-1">
+                    <span className={`font-medium ${
+                      serviciosCompletados[servicio.id] 
+                        ? 'text-green-800 line-through' 
+                        : 'text-gray-900'
+                    }`}>
+                      {servicio.descripcion}
+                    </span>
+                    {serviciosCompletados[servicio.id] && (
+                      <div className="flex items-center mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
+                        <span className="text-xs text-green-600 font-medium">Completado</span>
+                      </div>
+                    )}
                   </div>
+                </div>
+                <div className="flex items-center space-x-3 ml-4">
                   {!isMecanico && (
-                    <span className="font-bold text-green-600 ml-4">
+                    <span className="font-bold text-green-600">
                       ${servicio.precio.toLocaleString()}
                     </span>
                   )}
+                  {canAddServices && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => removerServicio(servicio.id)}
+                      className="text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Productos */}
       {orden.detalles.length > 0 && (
@@ -553,6 +725,16 @@ export default function OrdenDetallePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de lubricación */}
+      <LubricacionModal
+        isOpen={showLubricacionModal}
+        onClose={() => {
+          setShowLubricacionModal(false)
+          setServicioLubricacionTemp(null)
+        }}
+        onAdd={handleLubricacionAdded}
+      />
     </div>
   )
 }

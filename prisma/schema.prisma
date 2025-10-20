@@ -68,7 +68,7 @@ model User {
   ordenes        OrdenServicio[]
   movimientos    MovimientoInventario[]
   notificaciones NotificacionUsuario[]
-  movimientosContables MovimientoContable[]  // 👈 Agrega esta línea
+  movimientosContables MovimientoContable[]
 
   @@map("users")
 }
@@ -107,81 +107,82 @@ model Producto {
   // Relaciones
   movimientos       MovimientoInventario[]
   detallesOrden     DetalleOrden[]
+  detallesContables DetalleIngresoContable[] @relation("ProductoDetallesContables") // 👈 Agregada
 
   @@map("productos")
 }
 
 model MovimientoInventario {
-  id          String          @id @default(cuid())
-  tipo        TipoMovimiento
-  cantidad    Int
-  motivo      String?
+  id             String          @id @default(cuid())
+  tipo           TipoMovimiento
+  cantidad       Int
+  motivo         String?
   precioUnitario Float?
-  total       Float?
-  fecha       DateTime        @default(now())
+  total          Float?
+  fecha          DateTime        @default(now())
   
   // Relaciones
-  producto    Producto        @relation(fields: [productoId], references: [id])
-  productoId  String
-  usuario     User            @relation(fields: [usuarioId], references: [id])
-  usuarioId   String
+  producto       Producto        @relation(fields: [productoId], references: [id])
+  productoId     String
+  usuario        User            @relation(fields: [usuarioId], references: [id])
+  usuarioId      String
 
   @@map("movimientos_inventario")
 }
 
 model OrdenServicio {
-  id            String        @id @default(cuid())
-  numeroOrden   String        @unique
-  clienteId     String
-  vehiculoId    String
-  descripcion   String
-  estado        EstadoOrden   @default(PENDIENTE)
-  fechaCreacion DateTime      @default(now())
-  fechaInicio   DateTime?
-  fechaFin      DateTime?
-  mes           Int           // Para filtrar por mes
-  anio          Int           // Para filtrar por año
+  id                    String        @id @default(cuid())
+  numeroOrden           String        @unique
+  clienteId             String
+  vehiculoId            String
+  descripcion           String
+  estado                EstadoOrden   @default(PENDIENTE)
+  fechaCreacion         DateTime      @default(now())
+  fechaInicio           DateTime?
+  fechaFin              DateTime?
+  mes                   Int
+  anio                  Int
 
   // Mano de obra
-  manoDeObra    Float?        @default(0) // Costo de mano de obra (opcional)
+  manoDeObra            Float?        @default(0)
 
   // Totales
-  subtotalServicios Float     @default(0)
-  subtotalProductos Float     @default(0)
-  subtotalRepuestosExternos Float @default(0)
-  iva               Float     @default(0)
-  total             Float     @default(0)
-  utilidad          Float     @default(0)
+  subtotalServicios     Float         @default(0)
+  subtotalProductos     Float         @default(0)
+  subtotalRepuestosExternos Float     @default(0)
+  iva                   Float         @default(0)
+  total                 Float         @default(0)
+  utilidad              Float         @default(0)
 
   // Relaciones
-  cliente       Cliente       @relation(fields: [clienteId], references: [id])
-  vehiculo      Vehiculo      @relation(fields: [vehiculoId], references: [id])
-  mecanico      User          @relation(fields: [mecanicoId], references: [id])
-  mecanicoId    String
-  detalles      DetalleOrden[]
-  servicios     ServicioOrden[]
-  repuestosExternos RepuestoExterno[]
-  facturas      Factura[]
+  cliente               Cliente       @relation(fields: [clienteId], references: [id])
+  vehiculo              Vehiculo      @relation(fields: [vehiculoId], references: [id])
+  mecanico              User          @relation(fields: [mecanicoId], references: [id])
+  mecanicoId            String
+  detalles              DetalleOrden[]
+  servicios             ServicioOrden[]
+  repuestosExternos     RepuestoExterno[]
+  facturas              Factura[]
 
   @@map("ordenes_servicio")
 }
 
 model Cliente {
-  id            String   @id @default(cuid())
-  nombre        String
-  telefono      String?
-  email         String?
-  direccion     String?
-  tipoDocumento String   @default("CC") // CC, NIT, CE, etc.
+  id              String   @id @default(cuid())
+  nombre          String
+  telefono        String?
+  email           String?
+  direccion       String?
+  tipoDocumento   String   @default("CC")
   numeroDocumento String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relaciones
-  vehiculos     Vehiculo[]
-  ordenes       OrdenServicio[]
-  facturas      Factura[]
+  vehiculos       Vehiculo[]
+  ordenes         OrdenServicio[]
+  facturas        Factura[]
 
   @@map("clientes")
 }
@@ -191,11 +192,11 @@ model Vehiculo {
   placa         String   @unique
   marca         String
   modelo        String
-  anio          Int?     // Cambio: año -> anio
+  anio          Int?
   color         String?
   vin           String?
   motor         String?
-  combustible   String?  // Gasolina, Diesel, Híbrido, etc.
+  combustible   String?
   kilometraje   Int?
   observaciones String?
   isActive      Boolean  @default(true)
@@ -211,40 +212,40 @@ model Vehiculo {
 }
 
 model RepuestoExterno {
-  id            String        @id @default(cuid())
-  nombre        String
-  descripcion   String?
-  cantidad      Int
-  precioCompra  Float         // Precio de compra
-  precioVenta   Float         // Precio de venta
-  precioUnitario Float        // Deprecated - usar precioVenta
-  subtotal      Float
-  utilidad      Float         @default(0) // Utilidad calculada
-  proveedor     String?
+  id             String        @id @default(cuid())
+  nombre         String
+  descripcion    String?
+  cantidad       Int
+  precioCompra   Float
+  precioVenta    Float
+  precioUnitario Float
+  subtotal       Float
+  utilidad       Float         @default(0)
+  proveedor      String?
 
   // Relaciones
-  orden         OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
-  ordenId       String
+  orden          OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  ordenId        String
 
   @@map("repuestos_externos")
 }
 
 model Factura {
-  id            String   @id @default(cuid())
-  numeroFactura String   @unique
-  fecha         DateTime @default(now())
-  vencimiento   DateTime?
-  subtotal      Float
-  iva           Float
-  total         Float
-  estado        String   @default("PENDIENTE") // PENDIENTE, PAGADA, VENCIDA, ANULADA
-  observaciones String?
+  id             String   @id @default(cuid())
+  numeroFactura  String   @unique
+  fecha          DateTime @default(now())
+  vencimiento    DateTime?
+  subtotal       Float
+  iva            Float
+  total          Float
+  estado         String   @default("PENDIENTE")
+  observaciones  String?
   
   // Relaciones
-  cliente       Cliente  @relation(fields: [clienteId], references: [id])
-  clienteId     String
-  orden         OrdenServicio? @relation(fields: [ordenId], references: [id])
-  ordenId       String?
+  cliente        Cliente  @relation(fields: [clienteId], references: [id])
+  clienteId      String
+  orden          OrdenServicio? @relation(fields: [ordenId], references: [id])
+  ordenId        String?
 
   @@map("facturas")
 }
@@ -253,12 +254,11 @@ model ServicioOrden {
   id          String        @id @default(cuid())
   descripcion String
   precio      Float
-  aplicaIva   Boolean       @default(false) // Los servicios NO aplican IVA
-  completado  Boolean       @default(false) // Estado de completitud del servicio
+  aplicaIva   Boolean       @default(false)
+  completado  Boolean       @default(false)
 
-  // Para servicios específicos que requieren productos
-  aceiteId    String?       // ID del aceite usado (para lubricación)
-  filtroId    String?       // ID del filtro usado (para lubricación)
+  aceiteId    String?
+  filtroId    String?
 
   // Relaciones
   orden       OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
@@ -268,17 +268,17 @@ model ServicioOrden {
 }
 
 model DetalleOrden {
-  id          String        @id @default(cuid())
-  cantidad    Int
+  id             String        @id @default(cuid())
+  cantidad       Int
   precioUnitario Float
-  tipoPrecio  TipoPrecio    @default(VENTA)
-  subtotal    Float
+  tipoPrecio     TipoPrecio    @default(VENTA)
+  subtotal       Float
   
   // Relaciones
-  orden       OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
-  ordenId     String
-  producto    Producto      @relation(fields: [productoId], references: [id])
-  productoId  String
+  orden          OrdenServicio @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  ordenId        String
+  producto       Producto      @relation(fields: [productoId], references: [id])
+  productoId     String
 
   @@map("detalles_orden")
 }
@@ -297,10 +297,10 @@ model Notificacion {
   id          String   @id @default(cuid())
   titulo      String
   mensaje     String
-  tipo        String   // 'warning', 'success', 'info', 'error'
-  categoria   String   // 'stock', 'inventory', 'users', 'products'
-  prioridad   String   // 'high', 'medium', 'low'
-  data        Json?    // Datos adicionales
+  tipo        String
+  categoria   String
+  prioridad   String
+  data        Json?
   createdAt   DateTime @default(now())
   
   // Relaciones
@@ -343,21 +343,52 @@ enum EntidadContable {
   TORNIREPUESTOS
 }
 
+// ==================== MODELOS DE CONTABILIDAD ====================
+
 model MovimientoContable {
-  id          String                @id @default(cuid())
-  tipo        TipoMovimientoContable
-  concepto    ConceptoContable
-  monto       Float
-  fecha       DateTime              @default(now())
-  descripcion String
-  entidad     EntidadContable
-  referencia  String?               // ID de la orden, factura, etc.
+  id                    String                    @id @default(cuid())
+  tipo                  String
+  concepto              String
+  monto                 Float
+  fecha                 DateTime                  @default(now())
+  descripcion           String
+  entidad               String
+  referencia            String?
+  mes                   Int                       @default(1)
+  anio                  Int                       @default(2024)
   
-  // Relaciones
-  usuario     User                  @relation(fields: [usuarioId], references: [id])
-  usuarioId   String
+  usuario               User                      @relation(fields: [usuarioId], references: [id])
+  usuarioId             String
   
-  createdAt   DateTime              @default(now())
+  detalleIngresos       DetalleIngresoContable[]
   
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([entidad])
+  @@index([tipo])
+  @@index([fecha])
+  @@index([mes, anio])
   @@map("movimientos_contables")
+}
+
+model DetalleIngresoContable {
+  id                    String                    @id @default(cuid())
+  cantidad              Int
+  precioCompra          Float
+  precioVenta           Float
+  subtotalCompra        Float
+  subtotalVenta         Float
+  utilidad              Float
+  
+  movimientoContable    MovimientoContable        @relation(fields: [movimientoContableId], references: [id], onDelete: Cascade)
+  movimientoContableId  String
+  
+  producto              Producto                  @relation("ProductoDetallesContables", fields: [productoId], references: [id])
+  productoId            String
+  
+  createdAt             DateTime                  @default(now())
+
+  @@index([productoId])
+  @@map("detalles_ingreso_contable")
 }
