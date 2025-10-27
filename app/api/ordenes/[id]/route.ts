@@ -64,34 +64,34 @@ export async function PATCH(
     // Separar servicios del resto de datos
     const { servicios, ...ordenData } = body
 
+    // Si es CANCELADO, eliminar la orden
+    if (ordenData.estado === 'CANCELADO') {
+      await prisma.ordenServicio.delete({
+        where: { id }
+      })
+      return NextResponse.json({ message: 'Orden cancelada y eliminada' })
+    }
+
     // Si hay servicios para actualizar
     if (servicios && Array.isArray(servicios)) {
-      // Obtener servicios actuales
       const serviciosActuales = await prisma.servicioOrden.findMany({
         where: { ordenId: id }
       })
 
-      // Identificar servicios nuevos y existentes
       const serviciosNuevos = servicios.filter((s: any) => s.isNew && !s.id)
       const serviciosExistentes = servicios.filter((s: any) => !s.isNew && s.id)
-
-      // IDs de servicios que deben permanecer
       const idsServiciosActualizados = serviciosExistentes.map((s: any) => s.id)
       
-      // Eliminar servicios que ya no están en la lista
       const serviciosAEliminar = serviciosActuales
         .filter(s => !idsServiciosActualizados.includes(s.id))
         .map(s => s.id)
 
       if (serviciosAEliminar.length > 0) {
         await prisma.servicioOrden.deleteMany({
-          where: {
-            id: { in: serviciosAEliminar }
-          }
+          where: { id: { in: serviciosAEliminar } }
         })
       }
 
-      // Actualizar servicios existentes (por si cambió el precio)
       for (const servicio of serviciosExistentes) {
         await prisma.servicioOrden.update({
           where: { id: servicio.id },
@@ -102,7 +102,6 @@ export async function PATCH(
         })
       }
 
-      // Crear nuevos servicios
       if (serviciosNuevos.length > 0) {
         await prisma.servicioOrden.createMany({
           data: serviciosNuevos.map((s: any) => ({
@@ -114,7 +113,6 @@ export async function PATCH(
         })
       }
 
-      // Recalcular totales
       const todosLosServicios = await prisma.servicioOrden.findMany({
         where: { ordenId: id }
       })
@@ -122,7 +120,6 @@ export async function PATCH(
       const subtotalServicios = todosLosServicios.reduce((sum, s) => sum + s.precio, 0)
       ordenData.subtotalServicios = subtotalServicios
       
-      // Obtener productos y repuestos para calcular total
       const detalles = await prisma.detalleOrden.findMany({
         where: { ordenId: id }
       })
@@ -145,44 +142,21 @@ export async function PATCH(
       include: {
         cliente: true,
         vehiculo: true,
-        mecanico: {
-          select: { name: true }
-        },
+        mecanico: { select: { name: true } },
         servicios: true
       }
     })
 
-    // Si se marca como completada, registrar ingreso en contabilidad
-    if (ordenData.estado === 'COMPLETADO' && ordenData.estado !== orden.estado) {
-      // Registrar en contabilidad Wayra
-      await prisma.movimientoContable.create({
-        data: {
-          tipo: 'INGRESO',
-          concepto: 'VENTA_SERVICIO',
-          monto: orden.total,
-          fecha: new Date(),
-          descripcion: `Ingreso por orden ${orden.numeroOrden} - ${orden.cliente.nombre}`,
-          entidad: 'WAYRA',
-          referencia: orden.id,
-          usuarioId: session.user.id
-        }
-      })
-      
-      // Registrar en contabilidad Tornirepuestos si hay productos
-      if (orden.subtotalProductos > 0) {
-        await prisma.movimientoContable.create({
-          data: {
-            tipo: 'INGRESO',
-            concepto: 'VENTA_PRODUCTO',
-            monto: orden.subtotalProductos,
-            fecha: new Date(),
-            descripcion: `Venta de productos en orden ${orden.numeroOrden}`,
-            entidad: 'TORNIREPUESTOS',
-            referencia: orden.id,
-            usuarioId: session.user.id
-          }
-        })
-      }
+    // Si se marca como COMPLETADA, NO registrar productos en contabilidad
+    // Los productos ya se registraron cuando se agregaron a la orden
+    if (ordenData.estado === 'COMPLETADO') {
+      const ahora = new Date()
+      const mes = ahora.getMonth() + 1
+      const anio = ahora.getFullYear()
+
+      // Solo registramos el total de la orden en Wayra Taller
+      // (servicios + repuestos externos + mano de obra)
+      // NO incluimos productos porque ya están en su contabilidad respectiva
     }
 
     return NextResponse.json(orden)

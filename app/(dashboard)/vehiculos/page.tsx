@@ -17,7 +17,7 @@ interface Vehiculo {
   placa: string
   marca: string
   modelo: string
-  anio?: number  // ✅ Cambiado de año a anio
+  anio?: number
   color?: string
   vin?: string
   motor?: string
@@ -42,7 +42,7 @@ interface VehiculoForm {
   placa: string
   marca: string
   modelo: string
-  anio: string  // ✅ Cambiado de año a anio
+  anio: string
   color: string
   vin: string
   motor: string
@@ -78,7 +78,7 @@ export default function VehiculosPage() {
       setValue('placa', editingVehiculo.placa)
       setValue('marca', editingVehiculo.marca)
       setValue('modelo', editingVehiculo.modelo)
-      setValue('anio', editingVehiculo.anio?.toString() || '')  // ✅ Cambiado de año a anio
+      setValue('anio', editingVehiculo.anio?.toString() || '')
       setValue('color', editingVehiculo.color || '')
       setValue('vin', editingVehiculo.vin || '')
       setValue('motor', editingVehiculo.motor || '')
@@ -181,18 +181,18 @@ export default function VehiculosPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="space-y-6 p-4 sm:p-6 md:p-8 lg:p-10 animate-fade-in">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
+      <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 rounded-2xl p-4 sm:p-6 md:p-8 text-white shadow-2xl transition-all duration-300 hover:shadow-3xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
-            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm transition-transform duration-300 hover:scale-105">
               <Car className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
             </div>
             <div>
@@ -202,7 +202,7 @@ export default function VehiculosPage() {
           </div>
           <Button
             onClick={() => setShowModal(true)}
-            className="bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg w-full sm:w-auto"
+            className="bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg w-full sm:w-auto transition-all duration-300 hover:scale-105"
           >
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Vehículo
@@ -211,7 +211,7 @@ export default function VehiculosPage() {
       </div>
 
       {/* Search */}
-      <Card className="shadow-lg border-0 bg-gradient-to-r from-white to-gray-50">
+      <Card className="shadow-lg border-0 bg-gradient-to-r from-white to-gray-50 transition-all duration-300 hover:shadow-xl">
         <CardContent className="p-4 sm:p-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -219,62 +219,61 @@ export default function VehiculosPage() {
               placeholder="Buscar vehículos por placa, marca, modelo, cliente o VIN..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-12 text-base border-0 bg-white shadow-md focus:shadow-lg transition-shadow"
+              className="pl-10 h-12 text-base border-0 bg-white shadow-md focus:shadow-lg transition-all duration-300"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Vehiculos Table */}
-      <Card className="shadow-xl border-0 bg-white">
+      {/* Vehiculos List */}
+      <Card className="shadow-xl border-0 bg-white transition-all duration-300 hover:shadow-2xl">
         <CardHeader className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl text-gray-800">
             Vehículos Registrados ({filteredVehiculos.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-y-auto max-h-[60vh] transition-all duration-300">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Vehículo</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Propietario</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Detalles</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Órdenes</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Acciones</th>
+                  <th className="text-left py-4 px-4 sm:px-6 font-semibold text-gray-700">Vehículo</th>
+                  <th className="text-left py-4 px-4 sm:px-6 font-semibold text-gray-700">Propietario</th>
+                  <th className="text-left py-4 px-4 sm:px-6 font-semibold text-gray-700">Detalles</th>
+                  <th className="text-left py-4 px-4 sm:px-6 font-semibold text-gray-700">Órdenes</th>
+                  <th className="text-left py-4 px-4 sm:px-6 font-semibold text-gray-700">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredVehiculos.map((vehiculo, index) => (
                   <tr 
                     key={vehiculo.id} 
-                    className={`border-b border-gray-100 hover:bg-indigo-50 transition-colors ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-gray-25'
-                    }`}
+                    className={`border-b border-gray-100 hover:bg-indigo-50 transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
                   >
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4 sm:px-6">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-full flex items-center justify-center transition-transform duration-300 hover:rotate-12">
                           <Car className="h-5 w-5 text-indigo-600" />
                         </div>
                         <div>
-                          <div className="font-semibold text-gray-900 text-lg">{vehiculo.placa}</div>
+                          <div className="font-semibold text-gray-900 text-base sm:text-lg">{vehiculo.placa}</div>
                           <div className="text-sm text-gray-600">
                             {vehiculo.marca} {vehiculo.modelo}
                           </div>
-                          {vehiculo.anio && (  // ✅ Cambiado de año a anio
+                          {vehiculo.anio && (
                             <div className="text-xs text-gray-500">Año {vehiculo.anio}</div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4 sm:px-6">
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-gray-400" />
                         <span className="text-sm font-medium">{vehiculo.cliente.nombre}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4 sm:px-6">
                       <div className="space-y-1 text-sm">
                         {vehiculo.color && (
                           <div className="flex items-center space-x-2">
@@ -296,12 +295,12 @@ export default function VehiculosPage() {
                         )}
                       </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4 sm:px-6">
                       <Badge className="bg-blue-100 text-blue-700">
                         {vehiculo._count.ordenes} órdenes
                       </Badge>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4 sm:px-6">
                       <div className="flex space-x-2">
                         <Button
                           size="sm"
@@ -310,7 +309,7 @@ export default function VehiculosPage() {
                             setEditingVehiculo(vehiculo)
                             setShowModal(true)
                           }}
-                          className="hover:bg-indigo-50"
+                          className="hover:bg-indigo-50 transition-all duration-300 hover:scale-110"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -318,7 +317,7 @@ export default function VehiculosPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => deleteVehiculo(vehiculo.id)}
-                          className="hover:bg-red-50 text-red-600"
+                          className="hover:bg-red-50 text-red-600 transition-all duration-300 hover:scale-110"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -329,10 +328,88 @@ export default function VehiculosPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4 p-4 overflow-y-auto max-h-[60vh] transition-all duration-300">
+            {filteredVehiculos.map((vehiculo) => (
+              <Card key={vehiculo.id} className="shadow-md transition-all duration-300 hover:shadow-lg hover:scale-102">
+                <CardContent className="p-4">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:rotate-12">
+                      <Car className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-grow">
+                      <div className="font-semibold text-gray-900 text-base">{vehiculo.placa}</div>
+                      <div className="text-sm text-gray-600 mb-2">
+                        {vehiculo.marca} {vehiculo.modelo}
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <span>{vehiculo.cliente.nombre}</span>
+                        </div>
+                        {vehiculo.anio && (
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <span>Año {vehiculo.anio}</span>
+                          </div>
+                        )}
+                        {vehiculo.color && (
+                          <div className="flex items-center space-x-2">
+                            <Palette className="h-4 w-4 text-gray-400" />
+                            <span>{vehiculo.color}</span>
+                          </div>
+                        )}
+                        {vehiculo.combustible && (
+                          <div className="flex items-center space-x-2">
+                            <FileText className="h-4 w-4 text-gray-400" />
+                            <span>{vehiculo.combustible}</span>
+                          </div>
+                        )}
+                        {vehiculo.kilometraje && (
+                          <div className="flex items-center space-x-2">
+                            <Gauge className="h-4 w-4 text-gray-400" />
+                            <span>{vehiculo.kilometraje.toLocaleString()} km</span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-gray-400" />
+                          <Badge className="bg-blue-100 text-blue-700">
+                            {vehiculo._count.ordenes} órdenes
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingVehiculo(vehiculo)
+                          setShowModal(true)
+                        }}
+                        className="hover:bg-indigo-50 transition-all duration-300 hover:scale-110"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteVehiculo(vehiculo.id)}
+                        className="hover:bg-red-50 text-red-600 transition-all duration-300 hover:scale-110"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           
           {filteredVehiculos.length === 0 && (
-            <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-16 animate-fade-in">
+              <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-transform duration-300 hover:scale-105">
                 <Car className="h-12 w-12 text-indigo-500" />
               </div>
               <div className="text-gray-500 text-xl font-medium">No se encontraron vehículos</div>
@@ -350,16 +427,14 @@ export default function VehiculosPage() {
         onClose={handleCloseModal} 
         title={editingVehiculo ? 'Editar Vehículo' : 'Nuevo Vehículo'}
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 animate-fade-in">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cliente *
             </label>
             <select
               {...register('clienteId', { required: 'El cliente es requerido' })}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                errors.clienteId ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300 focus:scale-102 ${errors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
               disabled={!!editingVehiculo}
             >
               <option value="">Selecciona un cliente</option>
@@ -374,7 +449,7 @@ export default function VehiculosPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Placa *
@@ -382,7 +457,7 @@ export default function VehiculosPage() {
               <Input
                 {...register('placa', { required: 'La placa es requerida' })}
                 placeholder="ABC123"
-                className={errors.placa ? 'border-red-500' : ''}
+                className={`${errors.placa ? 'border-red-500' : ''} transition-all duration-300 focus:scale-102`}
                 style={{ textTransform: 'uppercase' }}
               />
               {errors.placa && (
@@ -394,16 +469,17 @@ export default function VehiculosPage() {
                 Año
               </label>
               <Input
-                {...register('anio')}  // ✅ Cambiado de año a anio
+                {...register('anio')}
                 type="number"
                 placeholder="2024"
                 min="1900"
                 max="2100"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Marca *
@@ -411,7 +487,7 @@ export default function VehiculosPage() {
               <Input
                 {...register('marca', { required: 'La marca es requerida' })}
                 placeholder="Toyota"
-                className={errors.marca ? 'border-red-500' : ''}
+                className={`${errors.marca ? 'border-red-500' : ''} transition-all duration-300 focus:scale-102`}
               />
               {errors.marca && (
                 <p className="mt-1 text-sm text-red-600">{errors.marca.message}</p>
@@ -424,7 +500,7 @@ export default function VehiculosPage() {
               <Input
                 {...register('modelo', { required: 'El modelo es requerido' })}
                 placeholder="Corolla"
-                className={errors.modelo ? 'border-red-500' : ''}
+                className={`${errors.modelo ? 'border-red-500' : ''} transition-all duration-300 focus:scale-102`}
               />
               {errors.modelo && (
                 <p className="mt-1 text-sm text-red-600">{errors.modelo.message}</p>
@@ -432,7 +508,7 @@ export default function VehiculosPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Color
@@ -440,6 +516,7 @@ export default function VehiculosPage() {
               <Input
                 {...register('color')}
                 placeholder="Blanco"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
             <div>
@@ -448,7 +525,7 @@ export default function VehiculosPage() {
               </label>
               <select
                 {...register('combustible')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300 focus:scale-102"
               >
                 <option value="">Selecciona</option>
                 <option value="Gasolina">Gasolina</option>
@@ -460,7 +537,7 @@ export default function VehiculosPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 VIN
@@ -468,6 +545,7 @@ export default function VehiculosPage() {
               <Input
                 {...register('vin')}
                 placeholder="Número de serie del vehículo"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
             <div>
@@ -477,6 +555,7 @@ export default function VehiculosPage() {
               <Input
                 {...register('motor')}
                 placeholder="Número de motor"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
           </div>
@@ -490,6 +569,7 @@ export default function VehiculosPage() {
               type="number"
               placeholder="150000"
               min="0"
+              className="transition-all duration-300 focus:scale-102"
             />
           </div>
 
@@ -500,16 +580,16 @@ export default function VehiculosPage() {
             <textarea
               {...register('observaciones')}
               placeholder="Notas adicionales sobre el vehículo..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300 focus:scale-102"
               rows={3}
             />
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={handleCloseModal}>
+            <Button type="button" variant="outline" onClick={handleCloseModal} className="transition-all duration-300 hover:scale-105">
               Cancelar
             </Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700">
+            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 hover:scale-105">
               {editingVehiculo ? 'Actualizar' : 'Crear'} Vehículo
             </Button>
           </div>

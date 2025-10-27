@@ -1,12 +1,15 @@
+// app/(dashboard)/contabilidad/wayra-taller/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { TrendingUp, TrendingDown, DollarSign, Users, Wrench, BarChart3, Download, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Users, Wrench, BarChart3, Download, Zap, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Modal } from '@/components/ui/modal'
+import { Input } from '@/components/ui/input'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
 
@@ -15,7 +18,8 @@ interface IngresoServicio {
   fecha: Date
   descripcion: string
   monto: number
-  tipo: 'SERVICIO' | 'PRODUCTO' | 'REPUESTO_EXTERNO'
+  tipo: 'SERVICIO' | 'REPUESTO_EXTERNO' | 'MANO_OBRA'
+  ordenId?: string
 }
 
 interface ServicioMasRealizado {
@@ -42,6 +46,7 @@ export default function ContabilidadWayraTallerPage() {
   const [serviciosMasRealizados, setServiciosMasRealizados] = useState<ServicioMasRealizado[]>([])
   const [egresos, setEgresos] = useState<EgresoContable[]>([])
   const [loading, setLoading] = useState(true)
+  const [showEgresoModal, setShowEgresoModal] = useState(false)
 
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
 
@@ -68,6 +73,24 @@ export default function ContabilidadWayraTallerPage() {
       toast.error('Error al cargar contabilidad')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const eliminarEgreso = async (id: string) => {
+    if (!confirm('¿Eliminar este egreso?')) return
+
+    try {
+      const response = await fetch(`/api/contabilidad/wayra-taller?id=${id}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        toast.success('Egreso eliminado')
+        fetchContabilidad()
+      } else {
+        toast.error('Error al eliminar egreso')
+      }
+    } catch (error) {
+      toast.error('Error al eliminar egreso')
     }
   }
 
@@ -234,7 +257,7 @@ export default function ContabilidadWayraTallerPage() {
         <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">
           <CardTitle className="flex items-center space-x-2">
             <Wrench className="h-5 w-5" />
-            <span>Ingresos por Servicios y Productos</span>
+            <span>Ingresos por Servicios y Repuestos</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -259,11 +282,11 @@ export default function ContabilidadWayraTallerPage() {
                       {ingreso.tipo === 'SERVICIO' && (
                         <Badge className="bg-blue-100 text-blue-700">Servicio</Badge>
                       )}
-                      {ingreso.tipo === 'PRODUCTO' && (
-                        <Badge className="bg-purple-100 text-purple-700">Producto</Badge>
-                      )}
                       {ingreso.tipo === 'REPUESTO_EXTERNO' && (
                         <Badge className="bg-orange-100 text-orange-700">Repuesto Ext.</Badge>
+                      )}
+                      {ingreso.tipo === 'MANO_OBRA' && (
+                        <Badge className="bg-purple-100 text-purple-700">Mano de Obra</Badge>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right text-sm font-bold text-green-600">
@@ -285,11 +308,19 @@ export default function ContabilidadWayraTallerPage() {
 
       {/* Egresos */}
       <Card>
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg flex flex-row items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
             <span>Egresos (Nóminas y Gastos Operacionales)</span>
           </CardTitle>
+          <Button
+            onClick={() => setShowEgresoModal(true)}
+            size="sm"
+            className="bg-white text-orange-600 hover:bg-orange-50"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Egreso
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -300,8 +331,8 @@ export default function ContabilidadWayraTallerPage() {
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Descripción</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Concepto</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Usuario</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Rol</th>
                   <th className="text-right py-3 px-4 font-semibold text-gray-700">Valor</th>
+                  <th className="text-center py-3 px-4 font-semibold text-gray-700">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -315,21 +346,18 @@ export default function ContabilidadWayraTallerPage() {
                       <Badge className="bg-gray-100 text-gray-700 text-xs">{egreso.concepto}</Badge>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">{egreso.usuario}</td>
-                    <td className="py-3 px-4 text-sm">
-                      <Badge 
-                        className={`text-xs ${
-                          egreso.rol === 'MECANICO' 
-                            ? 'bg-blue-100 text-blue-700'
-                            : egreso.rol === 'ADMIN'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {egreso.rol}
-                      </Badge>
-                    </td>
                     <td className="py-3 px-4 text-right text-sm font-bold text-red-600">
                       -${egreso.valor.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => eliminarEgreso(egreso.id)}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 )) : (
@@ -344,6 +372,122 @@ export default function ContabilidadWayraTallerPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal Agregar Egreso */}
+      <EgresoModal
+        isOpen={showEgresoModal}
+        onClose={() => setShowEgresoModal(false)}
+        onSuccess={fetchContabilidad}
+        entidad="WAYRA"
+      />
     </div>
+  )
+}
+
+// Modal para agregar egresos
+function EgresoModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  entidad 
+}: { 
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  entidad: string
+}) {
+  const [formData, setFormData] = useState({
+    descripcion: '',
+    valor: '',
+    concepto: 'GASTO_OPERATIVO'
+  })
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.descripcion || !formData.valor) {
+      toast.error('Completa todos los campos')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/contabilidad/wayra-taller`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (response.ok) {
+        toast.success('Egreso registrado')
+        setFormData({ descripcion: '', valor: '', concepto: 'GASTO_OPERATIVO' })
+        onSuccess()
+        onClose()
+      } else {
+        toast.error('Error al registrar egreso')
+      }
+    } catch (error) {
+      toast.error('Error al registrar egreso')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Egreso">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Descripción *
+          </label>
+          <Input
+            value={formData.descripcion}
+            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+            placeholder="Ej: Pago nómina Juan, Compra herramientas"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Concepto *
+          </label>
+          <select
+            value={formData.concepto}
+            onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          >
+            <option value="GASTO_OPERATIVO">Gasto Operativo</option>
+            <option value="GASTO_NOMINA">Nómina</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Valor *
+          </label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.valor}
+            onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+            placeholder="0.00"
+            required
+          />
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={loading} className="bg-orange-600 hover:bg-orange-700">
+            {loading ? 'Guardando...' : 'Guardar Egreso'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }

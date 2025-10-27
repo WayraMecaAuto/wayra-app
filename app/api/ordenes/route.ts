@@ -145,8 +145,9 @@ export async function POST(request: NextRequest) {
     const manoDeObraNum = parseFloat(manoDeObra) || 0;
     const total = subtotal + manoDeObraNum;
 
-    // Calcular utilidad (solo sobre productos internos)
+    // Calcular utilidad (solo sobre productos internos y repuestos externos)
     let utilidad = 0;
+    
     if (productos?.length > 0) {
       for (const prod of productos) {
         const producto = await prisma.producto.findUnique({
@@ -158,6 +159,13 @@ export async function POST(request: NextRequest) {
           utilidad += ventaTotal - costoTotal;
         }
       }
+    }
+
+    if (repuestosExternos?.length > 0) {
+      utilidad += repuestosExternos.reduce(
+        (sum: number, r: any) => sum + parseFloat(r.utilidad || 0),
+        0
+      );
     }
 
     // Crear orden
@@ -185,13 +193,14 @@ export async function POST(request: NextRequest) {
         data: servicios.map((s: any) => ({
           descripcion: s.descripcion,
           precio: parseFloat(s.precio),
-          aplicaIva: false, // Los servicios NO aplican IVA
+          aplicaIva: false,
           ordenId: orden.id,
         })),
       });
     }
 
     // Crear detalles de productos y actualizar stock
+    // IMPORTANTE: NO registramos en contabilidad aquí, solo movimiento de inventario
     if (productos?.length > 0) {
       for (const prod of productos) {
         await prisma.detalleOrden.create({
@@ -205,7 +214,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Actualizar stock y crear movimiento
+        // Actualizar stock y crear movimiento de inventario
         await prisma.producto.update({
           where: { id: prod.id },
           data: {
@@ -237,10 +246,8 @@ export async function POST(request: NextRequest) {
           descripcion: r.descripcion || "",
           cantidad: parseInt(r.cantidad),
           precioCompra: parseFloat(r.precioCompra) || 0,
-          precioVenta:
-            parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
-          precioUnitario:
-            parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
+          precioVenta: parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
+          precioUnitario: parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
           subtotal: parseFloat(r.subtotal),
           utilidad: parseFloat(r.utilidad) || 0,
           proveedor: r.proveedor || "",

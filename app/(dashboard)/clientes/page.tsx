@@ -150,12 +150,12 @@ export default function ClientesPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="space-y-6 p-4 sm:p-6 md:p-8 lg:p-10 animate-fade-in">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-4 sm:p-6 md:p-8 text-white shadow-2xl transition-all duration-300 hover:shadow-3xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
-            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm transition-transform duration-300 hover:scale-105">
               <User className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
             </div>
             <div>
@@ -165,7 +165,7 @@ export default function ClientesPage() {
           </div>
           <Button
             onClick={() => setShowModal(true)}
-            className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg w-full sm:w-auto"
+            className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg w-full sm:w-auto transition-all duration-300 hover:scale-105"
           >
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Cliente
@@ -174,7 +174,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Search */}
-      <Card className="shadow-lg border-0 bg-gradient-to-r from-white to-gray-50">
+      <Card className="shadow-lg border-0 bg-gradient-to-r from-white to-gray-50 transition-all duration-300 hover:shadow-xl">
         <CardContent className="p-4 sm:p-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -182,23 +182,24 @@ export default function ClientesPage() {
               placeholder="Buscar clientes por nombre, teléfono, email o documento..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-12 text-base border-0 bg-white shadow-md focus:shadow-lg transition-shadow"
+              className="pl-10 h-12 text-base border-0 bg-white shadow-md focus:shadow-lg transition-all duration-300"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Clientes Table */}
-      <Card className="shadow-xl border-0 bg-white">
+      {/* Clientes List */}
+      <Card className="shadow-xl border-0 bg-white transition-all duration-300 hover:shadow-2xl">
         <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl text-gray-800">
             Clientes Registrados ({filteredClientes.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-y-auto max-h-[60vh] transition-all duration-300">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="text-left py-4 px-6 font-semibold text-gray-700">Cliente</th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-700">Contacto</th>
@@ -212,13 +213,11 @@ export default function ClientesPage() {
                 {filteredClientes.map((cliente, index) => (
                   <tr 
                     key={cliente.id} 
-                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-gray-25'
-                    }`}
+                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
                   >
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center transition-transform duration-300 hover:rotate-12">
                           <User className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
@@ -272,7 +271,7 @@ export default function ClientesPage() {
                             setEditingCliente(cliente)
                             setShowModal(true)
                           }}
-                          className="hover:bg-blue-50"
+                          className="hover:bg-blue-50 transition-all duration-300 hover:scale-110"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -280,7 +279,7 @@ export default function ClientesPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => deleteCliente(cliente.id)}
-                          className="hover:bg-red-50 text-red-600"
+                          className="hover:bg-red-50 text-red-600 transition-all duration-300 hover:scale-110"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -291,10 +290,82 @@ export default function ClientesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4 p-4 overflow-y-auto max-h-[60vh] transition-all duration-300">
+            {filteredClientes.map((cliente) => (
+              <Card key={cliente.id} className="shadow-md transition-all duration-300 hover:shadow-lg hover:scale-102">
+                <CardContent className="p-4">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:rotate-12">
+                      <User className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-grow">
+                      <div className="font-semibold text-gray-900">{cliente.nombre}</div>
+                      <div className="text-sm text-gray-500 mb-2">
+                        Cliente desde {new Date(cliente.createdAt).toLocaleDateString('es-CO')}
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        {cliente.telefono && (
+                          <div className="flex items-center space-x-2">
+                            <Phone className="h-4 w-4 text-gray-400" />
+                            <span>{cliente.telefono}</span>
+                          </div>
+                        )}
+                        {cliente.email && (
+                          <div className="flex items-center space-x-2">
+                            <Mail className="h-4 w-4 text-gray-400" />
+                            <span>{cliente.email}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-gray-400" />
+                          <span>{cliente.tipoDocumento} {cliente.numeroDocumento || ''}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Car className="h-4 w-4 text-gray-400" />
+                          <Badge className="bg-green-100 text-green-700">
+                            {cliente.vehiculos.length} vehículos
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Eye className="h-4 w-4 text-gray-400" />
+                          <Badge className="bg-blue-100 text-blue-700">
+                            {cliente._count.ordenes} órdenes
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingCliente(cliente)
+                          setShowModal(true)
+                        }}
+                        className="hover:bg-blue-50 transition-all duration-300 hover:scale-110"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteCliente(cliente.id)}
+                        className="hover:bg-red-50 text-red-600 transition-all duration-300 hover:scale-110"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           
           {filteredClientes.length === 0 && (
-            <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-16 animate-fade-in">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-transform duration-300 hover:scale-105">
                 <User className="h-12 w-12 text-blue-500" />
               </div>
               <div className="text-gray-500 text-xl font-medium">No se encontraron clientes</div>
@@ -312,7 +383,7 @@ export default function ClientesPage() {
         onClose={handleCloseModal} 
         title={editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 animate-fade-in">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Nombre Completo *
@@ -320,21 +391,21 @@ export default function ClientesPage() {
             <Input
               {...register('nombre', { required: 'El nombre es requerido' })}
               placeholder="Nombre del cliente"
-              className={errors.nombre ? 'border-red-500' : ''}
+              className={`${errors.nombre ? 'border-red-500' : ''} transition-all duration-300 focus:scale-102`}
             />
             {errors.nombre && (
               <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tipo de Documento
               </label>
               <select
                 {...register('tipoDocumento')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 focus:scale-102"
               >
                 <option value="CC">Cédula de Ciudadanía</option>
                 <option value="NIT">NIT</option>
@@ -349,11 +420,12 @@ export default function ClientesPage() {
               <Input
                 {...register('numeroDocumento')}
                 placeholder="Número de documento"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Teléfono
@@ -361,6 +433,7 @@ export default function ClientesPage() {
               <Input
                 {...register('telefono')}
                 placeholder="Número de teléfono"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
             <div>
@@ -371,6 +444,7 @@ export default function ClientesPage() {
                 {...register('email')}
                 type="email"
                 placeholder="correo@ejemplo.com"
+                className="transition-all duration-300 focus:scale-102"
               />
             </div>
           </div>
@@ -382,14 +456,15 @@ export default function ClientesPage() {
             <Input
               {...register('direccion')}
               placeholder="Dirección completa"
+              className="transition-all duration-300 focus:scale-102"
             />
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={handleCloseModal}>
+            <Button type="button" variant="outline" onClick={handleCloseModal} className="transition-all duration-300 hover:scale-105">
               Cancelar
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 transition-all duration-300 hover:scale-105">
               {editingCliente ? 'Actualizar' : 'Crear'} Cliente
             </Button>
           </div>

@@ -99,31 +99,20 @@ export default function NuevaOrdenPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [mecanicos, setMecanicos] = useState<any[]>([]);
-  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>(
-    []
-  );
-  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<
-    ServicioConLubricacion[]
-  >([]);
-  const [productosSeleccionados, setProductosSeleccionados] = useState<
-    ProductoOrden[]
-  >([]);
-  const [repuestosExternos, setRepuestosExternos] = useState<RepuestoExterno[]>(
-    []
-  );
+  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>([]);
+  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<ServicioConLubricacion[]>([]);
+  const [productosSeleccionados, setProductosSeleccionados] = useState<ProductoOrden[]>([]);
+  const [repuestosExternos, setRepuestosExternos] = useState<RepuestoExterno[]>([]);
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showClienteModal, setShowClienteModal] = useState(false);
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showRepuestoModal, setShowRepuestoModal] = useState(false);
   const [showLubricacionModal, setShowLubricacionModal] = useState(false);
-  const [servicioLubricacionTemp, setServicioLubricacionTemp] =
-    useState<Servicio | null>(null);
+  const [servicioLubricacionTemp, setServicioLubricacionTemp] = useState<Servicio | null>(null);
 
   // Verificar permisos
-  const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
-    session?.user?.role || ""
-  );
+  const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(session?.user?.role || "");
 
   const {
     register,
@@ -201,7 +190,7 @@ export default function NuevaOrdenPage() {
           clave: s.clave,
           descripcion: s.descripcion,
           precio: parseFloat(s.valor),
-          requiereLubricacion: s.clave === "SERVICIO_LUBRICACION", // Identificar servicio de lubricación
+          requiereLubricacion: s.clave === "SERVICIO_LUBRICACION",
         }));
         setServiciosDisponibles(servicios);
       }
@@ -222,19 +211,14 @@ export default function NuevaOrdenPage() {
 
   const handleBarcodeScanned = async (code: string) => {
     try {
-      const response = await fetch(
-        `/api/productos/barcode/${encodeURIComponent(code)}`
-      );
-
+      const response = await fetch(`/api/productos/barcode/${encodeURIComponent(code)}`);
       if (response.ok) {
         const product = await response.json();
-
         const exists = productosSeleccionados.find((p) => p.id === product.id);
         if (exists) {
           toast.error("Este producto ya está agregado a la orden");
           return;
         }
-
         const nuevoProducto: ProductoOrden = {
           id: product.id,
           nombre: product.nombre,
@@ -245,7 +229,6 @@ export default function NuevaOrdenPage() {
           subtotal: product.precioVenta,
           stock: product.stock,
         };
-
         setProductosSeleccionados([...productosSeleccionados, nuevoProducto]);
         toast.success(`Producto agregado: ${product.nombre}`);
       } else {
@@ -259,13 +242,10 @@ export default function NuevaOrdenPage() {
 
   const agregarServicio = (servicio: Servicio) => {
     if (servicio.requiereLubricacion) {
-      // Si es servicio de lubricación, abrir modal para seleccionar aceite y filtro
       setServicioLubricacionTemp(servicio);
       setShowLubricacionModal(true);
     } else {
-      const existe = serviciosSeleccionados.find(
-        (s) => s.clave === servicio.clave
-      );
+      const existe = serviciosSeleccionados.find((s) => s.clave === servicio.clave);
       if (!existe) {
         setServiciosSeleccionados([...serviciosSeleccionados, servicio]);
         toast.success("Servicio agregado");
@@ -276,45 +256,31 @@ export default function NuevaOrdenPage() {
   const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
     if (servicioLubricacionTemp) {
       try {
-        // Obtener información completa de aceite y filtro
         const [aceiteResponse, filtroResponse] = await Promise.all([
           fetch(`/api/productos/${aceiteId}`),
           fetch(`/api/productos/${filtroId}`),
         ]);
-
         if (aceiteResponse.ok && filtroResponse.ok) {
           const aceite = await aceiteResponse.json();
           const filtro = await filtroResponse.json();
-
-          // Calcular precio total del servicio de lubricación
           const precioTotal = aceite.precioVenta + filtro.precioVenta;
-
           const servicioConLubricacion: ServicioConLubricacion = {
             ...servicioLubricacionTemp,
-            precio: precioTotal, // Actualizar con el precio calculado
+            precio: precioTotal,
             aceiteId,
             filtroId,
             aceiteNombre: aceite.nombre,
             filtroNombre: filtro.nombre,
           };
-
-          setServiciosSeleccionados([
-            ...serviciosSeleccionados,
-            servicioConLubricacion,
-          ]);
+          setServiciosSeleccionados([...serviciosSeleccionados, servicioConLubricacion]);
           setServicioLubricacionTemp(null);
-
           toast.success(
             <div>
-              <div className="font-semibold">
-                Servicio de lubricación agregado
-              </div>
+              <div className="font-semibold">Servicio de lubricación agregado</div>
               <div className="text-sm mt-1">
                 <div>• {aceite.nombre}</div>
                 <div>• {filtro.nombre}</div>
-                <div className="font-semibold mt-1">
-                  Total: ${precioTotal.toLocaleString()}
-                </div>
+                <div className="font-semibold mt-1">Total: ${precioTotal.toLocaleString()}</div>
               </div>
             </div>,
             { duration: 4000 }
@@ -330,35 +296,25 @@ export default function NuevaOrdenPage() {
   };
 
   const removerServicio = (servicioId: string) => {
-    setServiciosSeleccionados(
-      serviciosSeleccionados.filter((s) => s.clave !== servicioId)
-    );
+    setServiciosSeleccionados(serviciosSeleccionados.filter((s) => s.clave !== servicioId));
     toast.success("Servicio removido");
   };
 
   const actualizarProducto = (index: number, campo: string, valor: any) => {
     const nuevosProductos = [...productosSeleccionados];
     nuevosProductos[index] = { ...nuevosProductos[index], [campo]: valor };
-
     if (campo === "cantidad" || campo === "precio") {
-      nuevosProductos[index].subtotal =
-        nuevosProductos[index].cantidad * nuevosProductos[index].precio;
+      nuevosProductos[index].subtotal = nuevosProductos[index].cantidad * nuevosProductos[index].precio;
     }
-
     setProductosSeleccionados(nuevosProductos);
   };
 
   const removerProducto = (index: number) => {
-    setProductosSeleccionados(
-      productosSeleccionados.filter((_, i) => i !== index)
-    );
+    setProductosSeleccionados(productosSeleccionados.filter((_, i) => i !== index));
   };
 
   const agregarRepuestoExterno = (repuesto: RepuestoExterno) => {
-    setRepuestosExternos([
-      ...repuestosExternos,
-      { ...repuesto, id: Date.now().toString() },
-    ]);
+    setRepuestosExternos([...repuestosExternos, { ...repuesto, id: Date.now().toString() }]);
   };
 
   const removerRepuestoExterno = (index: number) => {
@@ -366,26 +322,12 @@ export default function NuevaOrdenPage() {
   };
 
   const calcularTotales = () => {
-    const totalServicios = serviciosSeleccionados.reduce(
-      (sum, s) => sum + s.precio,
-      0
-    );
-    const totalProductos = productosSeleccionados.reduce(
-      (sum, p) => sum + p.subtotal,
-      0
-    );
-    const totalRepuestosExternos = repuestosExternos.reduce(
-      (sum, r) => sum + r.subtotal,
-      0
-    );
-    const subtotal =
-      totalServicios + totalProductos + totalRepuestosExternos + manoDeObra;
+    const totalServicios = serviciosSeleccionados.reduce((sum, s) => sum + s.precio, 0);
+    const totalProductos = productosSeleccionados.reduce((sum, p) => sum + p.subtotal, 0);
+    const totalRepuestosExternos = repuestosExternos.reduce((sum, r) => sum + r.subtotal, 0);
+    const subtotal = totalServicios + totalProductos + totalRepuestosExternos + manoDeObra;
     const total = subtotal;
-    const utilidadRepuestos = repuestosExternos.reduce(
-      (sum, r) => sum + r.utilidad,
-      0
-    );
-
+    const utilidadRepuestos = repuestosExternos.reduce((sum, r) => sum + r.utilidad, 0);
     return {
       totalServicios,
       totalProductos,
@@ -398,17 +340,10 @@ export default function NuevaOrdenPage() {
   };
 
   const onSubmit = async (data: OrdenForm) => {
-    if (
-      serviciosSeleccionados.length === 0 &&
-      productosSeleccionados.length === 0 &&
-      repuestosExternos.length === 0
-    ) {
-      toast.error(
-        "Debe agregar al menos un servicio, producto o repuesto externo"
-      );
+    if (serviciosSeleccionados.length === 0 && productosSeleccionados.length === 0 && repuestosExternos.length === 0) {
+      toast.error("Debe agregar al menos un servicio, producto o repuesto externo");
       return;
     }
-
     setLoading(true);
     try {
       const response = await fetch("/api/ordenes", {
@@ -422,7 +357,6 @@ export default function NuevaOrdenPage() {
           repuestosExternos,
         }),
       });
-
       if (response.ok) {
         toast.success("Orden creada exitosamente");
         window.location.href = "/ordenes";
@@ -444,80 +378,84 @@ export default function NuevaOrdenPage() {
   const totales = calcularTotales();
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="container mx-auto space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 via-green-700 to-green-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-            <Plus className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
+      <div className="bg-gradient-to-r from-green-600 to-green-800 rounded-xl p-6 sm:p-8 text-white shadow-lg animate-fade-in">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-x-0 sm:space-x-4 gap-4">
+          <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
+            <Plus className="h-6 sm:h-8 w-6 sm:w-8 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-              Nueva Orden de Trabajo
-            </h1>
-            <p className="text-green-100 text-base sm:text-lg">
-              Crear nueva orden de servicio completa
-            </p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">Nueva Orden de Trabajo</h1>
+            <p className="text-green-100 text-sm sm:text-base">Crear nueva orden de servicio completa</p>
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Información del Cliente y Vehículo */}
-          <Card className="shadow-xl border-0">
+          <Card className="shadow-lg border-0 animate-fade-in">
             <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
                 <User className="h-5 w-5" />
                 <span>Cliente y Vehículo</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex space-x-2">
-                <select
-                  {...register("clienteId", {
-                    required: "Selecciona un cliente",
-                  })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Seleccionar cliente</option>
-                  {clientes.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nombre}{" "}
-                      {cliente.telefono && `- ${cliente.telefono}`}
-                    </option>
-                  ))}
-                </select>
+            <CardContent className="p-4 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <div className="relative flex-1">
+                  <select
+                    {...register("clienteId", { required: "Selecciona un cliente" })}
+                    className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
+                  >
+                    <option value="">Seleccionar cliente</option>
+                    {clientes.map((cliente) => (
+                      <option key={cliente.id} value={cliente.id}>
+                        {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowClienteModal(true)}
                   title="Agregar nuevo cliente"
+                  className="hover:scale-105 transition-transform border-gray-200 shadow-sm"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
               {errors.clienteId && (
-                <p className="text-sm text-red-600">
-                  {errors.clienteId.message}
-                </p>
+                <p className="text-sm text-red-600">{errors.clienteId.message}</p>
               )}
 
-              <div className="flex space-x-2">
-                <select
-                  {...register("vehiculoId", {
-                    required: "Selecciona un vehículo",
-                  })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!selectedClienteId}
-                >
-                  <option value="">Seleccionar vehículo</option>
-                  {vehiculos.map((vehiculo) => (
-                    <option key={vehiculo.id} value={vehiculo.id}>
-                      {vehiculo.placa} - {vehiculo.marca} {vehiculo.modelo}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <div className="relative flex-1">
+                  <select
+                    {...register("vehiculoId", { required: "Selecciona un vehículo" })}
+                    className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
+                    disabled={!selectedClienteId}
+                  >
+                    <option value="">Seleccionar vehículo</option>
+                    {vehiculos.map((vehiculo) => (
+                      <option key={vehiculo.id} value={vehiculo.id}>
+                        {vehiculo.placa} - {vehiculo.marca} {vehiculo.modelo}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -530,22 +468,19 @@ export default function NuevaOrdenPage() {
                   }}
                   disabled={!selectedClienteId}
                   title="Agregar nuevo vehículo"
+                  className="hover:scale-105 transition-transform border-gray-200 shadow-sm"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
               {errors.vehiculoId && (
-                <p className="text-sm text-red-600">
-                  {errors.vehiculoId.message}
-                </p>
+                <p className="text-sm text-red-600">{errors.vehiculoId.message}</p>
               )}
 
-              <div>
+              <div className="relative">
                 <select
-                  {...register("mecanicoId", {
-                    required: "Selecciona un mecánico",
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  {...register("mecanicoId", { required: "Selecciona un mecánico" })}
+                  className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                 >
                   <option value="">Seleccionar mecánico</option>
                   {mecanicos.map((mecanico) => (
@@ -554,88 +489,75 @@ export default function NuevaOrdenPage() {
                     </option>
                   ))}
                 </select>
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
                 {errors.mecanicoId && (
-                  <p className="text-sm text-red-600">
-                    {errors.mecanicoId.message}
-                  </p>
+                  <p className="text-sm text-red-600">{errors.mecanicoId.message}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mano de Obra (Opcional)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mano de Obra (Opcional)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                    $
-                  </span>
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                   <Input
                     {...register("manoDeObra")}
                     type="number"
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    className="pl-8"
+                    className="pl-8 text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                   />
                 </div>
               </div>
 
               <div>
                 <textarea
-                  {...register("descripcion", {
-                    required: "La descripción es requerida",
-                  })}
+                  {...register("descripcion", { required: "La descripción es requerida" })}
                   rows={3}
                   placeholder="Describe el trabajo a realizar..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-3 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 resize-none"
                 />
                 {errors.descripcion && (
-                  <p className="text-sm text-red-600">
-                    {errors.descripcion.message}
-                  </p>
+                  <p className="text-sm text-red-600">{errors.descripcion.message}</p>
                 )}
               </div>
             </CardContent>
           </Card>
 
           {/* Servicios */}
-          <Card className="shadow-xl border-0">
+          <Card className="shadow-lg border-0 animate-fade-in">
             <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
                 <Wrench className="h-5 w-5" />
                 <span>Servicios del Taller</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+            <CardContent className="p-4 sm:p-6 space-y-4">
+              <div className="max-h-64 overflow-y-auto">
                 {serviciosDisponibles.map((servicio) => (
                   <div
                     key={servicio.clave}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 min-w-0"
                   >
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {servicio.descripcion}
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">{servicio.descripcion}</div>
                       {!servicio.requiereLubricacion && (
-                        <div className="text-sm text-gray-500">
-                          ${servicio.precio.toLocaleString()}
-                        </div>
+                        <div className="text-sm text-gray-500">${servicio.precio.toLocaleString()}</div>
                       )}
                       {servicio.requiereLubricacion && (
-                        <div className="text-xs text-blue-600 mt-1">
-                          Precio según productos seleccionados
-                        </div>
+                        <div className="text-xs text-blue-600 mt-1">Precio según productos seleccionados</div>
                       )}
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       onClick={() => agregarServicio(servicio)}
-                      disabled={serviciosSeleccionados.some(
-                        (s) => s.clave === servicio.clave
-                      )}
-                      className="bg-green-600 hover:bg-green-700"
+                      disabled={serviciosSeleccionados.some((s) => s.clave === servicio.clave)}
+                      className="bg-green-600 hover:bg-green-700 hover:scale-105 transition-transform"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -646,27 +568,17 @@ export default function NuevaOrdenPage() {
               {/* Servicios Seleccionados */}
               {serviciosSeleccionados.length > 0 && (
                 <div className="border-t pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">
-                    Servicios Seleccionados:
-                  </h4>
-                  <div className="space-y-2">
+                  <h4 className="font-semibold text-gray-800 mb-3 text-base sm:text-lg">Servicios Seleccionados:</h4>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {serviciosSeleccionados.map((servicio, index) => (
                       <div
                         key={index}
-                        className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                        className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200 transition-all duration-200 min-w-0"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-green-800">
-                              {servicio.descripcion}
-                            </span>
-                          </div>
-
-                          {/* Input editable de precio */}
-                          <div className="space-y-1">
-                            <label className="text-xs text-gray-600">
-                              Precio para esta orden:
-                            </label>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm sm:text-base text-green-800 whitespace-normal break-words">{servicio.descripcion}</div>
+                          <div className="space-y-1 mt-2">
+                            <label className="text-xs text-gray-600">Precio para esta orden:</label>
                             <div className="flex items-center space-x-2">
                               <span className="text-sm text-gray-500">$</span>
                               <Input
@@ -675,33 +587,25 @@ export default function NuevaOrdenPage() {
                                 min="0"
                                 value={servicio.precio}
                                 onChange={(e) => {
-                                  const nuevosServicios = [
-                                    ...serviciosSeleccionados,
-                                  ];
-                                  nuevosServicios[index].precio =
-                                    parseFloat(e.target.value) || 0;
+                                  const nuevosServicios = [...serviciosSeleccionados];
+                                  nuevosServicios[index].precio = parseFloat(e.target.value) || 0;
                                   setServiciosSeleccionados(nuevosServicios);
                                 }}
-                                className="w-32 h-8 text-sm font-semibold"
+                                className="w-32 h-8 text-sm font-semibold border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                               />
-                              <span className="text-sm font-bold text-green-700">
-                                ${servicio.precio.toLocaleString()}
-                              </span>
+                              <span className="text-sm font-bold text-green-700">${servicio.precio.toLocaleString()}</span>
                             </div>
-                            <p className="text-xs text-gray-500">
-                              💡 Este precio solo aplica para esta orden
-                            </p>
+                            <p className="text-xs text-gray-500">💡 Este precio solo aplica para esta orden</p>
                           </div>
-
                           {servicio.aceiteId && servicio.filtroId && (
                             <div className="text-xs text-green-600 space-y-0.5 mt-2">
                               <div className="flex items-center">
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                <span>Aceite: {servicio.aceiteNombre}</span>
+                                <span className="whitespace-normal break-words">Aceite: {servicio.aceiteNombre}</span>
                               </div>
                               <div className="flex items-center">
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                <span>Filtro: {servicio.filtroNombre}</span>
+                                <span className="whitespace-normal break-words">Filtro: {servicio.filtroNombre}</span>
                               </div>
                             </div>
                           )}
@@ -711,7 +615,7 @@ export default function NuevaOrdenPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => removerServicio(servicio.clave)}
-                          className="text-red-600 hover:bg-red-50 ml-2"
+                          className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform ml-2"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -725,9 +629,9 @@ export default function NuevaOrdenPage() {
         </div>
 
         {/* Productos del Inventario */}
-        <Card className="shadow-xl border-0">
+        <Card className="shadow-lg border-0 animate-fade-in">
           <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
               <div className="flex items-center space-x-2">
                 <Package className="h-5 w-5" />
                 <span>Productos del Inventario</span>
@@ -735,144 +639,157 @@ export default function NuevaOrdenPage() {
               <Button
                 type="button"
                 onClick={() => setShowScanner(true)}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
               >
                 <Camera className="h-4 w-4 mr-2" />
                 Escanear Producto
               </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             {productosSeleccionados.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Producto
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Stock
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Cantidad
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Tipo Precio
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Precio Unit.
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Subtotal
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productosSeleccionados.map((producto, index) => (
-                      <tr
-                        key={producto.id}
-                        className="border-b border-gray-100"
-                      >
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {producto.nombre}
+              <div className="max-h-96 overflow-y-auto">
+                <div className="hidden lg:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">Producto</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Stock</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Cantidad</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Tipo Precio</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Precio Unit.</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Subtotal</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productosSeleccionados.map((producto, index) => (
+                        <tr key={producto.id} className="border-b border-gray-100">
+                          <td className="py-3 px-3 min-w-0">
+                            <div className="whitespace-normal break-words">
+                              <div className="font-medium text-sm sm:text-base text-gray-900">{producto.nombre}</div>
+                              <div className="text-xs sm:text-sm text-gray-500">{producto.codigo}</div>
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {producto.codigo}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`font-medium ${producto.stock <= 5 ? "text-red-600" : "text-gray-900"}`}
-                          >
-                            {producto.stock}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`font-medium ${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}>
+                              {producto.stock}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <Input
+                              type="number"
+                              min="1"
+                              max={producto.stock}
+                              value={producto.cantidad}
+                              onChange={(e) => actualizarProducto(index, "cantidad", parseInt(e.target.value) || 1)}
+                              className="w-16 h-8 text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                            />
+                          </td>
+                          <td className="py-3 px-3">
+                            <select
+                              value={producto.tipoPrecio}
+                              onChange={(e) => {
+                                const tipoPrecio = e.target.value as "VENTA" | "MINORISTA" | "MAYORISTA";
+                                actualizarProducto(index, "tipoPrecio", tipoPrecio);
+                              }}
+                              className="w-28 appearance-none pl-3 pr-8 py-1 text-sm border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
+                            >
+                              <option value="VENTA">Venta</option>
+                              <option value="MINORISTA">Minorista</option>
+                              <option value="MAYORISTA">Mayorista</option>
+                            </select>
+                          </td>
+                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">${producto.precio.toLocaleString()}</td>
+                          <td className="py-3 px-3 font-bold text-green-600 text-sm sm:text-base">${producto.subtotal.toLocaleString()}</td>
+                          <td className="py-3 px-3">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => removerProducto(index)}
+                              className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="lg:hidden space-y-4">
+                  {productosSeleccionados.map((producto, index) => (
+                    <div key={producto.id} className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">{producto.nombre}</span>
+                        <span className="text-xs sm:text-sm text-gray-500">{producto.codigo}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="text-sm sm:text-base">
+                          <span className="font-medium">Stock: </span>
+                          <span className={`${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}>{producto.stock}</span>
+                        </div>
+                        <div className="text-sm sm:text-base">
+                          <span className="font-medium">Cantidad: </span>
                           <Input
                             type="number"
                             min="1"
                             max={producto.stock}
                             value={producto.cantidad}
-                            onChange={(e) =>
-                              actualizarProducto(
-                                index,
-                                "cantidad",
-                                parseInt(e.target.value) || 1
-                              )
-                            }
-                            className="w-20 h-8 text-center"
+                            onChange={(e) => actualizarProducto(index, "cantidad", parseInt(e.target.value) || 1)}
+                            className="w-16 h-8 inline-block text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                           />
-                        </td>
-                        <td className="py-3 px-4">
+                        </div>
+                        <div className="text-sm sm:text-base">
+                          <span className="font-medium">Tipo Precio: </span>
                           <select
                             value={producto.tipoPrecio}
                             onChange={(e) => {
-                              const tipoPrecio = e.target.value as
-                                | "VENTA"
-                                | "MINORISTA"
-                                | "MAYORISTA";
-                              actualizarProducto(
-                                index,
-                                "tipoPrecio",
-                                tipoPrecio
-                              );
+                              const tipoPrecio = e.target.value as "VENTA" | "MINORISTA" | "MAYORISTA";
+                              actualizarProducto(index, "tipoPrecio", tipoPrecio);
                             }}
-                            className="text-sm border border-gray-300 rounded px-2 py-1"
+                            className="w-28 appearance-none pl-3 pr-8 py-1 text-sm border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                           >
                             <option value="VENTA">Venta</option>
                             <option value="MINORISTA">Minorista</option>
                             <option value="MAYORISTA">Mayorista</option>
                           </select>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="font-medium text-green-600">
-                            ${producto.precio.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-green-600">
-                            ${producto.subtotal.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => removerProducto(index)}
-                            className="text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <div className="text-sm sm:text-base text-right">
+                          <div><span className="font-medium">Precio Unit.: </span>${producto.precio.toLocaleString()}</div>
+                          <div><span className="font-medium">Subtotal: </span><span className="font-bold text-green-600">${producto.subtotal.toLocaleString()}</span></div>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removerProducto(index)}
+                          className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>No hay productos agregados</p>
-                <p className="text-sm">
-                  Escanea códigos de barras para agregar productos
-                </p>
+                <p className="text-sm sm:text-base">No hay productos agregados</p>
+                <p className="text-xs sm:text-sm">Escanea códigos de barras para agregar productos</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Repuestos Externos */}
-        <Card className="shadow-xl border-0">
+        <Card className="shadow-lg border-0 animate-fade-in">
           <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
               <div className="flex items-center space-x-2">
                 <ShoppingCart className="h-5 w-5" />
                 <span>Repuestos Externos</span>
@@ -880,160 +797,145 @@ export default function NuevaOrdenPage() {
               <Button
                 type="button"
                 onClick={() => setShowRepuestoModal(true)}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar Repuesto
               </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             {repuestosExternos.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Repuesto
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Proveedor
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Cantidad
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        P. Compra
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        P. Venta
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Utilidad
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Subtotal
-                      </th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {repuestosExternos.map((repuesto, index) => (
-                      <tr
-                        key={repuesto.id}
-                        className="border-b border-gray-100"
-                      >
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {repuesto.nombre}
-                            </div>
-                            {repuesto.descripcion && (
-                              <div className="text-sm text-gray-500">
-                                {repuesto.descripcion}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">
-                          {repuesto.proveedor || "-"}
-                        </td>
-                        <td className="py-3 px-4 font-medium">
-                          {repuesto.cantidad}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">
-                          ${repuesto.precioCompra.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 font-medium text-orange-600">
-                          ${repuesto.precioVenta.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 font-medium text-green-600">
-                          ${repuesto.utilidad.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-orange-600">
-                          ${repuesto.subtotal.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => removerRepuestoExterno(index)}
-                            className="text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
+              <div className="max-h-96 overflow-y-auto">
+                <div className="hidden lg:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">Repuesto</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Proveedor</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Cantidad</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">P. Compra</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">P. Venta</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Utilidad</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Subtotal</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {repuestosExternos.map((repuesto, index) => (
+                        <tr key={repuesto.id} className="border-b border-gray-100">
+                          <td className="py-3 px-3 min-w-0">
+                            <div className="whitespace-normal break-words">
+                              <div className="font-medium text-sm sm:text-base text-gray-900">{repuesto.nombre}</div>
+                              {repuesto.descripcion && (
+                                <div className="text-xs sm:text-sm text-gray-500">{repuesto.descripcion}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600 whitespace-normal break-words">{repuesto.proveedor || "-"}</td>
+                          <td className="py-3 px-3 font-medium text-sm sm:text-base">{repuesto.cantidad}</td>
+                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600">${repuesto.precioCompra.toLocaleString()}</td>
+                          <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">${repuesto.precioVenta.toLocaleString()}</td>
+                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">${repuesto.utilidad.toLocaleString()}</td>
+                          <td className="py-3 px-3 font-bold text-orange-600 text-sm sm:text-base">${repuesto.subtotal.toLocaleString()}</td>
+                          <td className="py-3 px-3">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => removerRepuestoExterno(index)}
+                              className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="lg:hidden space-y-4">
+                  {repuestosExternos.map((repuesto, index) => (
+                    <div key={repuesto.id} className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">{repuesto.nombre}</span>
+                        {repuesto.descripcion && (
+                          <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">{repuesto.descripcion}</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="text-sm sm:text-base flex flex-col">
+                          <div><span className="font-medium">Proveedor: </span>{repuesto.proveedor || "-"}</div>
+                          <div><span className="font-medium">Cantidad: </span>{repuesto.cantidad}</div>
+                        </div>
+                        <div className="text-sm sm:text-base text-right">
+                          <div><span className="font-medium">P. Compra: </span>${repuesto.precioCompra.toLocaleString()}</div>
+                          <div><span className="font-medium">P. Venta: </span>${repuesto.precioVenta.toLocaleString()}</div>
+                          <div><span className="font-medium">Utilidad: </span><span className="text-green-600">${repuesto.utilidad.toLocaleString()}</span></div>
+                          <div><span className="font-medium">Subtotal: </span><span className="font-bold text-orange-600">${repuesto.subtotal.toLocaleString()}</span></div>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removerRepuestoExterno(index)}
+                          className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>No hay repuestos externos agregados</p>
-                <p className="text-sm">
-                  Agrega repuestos que no están en el inventario
-                </p>
+                <p className="text-sm sm:text-base">No hay repuestos externos agregados</p>
+                <p className="text-xs sm:text-sm">Agrega repuestos que no están en el inventario</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Resumen y Total */}
-        <Card className="shadow-xl border-0 bg-gradient-to-r from-gray-50 to-blue-50">
+        <Card className="shadow-lg border-0 bg-gradient-to-r from-gray-50 to-blue-50 animate-fade-in">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-gray-800">
+            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-gray-800">
               <Calculator className="h-5 w-5 text-blue-600" />
               <span>Resumen de la Orden</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-              <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+          <CardContent className="p-4 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Servicios</div>
-                <div className="text-2xl font-bold text-green-600">
-                  ${totales.totalServicios.toLocaleString()}
-                </div>
+                <div className="text-lg sm:text-xl font-bold text-green-600">${totales.totalServicios.toLocaleString()}</div>
               </div>
-              <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+              <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Productos</div>
-                <div className="text-2xl font-bold text-blue-600">
-                  ${totales.totalProductos.toLocaleString()}
-                </div>
+                <div className="text-lg sm:text-xl font-bold text-blue-600">${totales.totalProductos.toLocaleString()}</div>
               </div>
-              <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+              <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Repuestos Ext.</div>
-                <div className="text-2xl font-bold text-orange-600">
-                  ${totales.totalRepuestosExternos.toLocaleString()}
-                </div>
+                <div className="text-lg sm:text-xl font-bold text-orange-600">${totales.totalRepuestosExternos.toLocaleString()}</div>
               </div>
-              <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+              <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Mano de Obra</div>
-                <div className="text-2xl font-bold text-indigo-600">
-                  ${totales.manoDeObra.toLocaleString()}
-                </div>
+                <div className="text-lg sm:text-xl font-bold text-indigo-600">${totales.manoDeObra.toLocaleString()}</div>
               </div>
-              <div className="text-center p-4 bg-white rounded-xl shadow-sm border-2 border-purple-200">
+              <div className="text-center p-4 bg-white rounded-lg shadow-sm border-2 border-purple-200">
                 <div className="text-sm text-gray-600 mb-1">Total</div>
-                <div className="text-3xl font-bold text-purple-600">
-                  ${totales.total.toLocaleString()}
-                </div>
+                <div className="text-xl sm:text-2xl font-bold text-purple-600">${totales.total.toLocaleString()}</div>
               </div>
             </div>
-
             {totales.utilidadRepuestos > 0 && (
-              <div className="mt-6 p-4 bg-green-50 rounded-xl border border-green-200">
+              <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-700 font-medium">
-                    Utilidad Repuestos Externos:
-                  </span>
-                  <span className="text-xl font-bold text-green-600">
-                    ${totales.utilidadRepuestos.toLocaleString()}
-                  </span>
+                  <span className="text-sm sm:text-base text-gray-700 font-medium">Utilidad Repuestos Externos:</span>
+                  <span className="text-lg sm:text-xl font-bold text-green-600">${totales.utilidadRepuestos.toLocaleString()}</span>
                 </div>
               </div>
             )}
@@ -1041,20 +943,20 @@ export default function NuevaOrdenPage() {
         </Card>
 
         {/* Botones */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => window.history.back()}
             disabled={loading}
-            className="px-8 py-3"
+            className="px-6 py-2 text-sm sm:text-base border-gray-200 shadow-sm hover:scale-105 transition-transform"
           >
             Cancelar
           </Button>
           <Button
             type="submit"
             disabled={loading}
-            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 px-8 py-3 shadow-lg"
+            className="px-6 py-2 text-sm sm:text-base bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg hover:scale-105 transition-transform"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
@@ -1073,13 +975,11 @@ export default function NuevaOrdenPage() {
         onScan={handleBarcodeScanned}
         title="Escanear Producto para Orden"
       />
-
       <ClienteForm
         isOpen={showClienteModal}
         onClose={() => setShowClienteModal(false)}
         onSuccess={handleClienteCreated}
       />
-
       {selectedClienteId && (
         <VehiculoForm
           isOpen={showVehiculoModal}
@@ -1088,13 +988,11 @@ export default function NuevaOrdenPage() {
           clienteId={selectedClienteId}
         />
       )}
-
       <RepuestoExternoModal
         isOpen={showRepuestoModal}
         onClose={() => setShowRepuestoModal(false)}
         onAdd={agregarRepuestoExterno}
       />
-
       <LubricacionModal
         isOpen={showLubricacionModal}
         onClose={() => {
@@ -1108,15 +1006,7 @@ export default function NuevaOrdenPage() {
 }
 
 // Componente para modal de repuesto externo
-function RepuestoExternoModal({
-  isOpen,
-  onClose,
-  onAdd,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onAdd: (repuesto: RepuestoExterno) => void;
-}) {
+function RepuestoExternoModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd: (repuesto: RepuestoExterno) => void }) {
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -1134,23 +1024,15 @@ function RepuestoExternoModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (
-      !formData.nombre ||
-      formData.precioCompra <= 0 ||
-      formData.precioVenta <= 0
-    ) {
+    if (!formData.nombre || formData.precioCompra <= 0 || formData.precioVenta <= 0) {
       toast.error("Completa todos los campos requeridos");
       return;
     }
-
     if (formData.precioVenta < formData.precioCompra) {
       toast.error("El precio de venta debe ser mayor al precio de compra");
       return;
     }
-
     const utilidad = calcularUtilidad();
-
     const repuesto: RepuestoExterno = {
       id: Date.now().toString(),
       nombre: formData.nombre,
@@ -1162,7 +1044,6 @@ function RepuestoExternoModal({
       utilidad: utilidad,
       proveedor: formData.proveedor,
     };
-
     onAdd(repuesto);
     setFormData({
       nombre: "",
@@ -1177,130 +1058,92 @@ function RepuestoExternoModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Repuesto Externo">
+    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Repuesto Externo" className="animate-fade-in">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nombre del Repuesto *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Repuesto *</label>
           <Input
             value={formData.nombre}
-            onChange={(e) =>
-              setFormData({ ...formData, nombre: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
             placeholder="Ej: Pastillas de freno Toyota"
+            className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
             required
           />
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descripción
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
           <Input
             value={formData.descripcion}
-            onChange={(e) =>
-              setFormData({ ...formData, descripcion: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
             placeholder="Descripción adicional"
+            className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
           />
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Proveedor
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
           <Input
             value={formData.proveedor}
-            onChange={(e) =>
-              setFormData({ ...formData, proveedor: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
             placeholder="Nombre del proveedor"
+            className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
           />
         </div>
-
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cantidad *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
             <Input
               type="number"
               min="1"
               value={formData.cantidad}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  cantidad: parseInt(e.target.value) || 1,
-                })
-              }
+              onChange={(e) => setFormData({ ...formData, cantidad: parseInt(e.target.value) || 1 })}
+              className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Precio Compra *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Precio Compra *</label>
             <Input
               type="number"
               step="100"
               min="0"
               value={formData.precioCompra}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  precioCompra: parseFloat(e.target.value) || 0,
-                })
-              }
+              onChange={(e) => setFormData({ ...formData, precioCompra: parseFloat(e.target.value) || 0 })}
+              className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Precio Venta *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Precio Venta *</label>
             <Input
               type="number"
               step="100"
               min="0"
               value={formData.precioVenta}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  precioVenta: parseFloat(e.target.value) || 0,
-                })
-              }
+              onChange={(e) => setFormData({ ...formData, precioVenta: parseFloat(e.target.value) || 0 })}
+              className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               required
             />
           </div>
         </div>
-
         <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Total Compra:</span>
-            <span className="font-medium text-gray-800">
-              ${(formData.cantidad * formData.precioCompra).toLocaleString()}
-            </span>
+          <div className="flex justify-between items-center text-sm sm:text-base">
+            <span className="text-gray-600">Total Compra:</span>
+            <span className="font-medium text-gray-800">${(formData.cantidad * formData.precioCompra).toLocaleString()}</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Total Venta:</span>
-            <span className="font-medium text-orange-600">
-              ${(formData.cantidad * formData.precioVenta).toLocaleString()}
-            </span>
+          <div className="flex justify-between items-center text-sm sm:text-base">
+            <span className="text-gray-600">Total Venta:</span>
+            <span className="font-medium text-orange-600">${(formData.cantidad * formData.precioVenta).toLocaleString()}</span>
           </div>
-          <div className="flex justify-between items-center border-t pt-2">
+          <div className="flex justify-between items-center border-t pt-2 text-sm sm:text-base">
             <span className="font-medium text-gray-700">Utilidad:</span>
-            <span className="text-xl font-bold text-green-600">
-              ${calcularUtilidad().toLocaleString()}
-            </span>
+            <span className="font-bold text-green-600">${calcularUtilidad().toLocaleString()}</span>
           </div>
         </div>
-
         <div className="flex justify-end space-x-3 pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} className="px-6 py-2 text-sm sm:text-base border-gray-200 shadow-sm hover:scale-105 transition-transform">
             Cancelar
           </Button>
-          <Button type="submit" className="bg-orange-600 hover:bg-orange-700">
+          <Button type="submit" className="px-6 py-2 text-sm sm:text-base bg-orange-600 hover:bg-orange-700 hover:scale-105 transition-transform">
             Agregar Repuesto
           </Button>
         </div>
