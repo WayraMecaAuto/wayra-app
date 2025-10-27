@@ -60,9 +60,26 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-
-    // Separar servicios del resto de datos
     const { servicios, ...ordenData } = body
+
+    // Obtener orden actual
+    const ordenActual = await prisma.ordenServicio.findUnique({
+      where: { id },
+      include: {
+        detalles: {
+          include: {
+            producto: true
+          }
+        }
+      }
+    })
+
+    // No permitir editar órdenes completadas
+    if (ordenActual?.estado === 'COMPLETADO') {
+      return NextResponse.json({ 
+        error: 'No se pueden editar órdenes completadas' 
+      }, { status: 403 })
+    }
 
     // Si es CANCELADO, eliminar la orden
     if (ordenData.estado === 'CANCELADO') {
@@ -72,7 +89,7 @@ export async function PATCH(
       return NextResponse.json({ message: 'Orden cancelada y eliminada' })
     }
 
-    // Si hay servicios para actualizar
+    // Actualizar servicios si se proporcionan
     if (servicios && Array.isArray(servicios)) {
       const serviciosActuales = await prisma.servicioOrden.findMany({
         where: { ordenId: id }
@@ -143,20 +160,99 @@ export async function PATCH(
         cliente: true,
         vehiculo: true,
         mecanico: { select: { name: true } },
-        servicios: true
+        servicios: true,
+        detalles: {
+          include: {
+            producto: true
+          }
+        },
+        repuestosExternos: true
       }
     })
 
-    // Si se marca como COMPLETADA, NO registrar productos en contabilidad
-    // Los productos ya se registraron cuando se agregaron a la orden
-    if (ordenData.estado === 'COMPLETADO') {
+    // Si se marca como COMPLETADA, registrar en contabilidad
+    if (ordenData.estado === 'COMPLETADO' && ordenActual?.estado !== 'COMPLETADO') {
       const ahora = new Date()
       const mes = ahora.getMonth() + 1
       const anio = ahora.getFullYear()
 
-      // Solo registramos el total de la orden en Wayra Taller
-      // (servicios + repuestos externos + mano de obra)
-      // NO incluimos productos porque ya están en su contabilidad respectiva
+      // 1. Registrar productos WAYRA en contabilidad WAYRA_PRODUCTOS
+      const productosWayra = orden.detalles.filter(d => 
+        d.producto.tipo === 'WAYRA_ENI' || d.producto.tipo === 'WAYRA_CALAN'
+      )
+
+      if (productosWayra.length > 0) {
+        const totalWayra = productosWayra.reduce((sum, d) => sum + d.subtotal, 0)
+        
+        const movWayra = await prisma.movimientoContable.create({
+          data: {
+            tipo: 'INGRESO',
+            concepto: 'VENTA_DESDE_ORDEN',
+            monto: totalWayra,
+            fecha: ahora,
+            descripcion: `Productos Wayra - Orden ${orden.numeroOrden}`,
+            entidad: 'WAYRA_PRODUCTOS',
+            referencia: orden.id,
+            mes,
+            anio,
+            usuarioId: session.user.id
+          }
+        })
+
+        for (const detalle of productosWayra) {
+          await prisma.detalleIngresoContable.create({
+            data: {
+              movimientoContableId: movWayra.id,
+              productoId: detalle.productoId,
+              cantidad: detalle.cantidad,
+              precioCompra: detalle.producto.precioCompra,
+              precioVenta: detalle.precioUnitario,
+              subtotalCompra: detalle.producto.precioCompra * detalle.cantidad,
+              subtotalVenta: detalle.subtotal,
+              utilidad: detalle.subtotal - (detalle.producto.precioCompra * detalle.cantidad)
+            }
+          })
+        }
+      }
+
+      // 2. Registrar productos TORNI_REPUESTO en contabilidad TORNIREPUESTOS
+      const productosTorni = orden.detalles.filter(d => 
+        d.producto.tipo === 'TORNI_REPUESTO' || d.producto.tipo === 'TORNILLERIA'
+      )
+
+      if (productosTorni.length > 0) {
+        const totalTorni = productosTorni.reduce((sum, d) => sum + d.subtotal, 0)
+        
+        const movTorni = await prisma.movimientoContable.create({
+          data: {
+            tipo: 'INGRESO',
+            concepto: 'VENTA_DESDE_ORDEN',
+            monto: totalTorni,
+            fecha: ahora,
+            descripcion: `Productos TorniRepuestos - Orden ${orden.numeroOrden}`,
+            entidad: 'TORNIREPUESTOS',
+            referencia: orden.id,
+            mes,
+            anio,
+            usuarioId: session.user.id
+          }
+        })
+
+        for (const detalle of productosTorni) {
+          await prisma.detalleIngresoContable.create({
+            data: {
+              movimientoContableId: movTorni.id,
+              productoId: detalle.productoId,
+              cantidad: detalle.cantidad,
+              precioCompra: detalle.producto.precioCompra,
+              precioVenta: detalle.precioUnitario,
+              subtotalCompra: detalle.producto.precioCompra * detalle.cantidad,
+              subtotalVenta: detalle.subtotal,
+              utilidad: detalle.subtotal - (detalle.producto.precioCompra * detalle.cantidad)
+            }
+          })
+        }
+      }
     }
 
     return NextResponse.json(orden)

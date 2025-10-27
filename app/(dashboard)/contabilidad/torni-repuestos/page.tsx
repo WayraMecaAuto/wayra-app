@@ -1,4 +1,3 @@
-// app/(dashboard)/contabilidad/torni-repuestos/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'

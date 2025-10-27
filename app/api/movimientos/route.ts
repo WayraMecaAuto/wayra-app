@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
 
-// Roles permitidos para cada tipo de movimiento
 const ROLES_ENTRADA = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'ADMIN_WAYRA_PRODUCTOS', 'ADMIN_TORNI_REPUESTOS']
 const ROLES_SALIDA = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'ADMIN_WAYRA_PRODUCTOS', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_WAYRA', 'VENDEDOR_TORNI']
 
@@ -15,7 +14,6 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Todos los roles pueden consultar movimientos
     const movimientos = await prisma.movimientoInventario.findMany({
       take: 50,
       orderBy: { fecha: 'desc' },
@@ -48,15 +46,14 @@ export async function POST(request: NextRequest) {
     const { productoId, tipo, cantidad, motivo, precioUnitario } = body
     const userRole = session.user.role
 
-    // Validaciones de campos requeridos
+    // Validaciones
     if (!productoId || !tipo || !cantidad) {
       return NextResponse.json({ error: 'Campos requeridos faltantes' }, { status: 400 })
     }
 
-    // Validar permisos según tipo de movimiento
     if (tipo === 'ENTRADA' && !ROLES_ENTRADA.includes(userRole)) {
       return NextResponse.json({
-        error: 'No tienes permisos para registrar entradas de inventario. Solo administradores pueden realizar esta acción.'
+        error: 'No tienes permisos para registrar entradas de inventario.'
       }, { status: 403 })
     }
 
@@ -66,7 +63,6 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Convertir cantidad a número entero
     const cantidadNum = parseInt(cantidad.toString())
     const precioUnitarioNum = precioUnitario && precioUnitario !== '' ? parseFloat(precioUnitario.toString()) : null
 
@@ -74,7 +70,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cantidad inválida' }, { status: 400 })
     }
 
-    // Obtener producto actual
+    // Obtener producto
     const producto = await prisma.producto.findUnique({
       where: { id: productoId }
     })
@@ -98,9 +94,15 @@ export async function POST(request: NextRequest) {
       nuevoStock -= cantidadNum
     }
 
-    // Crear movimiento y actualizar stock en una transacción
+    // Determinar entidad contable según tipo de producto
+    let entidadContable = 'TORNIREPUESTOS'
+    if (producto.tipo === 'WAYRA_ENI' || producto.tipo === 'WAYRA_CALAN') {
+      entidadContable = 'WAYRA_PRODUCTOS'
+    }
+
+    // Crear movimiento, actualizar stock y registrar en contabilidad
     const movimiento = await prisma.$transaction(async (tx) => {
-      // Crear el movimiento
+      // 1. Crear movimiento de inventario
       const nuevoMovimiento = await tx.movimientoInventario.create({
         data: {
           tipo,
@@ -121,11 +123,47 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Actualizar stock del producto
+      // 2. Actualizar stock
       await tx.producto.update({
         where: { id: productoId },
         data: { stock: nuevoStock }
       })
+
+      // 3. Si es SALIDA (venta directa), registrar en contabilidad
+      if (tipo === 'SALIDA' && precioUnitarioNum) {
+        const ahora = new Date()
+        const mes = ahora.getMonth() + 1
+        const anio = ahora.getFullYear()
+
+        const movimientoContable = await tx.movimientoContable.create({
+          data: {
+            tipo: 'INGRESO',
+            concepto: 'VENTA_PRODUCTO',
+            monto: precioUnitarioNum * cantidadNum,
+            fecha: ahora,
+            descripcion: `Venta directa: ${producto.nombre} - ${motivo}`,
+            entidad: entidadContable,
+            referencia: productoId,
+            mes,
+            anio,
+            usuarioId: session.user.id
+          }
+        })
+
+        // Crear detalle del ingreso
+        await tx.detalleIngresoContable.create({
+          data: {
+            movimientoContableId: movimientoContable.id,
+            productoId,
+            cantidad: cantidadNum,
+            precioCompra: producto.precioCompra,
+            precioVenta: precioUnitarioNum,
+            subtotalCompra: producto.precioCompra * cantidadNum,
+            subtotalVenta: precioUnitarioNum * cantidadNum,
+            utilidad: (precioUnitarioNum - producto.precioCompra) * cantidadNum
+          }
+        })
+      }
 
       return nuevoMovimiento
     })
