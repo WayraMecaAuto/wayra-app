@@ -100,7 +100,7 @@ function generarHTMLFactura(factura: any, logoBase64: string): string {
   const año = fecha.getFullYear()
 
   // Generar título personalizado
-  const titulo = `FAC-${factura.numeroFactura.split('-')[1]} - ORDEN ${factura.orden.numeroOrden} - ${mes.toUpperCase()} ${año}`
+  const titulo = `FAC-${factura.numeroFactura.split('-')[1]}`
 
   return `
     <!DOCTYPE html>
@@ -497,8 +497,7 @@ function generarHTMLFactura(factura: any, logoBase64: string): string {
             <span>${factura.subtotal.toLocaleString('es-CO')}</span>
           </div>
           <div class="total-row">
-            <span>IVA (19%):</span>
-            <span>${factura.iva.toLocaleString('es-CO')}</span>
+            <span>IVA (19%)</span>
           </div>
           <div class="total-row final">
             <span>Total:</span>

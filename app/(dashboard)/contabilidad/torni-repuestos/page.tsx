@@ -12,6 +12,7 @@ import {
   Download,
   Plus,
   Trash2,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +54,12 @@ export default function ContabilidadTorniRepuestosPage() {
   const [showEgresoModal, setShowEgresoModal] = useState(false);
   const [searchIngresos, setSearchIngresos] = useState("");
   const [searchEgresos, setSearchEgresos] = useState("");
+  const currentYear = new Date().getFullYear();
+  const years = [];
+
+  for (let year = 2025; year <= currentYear + 10; year++) {
+    years.push(year);
+  }
 
   const hasAccess = ["SUPER_USUARIO", "ADMIN_TORNI_REPUESTOS"].includes(
     session?.user?.role || ""
@@ -122,18 +129,6 @@ export default function ContabilidadTorniRepuestosPage() {
 
   const totales = calcularTotales();
 
-  if (!hasAccess) {
-    redirect("/dashboard");
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
-
   const filteredIngresos = ingresos.filter(
     (i) =>
       i.descripcion.toLowerCase().includes(searchIngresos.toLowerCase()) ||
@@ -146,6 +141,18 @@ export default function ContabilidadTorniRepuestosPage() {
       e.descripcion.toLowerCase().includes(searchEgresos.toLowerCase()) ||
       e.concepto.toLowerCase().includes(searchEgresos.toLowerCase())
   );
+
+  if (!hasAccess) {
+    redirect("/dashboard");
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -203,8 +210,12 @@ export default function ContabilidadTorniRepuestosPage() {
                 onChange={(e) => setAño(parseInt(e.target.value))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
-                <option value={2024}>2024</option>
-                <option value={2025}>2025</option>
+                <option value="ALL">Todos los años</option>
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
               </select>
             </div>
             <Button className="bg-purple-600 hover:bg-purple-700">
@@ -279,15 +290,26 @@ export default function ContabilidadTorniRepuestosPage() {
       {/* Ingresos */}
       <Card>
         <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="h-5 w-5" />
-            <span>Ventas Directas</span>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="h-5 w-5" />
+              <span>Ventas Directas ({filteredIngresos.length})</span>
+            </CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar..."
+                value={searchIngresos}
+                onChange={(e) => setSearchIngresos(e.target.value)}
+                className="pl-9 h-9 bg-white text-gray-900"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-96 scrollbar-thin scrollbar-thumb-green-300 scrollbar-track-gray-100">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">
                     Fecha
@@ -316,8 +338,8 @@ export default function ContabilidadTorniRepuestosPage() {
                 </tr>
               </thead>
               <tbody>
-                {ingresos.length > 0 ? (
-                  ingresos.map((ingreso, index) => (
+                {filteredIngresos.length > 0 ? (
+                  filteredIngresos.map((ingreso, index) => (
                     <tr
                       key={ingreso.id}
                       className={`border-b ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
@@ -374,21 +396,32 @@ export default function ContabilidadTorniRepuestosPage() {
         <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg flex flex-row items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <TrendingDown className="h-5 w-5" />
-            <span>Egresos</span>
+            <span>Egresos ({filteredEgresos.length})</span>
           </CardTitle>
-          <Button
-            onClick={() => setShowEgresoModal(true)}
-            size="sm"
-            className="bg-white text-orange-600 hover:bg-orange-50"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar
-          </Button>
+          <div className="flex items-center space-x-3">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar..."
+                value={searchEgresos}
+                onChange={(e) => setSearchEgresos(e.target.value)}
+                className="pl-9 h-9 bg-white text-gray-900"
+              />
+            </div>
+            <Button
+              onClick={() => setShowEgresoModal(true)}
+              size="sm"
+              className="bg-white text-orange-600 hover:bg-orange-50"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-96 scrollbar-thin scrollbar-thumb-orange-300 scrollbar-track-gray-100">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">
                     Fecha
@@ -408,8 +441,8 @@ export default function ContabilidadTorniRepuestosPage() {
                 </tr>
               </thead>
               <tbody>
-                {egresos.length > 0 ? (
-                  egresos.map((egreso, index) => (
+                {filteredEgresos.length > 0 ? (
+                  filteredEgresos.map((egreso, index) => (
                     <tr
                       key={egreso.id}
                       className={`border-b ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
@@ -534,6 +567,13 @@ function EgresoModal({ isOpen, onClose, onSuccess, apiUrl }: any) {
           >
             <option value="GASTO_OPERATIVO">Gasto Operativo</option>
             <option value="COMPRA_PRODUCTO">Compra de Producto</option>
+            <option value="GASTO_NOMINA">Nómina</option>
+            <option value="SERVICIOS_PUBLICOS">Servicios Públicos</option>
+            <option value="ARRIENDO">Arriendo</option>
+            <option value="MANTENIMIENTO">Mantenimiento</option>
+            <option value="TRANSPORTE">Transporte</option>
+            <option value="MARKETING">Marketing y Publicidad</option>
+            <option value="IMPUESTOS">Impuestos</option>
             <option value="OTRO">Otro</option>
           </select>
         </div>

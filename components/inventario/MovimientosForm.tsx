@@ -84,8 +84,20 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
         setIsLoading(false)
         return
       }
+
+      //  Determinar la entidad contable según el tipo de producto
+      let entidadContable = 'WAYRA_PRODUCTOS'
+      if (product.tipo === 'TORNI_REPUESTO' || product.tipo === 'TORNILLERIA') {
+        entidadContable = 'TORNIREPUESTOS'
+      } else if (product.tipo === 'WAYRA_ENI' || product.tipo === 'WAYRA_CALAN') {
+        entidadContable = 'WAYRA_PRODUCTOS'
+      }
+
+      console.log('📊 Producto:', product.nombre)
+      console.log('📦 Tipo producto:', product.tipo)
+      console.log('🏢 Entidad contable:', entidadContable)
       
-      // 1. Crear movimiento de inventario
+      // 1. Crear movimiento de inventario (esto actualiza el stock automáticamente)
       const movResponse = await fetch('/api/movimientos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,7 +106,7 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
           tipo: data.tipo,
           cantidad: cantidadNum,
           motivo: data.motivo,
-          precioUnitario: data.precioUnitario && data.precioUnitario !== '' ? parseFloat(data.precioUnitario) : null
+          precioUnitario: tipo === 'SALIDA' ? precioVenta : (data.precioUnitario && data.precioUnitario !== '' ? parseFloat(data.precioUnitario) : null)
         })
       })
 
@@ -105,17 +117,18 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
         return
       }
 
-      // 2. Si es SALIDA, registrar en contabilidad
+      // 2. Si es SALIDA (venta directa), registrar en contabilidad
       if (data.tipo === 'SALIDA') {
         const ahora = new Date()
+        const mes = ahora.getMonth() + 1
+        const anio = ahora.getFullYear()
 
-        // Determinar entidad según el tipo de producto
-        let entidad = 'WAYRA_PRODUCTOS'
-        if (product.tipo === 'TORNI_REPUESTO' || product.tipo === 'TORNILLERIA') {
-          entidad = 'TORNI_REPUESTOS'
-        }
+        console.log('💰 Registrando venta en contabilidad...')
+        console.log('   - Entidad:', entidadContable)
+        console.log('   - Monto:', precioVenta * cantidadNum)
+        console.log('   - Producto:', product.nombre)
 
-        // Crear movimiento contable
+        // Crear movimiento contable de INGRESO
         const movimientoResponse = await fetch('/api/movimientos-contables', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -123,32 +136,40 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
             tipo: 'INGRESO',
             concepto: 'VENTA_PRODUCTO',
             monto: precioVenta * cantidadNum,
-            descripcion: `${data.motivo} - ${product.nombre}`,
-            entidad,
+            descripcion: `Venta directa: ${product.nombre} - ${data.motivo}`,
+            entidad: entidadContable,
             referencia: product.id,
-            mes: ahora.getMonth() + 1,
-            anio: ahora.getFullYear()
+            mes,
+            anio
           })
         })
 
         if (movimientoResponse.ok) {
           const movimientoData = await movimientoResponse.json()
+          console.log('✅ Movimiento contable creado:', movimientoData.id)
           
-          // Crear detalle de ingreso
-          await fetch('/api/detalles-ingreso-contable', {
+          // Crear detalle de ingreso contable
+          const detalleResponse = await fetch('/api/contabilidad/crear-ingreso', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              movimientoContableId: movimientoData.id,
               productoId: product.id,
               cantidad: cantidadNum,
               precioCompra: product.precioCompra,
               precioVenta: precioVenta,
-              subtotalCompra: product.precioCompra * cantidadNum,
-              subtotalVenta: precioVenta * cantidadNum,
-              utilidad: (precioVenta - product.precioCompra) * cantidadNum
+              descripcion: product.nombre,
+              entidad: entidadContable,
+              esDesdeOrden: false
             })
           })
+
+          if (detalleResponse.ok) {
+            console.log('✅ Detalle contable registrado correctamente')
+          } else {
+            console.error('⚠️ Error al crear detalle contable:', await detalleResponse.text())
+          }
+        } else {
+          console.error('⚠️ Error al crear movimiento contable:', await movimientoResponse.text())
         }
       }
 
@@ -156,7 +177,7 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
       onSuccess()
       handleClose()
     } catch (error) {
-      console.error('Error:', error)
+      console.error('❌ Error:', error)
       toast.error('Error al registrar movimiento')
     } finally {
       setIsLoading(false)
@@ -203,6 +224,9 @@ export function MovementForm({ isOpen, onClose, onSuccess, product, restrictToSa
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-gray-900 text-base sm:text-lg truncate">{product.nombre}</h4>
               <p className="text-xs sm:text-sm text-gray-600 mt-0.5">Código: {product.codigo}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Tipo: {product.tipo === 'WAYRA_ENI' ? 'Wayra ENI' : product.tipo === 'WAYRA_CALAN' ? 'Wayra CALAN' : product.tipo === 'TORNI_REPUESTO' ? 'TorniRepuestos' : 'Tornillería'}
+              </p>
             </div>
             <div className="text-right flex-shrink-0">
               <div className="text-xs sm:text-sm text-gray-600 mb-0.5">Stock</div>
