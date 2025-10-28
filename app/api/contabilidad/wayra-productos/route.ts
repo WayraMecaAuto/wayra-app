@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const mes = parseInt(searchParams.get('mes') || '1')
-    const año = parseInt(searchParams.get('año') || '2024')
+    const mes = parseInt(searchParams.get('mes') || String(new Date().getMonth() + 1))
+    const año = parseInt(searchParams.get('año') || String(new Date().getFullYear()))
 
-    // Obtener ingresos
+    // Obtener ingresos de productos vendidos (órdenes y ventas directas)
     const ingresosMovimientos = await prisma.movimientoContable.findMany({
       where: {
         tipo: 'INGRESO',
@@ -28,10 +28,17 @@ export async function GET(request: NextRequest) {
       include: {
         detalleIngresos: {
           include: {
-            producto: true
+            producto: {
+              select: {
+                nombre: true,
+                codigo: true,
+                tipo: true
+              }
+            }
           }
         }
-      }
+      },
+      orderBy: { fecha: 'desc' }
     })
 
     const ingresos = ingresosMovimientos.flatMap(mov =>
@@ -39,13 +46,14 @@ export async function GET(request: NextRequest) {
         id: detalle.id,
         fecha: mov.fecha,
         cantidad: detalle.cantidad,
-        descripcion: mov.descripcion,
+        descripcion: detalle.producto.nombre,
+        tipo: detalle.producto.tipo,
         precioCompra: detalle.precioCompra,
         precioVenta: detalle.precioVenta,
         utilidad: detalle.utilidad,
-        ordenId: mov.referencia,
+        ordenId: mov.referencia?.startsWith('ORD-') ? mov.referencia : null,
         productoId: detalle.productoId,
-        concepto: mov.concepto
+        motivo: mov.descripcion
       }))
     )
 
@@ -61,7 +69,8 @@ export async function GET(request: NextRequest) {
         usuario: {
           select: { name: true }
         }
-      }
+      },
+      orderBy: { fecha: 'desc' }
     })
 
     const egresosFormato = egresos.map(e => ({
@@ -78,7 +87,7 @@ export async function GET(request: NextRequest) {
       egresos: egresosFormato
     })
   } catch (error) {
-    console.error('Error fetching contabilidad:', error)
+    console.error('Error fetching contabilidad wayra-productos:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
@@ -103,7 +112,6 @@ export async function POST(request: NextRequest) {
     const mes = ahora.getMonth() + 1
     const anio = ahora.getFullYear()
 
-    // Crear egreso
     const egreso = await prisma.movimientoContable.create({
       data: {
         tipo: 'EGRESO',
@@ -114,12 +122,51 @@ export async function POST(request: NextRequest) {
         mes,
         anio,
         usuarioId: session.user.id
+      },
+      include: {
+        usuario: {
+          select: { name: true }
+        }
       }
     })
 
-    return NextResponse.json(egreso, { status: 201 })
+    return NextResponse.json({
+      id: egreso.id,
+      fecha: egreso.fecha,
+      descripcion: egreso.descripcion,
+      concepto: egreso.concepto,
+      usuario: egreso.usuario.name,
+      valor: egreso.monto
+    }, { status: 201 })
   } catch (error) {
     console.error('Error creating egreso:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
+    if (!session || !hasAccess) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+    }
+
+    await prisma.movimientoContable.delete({
+      where: { id }
+    })
+
+    return NextResponse.json({ message: 'Egreso eliminado' })
+  } catch (error) {
+    console.error('Error deleting egreso:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
