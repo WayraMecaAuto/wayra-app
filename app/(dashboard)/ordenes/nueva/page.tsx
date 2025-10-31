@@ -99,20 +99,31 @@ export default function NuevaOrdenPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [mecanicos, setMecanicos] = useState<any[]>([]);
-  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>([]);
-  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<ServicioConLubricacion[]>([]);
-  const [productosSeleccionados, setProductosSeleccionados] = useState<ProductoOrden[]>([]);
-  const [repuestosExternos, setRepuestosExternos] = useState<RepuestoExterno[]>([]);
+  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>(
+    []
+  );
+  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<
+    ServicioConLubricacion[]
+  >([]);
+  const [productosSeleccionados, setProductosSeleccionados] = useState<
+    ProductoOrden[]
+  >([]);
+  const [repuestosExternos, setRepuestosExternos] = useState<RepuestoExterno[]>(
+    []
+  );
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showClienteModal, setShowClienteModal] = useState(false);
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showRepuestoModal, setShowRepuestoModal] = useState(false);
   const [showLubricacionModal, setShowLubricacionModal] = useState(false);
-  const [servicioLubricacionTemp, setServicioLubricacionTemp] = useState<Servicio | null>(null);
+  const [servicioLubricacionTemp, setServicioLubricacionTemp] =
+    useState<Servicio | null>(null);
 
   // Verificar permisos
-  const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(session?.user?.role || "");
+  const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+    session?.user?.role || ""
+  );
 
   const {
     register,
@@ -211,7 +222,9 @@ export default function NuevaOrdenPage() {
 
   const handleBarcodeScanned = async (code: string) => {
     try {
-      const response = await fetch(`/api/productos/barcode/${encodeURIComponent(code)}`);
+      const response = await fetch(
+        `/api/productos/barcode/${encodeURIComponent(code)}`
+      );
       if (response.ok) {
         const product = await response.json();
         const exists = productosSeleccionados.find((p) => p.id === product.id);
@@ -245,7 +258,9 @@ export default function NuevaOrdenPage() {
       setServicioLubricacionTemp(servicio);
       setShowLubricacionModal(true);
     } else {
-      const existe = serviciosSeleccionados.find((s) => s.clave === servicio.clave);
+      const existe = serviciosSeleccionados.find(
+        (s) => s.clave === servicio.clave
+      );
       if (!existe) {
         setServiciosSeleccionados([...serviciosSeleccionados, servicio]);
         toast.success("Servicio agregado");
@@ -253,50 +268,100 @@ export default function NuevaOrdenPage() {
     }
   };
 
-  const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
-    if (servicioLubricacionTemp) {
-      try {
-        const [aceiteResponse, filtroResponse] = await Promise.all([
-          fetch(`/api/productos/${aceiteId}`),
-          fetch(`/api/productos/${filtroId}`),
-        ]);
-        if (aceiteResponse.ok && filtroResponse.ok) {
-          const aceite = await aceiteResponse.json();
-          const filtro = await filtroResponse.json();
-          const precioTotal = aceite.precioVenta + filtro.precioVenta;
-          const servicioConLubricacion: ServicioConLubricacion = {
-            ...servicioLubricacionTemp,
-            precio: precioTotal,
-            aceiteId,
-            filtroId,
-            aceiteNombre: aceite.nombre,
-            filtroNombre: filtro.nombre,
-          };
-          setServiciosSeleccionados([...serviciosSeleccionados, servicioConLubricacion]);
-          setServicioLubricacionTemp(null);
-          toast.success(
-            <div>
-              <div className="font-semibold">Servicio de lubricación agregado</div>
-              <div className="text-sm mt-1">
-                <div>• {aceite.nombre}</div>
-                <div>• {filtro.nombre}</div>
-                <div className="font-semibold mt-1">Total: ${precioTotal.toLocaleString()}</div>
-              </div>
-            </div>,
-            { duration: 4000 }
-          );
-        } else {
-          toast.error("Error al obtener los precios de los productos");
-        }
-      } catch (error) {
-        console.error("Error calculating lubrication price:", error);
-        toast.error("Error al calcular el precio del servicio");
+  const handleLubricacionAdded = async (
+    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>
+  ) => {
+    if (!servicioLubricacionTemp) return;
+
+    try {
+      console.log("🔧 Procesando lubricación con productos:", productos);
+
+      // Separar aceites y filtros
+      const aceites = productos.filter((p) => p.tipo === "ACEITE");
+      const filtros = productos.filter((p) => p.tipo === "FILTRO");
+
+      if (aceites.length === 0 || filtros.length === 0) {
+        toast.error("❌ Debe haber al menos un aceite y un filtro");
+        return;
       }
+
+      // Obtener información completa de todos los productos
+      const productosCompletos = await Promise.all(
+        productos.map(async (p) => {
+          const response = await fetch(`/api/productos/${p.id}`);
+          if (response.ok) {
+            return await response.json();
+          }
+          throw new Error(`No se pudo obtener el producto ${p.nombre}`);
+        })
+      );
+
+      // Calcular precio total
+      const precioTotal = productosCompletos.reduce(
+        (sum, p) => sum + p.precioVenta,
+        0
+      );
+
+      // Crear descripción detallada
+      const nombresAceites = aceites
+        .map((a) => {
+          const producto = productosCompletos.find((p) => p.id === a.id);
+          return producto?.nombre || a.nombre;
+        })
+        .join(", ");
+
+      const nombresFiltros = filtros
+        .map((f) => {
+          const producto = productosCompletos.find((p) => p.id === f.id);
+          return producto?.nombre || f.nombre;
+        })
+        .join(", ");
+
+      const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
+
+      // Agregar servicio con precio calculado
+      const servicioConLubricacion: ServicioConLubricacion = {
+        ...servicioLubricacionTemp,
+        precio: precioTotal,
+        descripcion: descripcion,
+      };
+
+      setServiciosSeleccionados([
+        ...serviciosSeleccionados,
+        servicioConLubricacion,
+      ]);
+      setServicioLubricacionTemp(null);
+
+      toast.success(
+        <div>
+          <div className="font-semibold">
+            ✅ Servicio de lubricación agregado
+          </div>
+          <div className="text-sm mt-1">
+            <div>
+              • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}
+            </div>
+            <div>
+              • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
+            </div>
+            <div className="font-semibold mt-1">
+              Total: ${precioTotal.toLocaleString()}
+            </div>
+          </div>
+        </div>,
+        { duration: 4000 }
+      );
+    } catch (error) {
+      console.error("❌ Error al procesar lubricación:", error);
+      toast.error("Error al agregar servicio de lubricación");
+      setServicioLubricacionTemp(null);
     }
   };
 
   const removerServicio = (servicioId: string) => {
-    setServiciosSeleccionados(serviciosSeleccionados.filter((s) => s.clave !== servicioId));
+    setServiciosSeleccionados(
+      serviciosSeleccionados.filter((s) => s.clave !== servicioId)
+    );
     toast.success("Servicio removido");
   };
 
@@ -304,17 +369,23 @@ export default function NuevaOrdenPage() {
     const nuevosProductos = [...productosSeleccionados];
     nuevosProductos[index] = { ...nuevosProductos[index], [campo]: valor };
     if (campo === "cantidad" || campo === "precio") {
-      nuevosProductos[index].subtotal = nuevosProductos[index].cantidad * nuevosProductos[index].precio;
+      nuevosProductos[index].subtotal =
+        nuevosProductos[index].cantidad * nuevosProductos[index].precio;
     }
     setProductosSeleccionados(nuevosProductos);
   };
 
   const removerProducto = (index: number) => {
-    setProductosSeleccionados(productosSeleccionados.filter((_, i) => i !== index));
+    setProductosSeleccionados(
+      productosSeleccionados.filter((_, i) => i !== index)
+    );
   };
 
   const agregarRepuestoExterno = (repuesto: RepuestoExterno) => {
-    setRepuestosExternos([...repuestosExternos, { ...repuesto, id: Date.now().toString() }]);
+    setRepuestosExternos([
+      ...repuestosExternos,
+      { ...repuesto, id: Date.now().toString() },
+    ]);
   };
 
   const removerRepuestoExterno = (index: number) => {
@@ -322,12 +393,25 @@ export default function NuevaOrdenPage() {
   };
 
   const calcularTotales = () => {
-    const totalServicios = serviciosSeleccionados.reduce((sum, s) => sum + s.precio, 0);
-    const totalProductos = productosSeleccionados.reduce((sum, p) => sum + p.subtotal, 0);
-    const totalRepuestosExternos = repuestosExternos.reduce((sum, r) => sum + r.subtotal, 0);
-    const subtotal = totalServicios + totalProductos + totalRepuestosExternos + manoDeObra;
+    const totalServicios = serviciosSeleccionados.reduce(
+      (sum, s) => sum + s.precio,
+      0
+    );
+    const totalProductos = productosSeleccionados.reduce(
+      (sum, p) => sum + p.subtotal,
+      0
+    );
+    const totalRepuestosExternos = repuestosExternos.reduce(
+      (sum, r) => sum + r.subtotal,
+      0
+    );
+    const subtotal =
+      totalServicios + totalProductos + totalRepuestosExternos + manoDeObra;
     const total = subtotal;
-    const utilidadRepuestos = repuestosExternos.reduce((sum, r) => sum + r.utilidad, 0);
+    const utilidadRepuestos = repuestosExternos.reduce(
+      (sum, r) => sum + r.utilidad,
+      0
+    );
     return {
       totalServicios,
       totalProductos,
@@ -340,8 +424,14 @@ export default function NuevaOrdenPage() {
   };
 
   const onSubmit = async (data: OrdenForm) => {
-    if (serviciosSeleccionados.length === 0 && productosSeleccionados.length === 0 && repuestosExternos.length === 0) {
-      toast.error("Debe agregar al menos un servicio, producto o repuesto externo");
+    if (
+      serviciosSeleccionados.length === 0 &&
+      productosSeleccionados.length === 0 &&
+      repuestosExternos.length === 0
+    ) {
+      toast.error(
+        "Debe agregar al menos un servicio, producto o repuesto externo"
+      );
       return;
     }
     setLoading(true);
@@ -386,8 +476,12 @@ export default function NuevaOrdenPage() {
             <Plus className="h-6 sm:h-8 w-6 sm:w-8 text-white" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">Nueva Orden de Trabajo</h1>
-            <p className="text-green-100 text-sm sm:text-base">Crear nueva orden de servicio completa</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">
+              Nueva Orden de Trabajo
+            </h1>
+            <p className="text-green-100 text-sm sm:text-base">
+              Crear nueva orden de servicio completa
+            </p>
           </div>
         </div>
       </div>
@@ -406,19 +500,32 @@ export default function NuevaOrdenPage() {
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <div className="relative flex-1">
                   <select
-                    {...register("clienteId", { required: "Selecciona un cliente" })}
+                    {...register("clienteId", {
+                      required: "Selecciona un cliente",
+                    })}
                     className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                   >
                     <option value="">Seleccionar cliente</option>
                     {clientes.map((cliente) => (
                       <option key={cliente.id} value={cliente.id}>
-                        {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
+                        {cliente.nombre}{" "}
+                        {cliente.telefono && `- ${cliente.telefono}`}
                       </option>
                     ))}
                   </select>
                   <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M19 9l-7 7-7-7"
+                      />
                     </svg>
                   </span>
                 </div>
@@ -433,13 +540,17 @@ export default function NuevaOrdenPage() {
                 </Button>
               </div>
               {errors.clienteId && (
-                <p className="text-sm text-red-600">{errors.clienteId.message}</p>
+                <p className="text-sm text-red-600">
+                  {errors.clienteId.message}
+                </p>
               )}
 
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <div className="relative flex-1">
                   <select
-                    {...register("vehiculoId", { required: "Selecciona un vehículo" })}
+                    {...register("vehiculoId", {
+                      required: "Selecciona un vehículo",
+                    })}
                     className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                     disabled={!selectedClienteId}
                   >
@@ -451,8 +562,18 @@ export default function NuevaOrdenPage() {
                     ))}
                   </select>
                   <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M19 9l-7 7-7-7"
+                      />
                     </svg>
                   </span>
                 </div>
@@ -474,12 +595,16 @@ export default function NuevaOrdenPage() {
                 </Button>
               </div>
               {errors.vehiculoId && (
-                <p className="text-sm text-red-600">{errors.vehiculoId.message}</p>
+                <p className="text-sm text-red-600">
+                  {errors.vehiculoId.message}
+                </p>
               )}
 
               <div className="relative">
                 <select
-                  {...register("mecanicoId", { required: "Selecciona un mecánico" })}
+                  {...register("mecanicoId", {
+                    required: "Selecciona un mecánico",
+                  })}
                   className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                 >
                   <option value="">Seleccionar mecánico</option>
@@ -490,19 +615,35 @@ export default function NuevaOrdenPage() {
                   ))}
                 </select>
                 <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </span>
                 {errors.mecanicoId && (
-                  <p className="text-sm text-red-600">{errors.mecanicoId.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.mecanicoId.message}
+                  </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mano de Obra (Opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mano de Obra (Opcional)
+                </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    $
+                  </span>
                   <Input
                     {...register("manoDeObra")}
                     type="number"
@@ -516,13 +657,17 @@ export default function NuevaOrdenPage() {
 
               <div>
                 <textarea
-                  {...register("descripcion", { required: "La descripción es requerida" })}
+                  {...register("descripcion", {
+                    required: "La descripción es requerida",
+                  })}
                   rows={3}
                   placeholder="Describe el trabajo a realizar..."
                   className="w-full px-3 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 resize-none"
                 />
                 {errors.descripcion && (
-                  <p className="text-sm text-red-600">{errors.descripcion.message}</p>
+                  <p className="text-sm text-red-600">
+                    {errors.descripcion.message}
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -544,19 +689,27 @@ export default function NuevaOrdenPage() {
                     className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 min-w-0"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">{servicio.descripcion}</div>
+                      <div className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">
+                        {servicio.descripcion}
+                      </div>
                       {!servicio.requiereLubricacion && (
-                        <div className="text-sm text-gray-500">${servicio.precio.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500">
+                          ${servicio.precio.toLocaleString()}
+                        </div>
                       )}
                       {servicio.requiereLubricacion && (
-                        <div className="text-xs text-blue-600 mt-1">Precio según productos seleccionados</div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          Precio según productos seleccionados
+                        </div>
                       )}
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       onClick={() => agregarServicio(servicio)}
-                      disabled={serviciosSeleccionados.some((s) => s.clave === servicio.clave)}
+                      disabled={serviciosSeleccionados.some(
+                        (s) => s.clave === servicio.clave
+                      )}
                       className="bg-green-600 hover:bg-green-700 hover:scale-105 transition-transform"
                     >
                       <Plus className="h-4 w-4" />
@@ -568,7 +721,9 @@ export default function NuevaOrdenPage() {
               {/* Servicios Seleccionados */}
               {serviciosSeleccionados.length > 0 && (
                 <div className="border-t pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3 text-base sm:text-lg">Servicios Seleccionados:</h4>
+                  <h4 className="font-semibold text-gray-800 mb-3 text-base sm:text-lg">
+                    Servicios Seleccionados:
+                  </h4>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {serviciosSeleccionados.map((servicio, index) => (
                       <div
@@ -576,9 +731,13 @@ export default function NuevaOrdenPage() {
                         className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200 transition-all duration-200 min-w-0"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm sm:text-base text-green-800 whitespace-normal break-words">{servicio.descripcion}</div>
+                          <div className="font-medium text-sm sm:text-base text-green-800 whitespace-normal break-words">
+                            {servicio.descripcion}
+                          </div>
                           <div className="space-y-1 mt-2">
-                            <label className="text-xs text-gray-600">Precio para esta orden:</label>
+                            <label className="text-xs text-gray-600">
+                              Precio para esta orden:
+                            </label>
                             <div className="flex items-center space-x-2">
                               <span className="text-sm text-gray-500">$</span>
                               <Input
@@ -587,25 +746,36 @@ export default function NuevaOrdenPage() {
                                 min="0"
                                 value={servicio.precio}
                                 onChange={(e) => {
-                                  const nuevosServicios = [...serviciosSeleccionados];
-                                  nuevosServicios[index].precio = parseFloat(e.target.value) || 0;
+                                  const nuevosServicios = [
+                                    ...serviciosSeleccionados,
+                                  ];
+                                  nuevosServicios[index].precio =
+                                    parseFloat(e.target.value) || 0;
                                   setServiciosSeleccionados(nuevosServicios);
                                 }}
                                 className="w-32 h-8 text-sm font-semibold border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                               />
-                              <span className="text-sm font-bold text-green-700">${servicio.precio.toLocaleString()}</span>
+                              <span className="text-sm font-bold text-green-700">
+                                ${servicio.precio.toLocaleString()}
+                              </span>
                             </div>
-                            <p className="text-xs text-gray-500">💡 Este precio solo aplica para esta orden</p>
+                            <p className="text-xs text-gray-500">
+                              💡 Este precio solo aplica para esta orden
+                            </p>
                           </div>
                           {servicio.aceiteId && servicio.filtroId && (
                             <div className="text-xs text-green-600 space-y-0.5 mt-2">
                               <div className="flex items-center">
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                <span className="whitespace-normal break-words">Aceite: {servicio.aceiteNombre}</span>
+                                <span className="whitespace-normal break-words">
+                                  Aceite: {servicio.aceiteNombre}
+                                </span>
                               </div>
                               <div className="flex items-center">
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                <span className="whitespace-normal break-words">Filtro: {servicio.filtroNombre}</span>
+                                <span className="whitespace-normal break-words">
+                                  Filtro: {servicio.filtroNombre}
+                                </span>
                               </div>
                             </div>
                           )}
@@ -653,26 +823,49 @@ export default function NuevaOrdenPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">Producto</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Stock</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Cantidad</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Tipo Precio</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Precio Unit.</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Subtotal</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Acciones</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
+                          Producto
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                          Stock
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                          Cantidad
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Tipo Precio
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Precio Unit.
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Subtotal
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                          Acciones
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {productosSeleccionados.map((producto, index) => (
-                        <tr key={producto.id} className="border-b border-gray-100">
+                        <tr
+                          key={producto.id}
+                          className="border-b border-gray-100"
+                        >
                           <td className="py-3 px-3 min-w-0">
                             <div className="whitespace-normal break-words">
-                              <div className="font-medium text-sm sm:text-base text-gray-900">{producto.nombre}</div>
-                              <div className="text-xs sm:text-sm text-gray-500">{producto.codigo}</div>
+                              <div className="font-medium text-sm sm:text-base text-gray-900">
+                                {producto.nombre}
+                              </div>
+                              <div className="text-xs sm:text-sm text-gray-500">
+                                {producto.codigo}
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-3">
-                            <span className={`font-medium ${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}>
+                            <span
+                              className={`font-medium ${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}
+                            >
                               {producto.stock}
                             </span>
                           </td>
@@ -682,7 +875,13 @@ export default function NuevaOrdenPage() {
                               min="1"
                               max={producto.stock}
                               value={producto.cantidad}
-                              onChange={(e) => actualizarProducto(index, "cantidad", parseInt(e.target.value) || 1)}
+                              onChange={(e) =>
+                                actualizarProducto(
+                                  index,
+                                  "cantidad",
+                                  parseInt(e.target.value) || 1
+                                )
+                              }
                               className="w-16 h-8 text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                             />
                           </td>
@@ -690,8 +889,15 @@ export default function NuevaOrdenPage() {
                             <select
                               value={producto.tipoPrecio}
                               onChange={(e) => {
-                                const tipoPrecio = e.target.value as "VENTA" | "MINORISTA" | "MAYORISTA";
-                                actualizarProducto(index, "tipoPrecio", tipoPrecio);
+                                const tipoPrecio = e.target.value as
+                                  | "VENTA"
+                                  | "MINORISTA"
+                                  | "MAYORISTA";
+                                actualizarProducto(
+                                  index,
+                                  "tipoPrecio",
+                                  tipoPrecio
+                                );
                               }}
                               className="w-28 appearance-none pl-3 pr-8 py-1 text-sm border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                             >
@@ -700,8 +906,12 @@ export default function NuevaOrdenPage() {
                               <option value="MAYORISTA">Mayorista</option>
                             </select>
                           </td>
-                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">${producto.precio.toLocaleString()}</td>
-                          <td className="py-3 px-3 font-bold text-green-600 text-sm sm:text-base">${producto.subtotal.toLocaleString()}</td>
+                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">
+                            ${producto.precio.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-3 font-bold text-green-600 text-sm sm:text-base">
+                            ${producto.subtotal.toLocaleString()}
+                          </td>
                           <td className="py-3 px-3">
                             <Button
                               type="button"
@@ -720,15 +930,26 @@ export default function NuevaOrdenPage() {
                 </div>
                 <div className="lg:hidden space-y-4">
                   {productosSeleccionados.map((producto, index) => (
-                    <div key={producto.id} className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0">
+                    <div
+                      key={producto.id}
+                      className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
+                    >
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">{producto.nombre}</span>
-                        <span className="text-xs sm:text-sm text-gray-500">{producto.codigo}</span>
+                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">
+                          {producto.nombre}
+                        </span>
+                        <span className="text-xs sm:text-sm text-gray-500">
+                          {producto.codigo}
+                        </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="text-sm sm:text-base">
                           <span className="font-medium">Stock: </span>
-                          <span className={`${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}>{producto.stock}</span>
+                          <span
+                            className={`${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}
+                          >
+                            {producto.stock}
+                          </span>
                         </div>
                         <div className="text-sm sm:text-base">
                           <span className="font-medium">Cantidad: </span>
@@ -737,7 +958,13 @@ export default function NuevaOrdenPage() {
                             min="1"
                             max={producto.stock}
                             value={producto.cantidad}
-                            onChange={(e) => actualizarProducto(index, "cantidad", parseInt(e.target.value) || 1)}
+                            onChange={(e) =>
+                              actualizarProducto(
+                                index,
+                                "cantidad",
+                                parseInt(e.target.value) || 1
+                              )
+                            }
                             className="w-16 h-8 inline-block text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                           />
                         </div>
@@ -746,8 +973,15 @@ export default function NuevaOrdenPage() {
                           <select
                             value={producto.tipoPrecio}
                             onChange={(e) => {
-                              const tipoPrecio = e.target.value as "VENTA" | "MINORISTA" | "MAYORISTA";
-                              actualizarProducto(index, "tipoPrecio", tipoPrecio);
+                              const tipoPrecio = e.target.value as
+                                | "VENTA"
+                                | "MINORISTA"
+                                | "MAYORISTA";
+                              actualizarProducto(
+                                index,
+                                "tipoPrecio",
+                                tipoPrecio
+                              );
                             }}
                             className="w-28 appearance-none pl-3 pr-8 py-1 text-sm border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
                           >
@@ -757,8 +991,16 @@ export default function NuevaOrdenPage() {
                           </select>
                         </div>
                         <div className="text-sm sm:text-base text-right">
-                          <div><span className="font-medium">Precio Unit.: </span>${producto.precio.toLocaleString()}</div>
-                          <div><span className="font-medium">Subtotal: </span><span className="font-bold text-green-600">${producto.subtotal.toLocaleString()}</span></div>
+                          <div>
+                            <span className="font-medium">Precio Unit.: </span>$
+                            {producto.precio.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Subtotal: </span>
+                            <span className="font-bold text-green-600">
+                              ${producto.subtotal.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex justify-end">
@@ -779,8 +1021,12 @@ export default function NuevaOrdenPage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm sm:text-base">No hay productos agregados</p>
-                <p className="text-xs sm:text-sm">Escanea códigos de barras para agregar productos</p>
+                <p className="text-sm sm:text-base">
+                  No hay productos agregados
+                </p>
+                <p className="text-xs sm:text-sm">
+                  Escanea códigos de barras para agregar productos
+                </p>
               </div>
             )}
           </CardContent>
@@ -811,33 +1057,68 @@ export default function NuevaOrdenPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">Repuesto</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Proveedor</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Cantidad</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">P. Compra</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">P. Venta</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Utilidad</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Subtotal</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">Acciones</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
+                          Repuesto
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Proveedor
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                          Cantidad
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          P. Compra
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          P. Venta
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Utilidad
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Subtotal
+                        </th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                          Acciones
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {repuestosExternos.map((repuesto, index) => (
-                        <tr key={repuesto.id} className="border-b border-gray-100">
+                        <tr
+                          key={repuesto.id}
+                          className="border-b border-gray-100"
+                        >
                           <td className="py-3 px-3 min-w-0">
                             <div className="whitespace-normal break-words">
-                              <div className="font-medium text-sm sm:text-base text-gray-900">{repuesto.nombre}</div>
+                              <div className="font-medium text-sm sm:text-base text-gray-900">
+                                {repuesto.nombre}
+                              </div>
                               {repuesto.descripcion && (
-                                <div className="text-xs sm:text-sm text-gray-500">{repuesto.descripcion}</div>
+                                <div className="text-xs sm:text-sm text-gray-500">
+                                  {repuesto.descripcion}
+                                </div>
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600 whitespace-normal break-words">{repuesto.proveedor || "-"}</td>
-                          <td className="py-3 px-3 font-medium text-sm sm:text-base">{repuesto.cantidad}</td>
-                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600">${repuesto.precioCompra.toLocaleString()}</td>
-                          <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">${repuesto.precioVenta.toLocaleString()}</td>
-                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">${repuesto.utilidad.toLocaleString()}</td>
-                          <td className="py-3 px-3 font-bold text-orange-600 text-sm sm:text-base">${repuesto.subtotal.toLocaleString()}</td>
+                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600 whitespace-normal break-words">
+                            {repuesto.proveedor || "-"}
+                          </td>
+                          <td className="py-3 px-3 font-medium text-sm sm:text-base">
+                            {repuesto.cantidad}
+                          </td>
+                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600">
+                            ${repuesto.precioCompra.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">
+                            ${repuesto.precioVenta.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">
+                            ${repuesto.utilidad.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-3 font-bold text-orange-600 text-sm sm:text-base">
+                            ${repuesto.subtotal.toLocaleString()}
+                          </td>
                           <td className="py-3 px-3">
                             <Button
                               type="button"
@@ -856,23 +1137,52 @@ export default function NuevaOrdenPage() {
                 </div>
                 <div className="lg:hidden space-y-4">
                   {repuestosExternos.map((repuesto, index) => (
-                    <div key={repuesto.id} className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0">
+                    <div
+                      key={repuesto.id}
+                      className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
+                    >
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">{repuesto.nombre}</span>
+                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">
+                          {repuesto.nombre}
+                        </span>
                         {repuesto.descripcion && (
-                          <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">{repuesto.descripcion}</span>
+                          <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">
+                            {repuesto.descripcion}
+                          </span>
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="text-sm sm:text-base flex flex-col">
-                          <div><span className="font-medium">Proveedor: </span>{repuesto.proveedor || "-"}</div>
-                          <div><span className="font-medium">Cantidad: </span>{repuesto.cantidad}</div>
+                          <div>
+                            <span className="font-medium">Proveedor: </span>
+                            {repuesto.proveedor || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Cantidad: </span>
+                            {repuesto.cantidad}
+                          </div>
                         </div>
                         <div className="text-sm sm:text-base text-right">
-                          <div><span className="font-medium">P. Compra: </span>${repuesto.precioCompra.toLocaleString()}</div>
-                          <div><span className="font-medium">P. Venta: </span>${repuesto.precioVenta.toLocaleString()}</div>
-                          <div><span className="font-medium">Utilidad: </span><span className="text-green-600">${repuesto.utilidad.toLocaleString()}</span></div>
-                          <div><span className="font-medium">Subtotal: </span><span className="font-bold text-orange-600">${repuesto.subtotal.toLocaleString()}</span></div>
+                          <div>
+                            <span className="font-medium">P. Compra: </span>$
+                            {repuesto.precioCompra.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">P. Venta: </span>$
+                            {repuesto.precioVenta.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Utilidad: </span>
+                            <span className="text-green-600">
+                              ${repuesto.utilidad.toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Subtotal: </span>
+                            <span className="font-bold text-orange-600">
+                              ${repuesto.subtotal.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex justify-end">
@@ -893,8 +1203,12 @@ export default function NuevaOrdenPage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm sm:text-base">No hay repuestos externos agregados</p>
-                <p className="text-xs sm:text-sm">Agrega repuestos que no están en el inventario</p>
+                <p className="text-sm sm:text-base">
+                  No hay repuestos externos agregados
+                </p>
+                <p className="text-xs sm:text-sm">
+                  Agrega repuestos que no están en el inventario
+                </p>
               </div>
             )}
           </CardContent>
@@ -912,30 +1226,44 @@ export default function NuevaOrdenPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Servicios</div>
-                <div className="text-lg sm:text-xl font-bold text-green-600">${totales.totalServicios.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold text-green-600">
+                  ${totales.totalServicios.toLocaleString()}
+                </div>
               </div>
               <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Productos</div>
-                <div className="text-lg sm:text-xl font-bold text-blue-600">${totales.totalProductos.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold text-blue-600">
+                  ${totales.totalProductos.toLocaleString()}
+                </div>
               </div>
               <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Repuestos Ext.</div>
-                <div className="text-lg sm:text-xl font-bold text-orange-600">${totales.totalRepuestosExternos.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold text-orange-600">
+                  ${totales.totalRepuestosExternos.toLocaleString()}
+                </div>
               </div>
               <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                 <div className="text-sm text-gray-600 mb-1">Mano de Obra</div>
-                <div className="text-lg sm:text-xl font-bold text-indigo-600">${totales.manoDeObra.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold text-indigo-600">
+                  ${totales.manoDeObra.toLocaleString()}
+                </div>
               </div>
               <div className="text-center p-4 bg-white rounded-lg shadow-sm border-2 border-purple-200">
                 <div className="text-sm text-gray-600 mb-1">Total</div>
-                <div className="text-xl sm:text-2xl font-bold text-purple-600">${totales.total.toLocaleString()}</div>
+                <div className="text-xl sm:text-2xl font-bold text-purple-600">
+                  ${totales.total.toLocaleString()}
+                </div>
               </div>
             </div>
             {totales.utilidadRepuestos > 0 && (
               <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm sm:text-base text-gray-700 font-medium">Utilidad Repuestos Externos:</span>
-                  <span className="text-lg sm:text-xl font-bold text-green-600">${totales.utilidadRepuestos.toLocaleString()}</span>
+                  <span className="text-sm sm:text-base text-gray-700 font-medium">
+                    Utilidad Repuestos Externos:
+                  </span>
+                  <span className="text-lg sm:text-xl font-bold text-green-600">
+                    ${totales.utilidadRepuestos.toLocaleString()}
+                  </span>
                 </div>
               </div>
             )}
@@ -1006,7 +1334,15 @@ export default function NuevaOrdenPage() {
 }
 
 // Componente para modal de repuesto externo
-function RepuestoExternoModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd: (repuesto: RepuestoExterno) => void }) {
+function RepuestoExternoModal({
+  isOpen,
+  onClose,
+  onAdd,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (repuesto: RepuestoExterno) => void;
+}) {
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -1024,7 +1360,11 @@ function RepuestoExternoModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onC
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nombre || formData.precioCompra <= 0 || formData.precioVenta <= 0) {
+    if (
+      !formData.nombre ||
+      formData.precioCompra <= 0 ||
+      formData.precioVenta <= 0
+    ) {
       toast.error("Completa todos los campos requeridos");
       return;
     }
@@ -1058,68 +1398,106 @@ function RepuestoExternoModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onC
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Repuesto Externo" className="animate-fade-in">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Agregar Repuesto Externo"
+      className="animate-fade-in"
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Repuesto *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Nombre del Repuesto *
+          </label>
           <Input
             value={formData.nombre}
-            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, nombre: e.target.value })
+            }
             placeholder="Ej: Pastillas de freno Toyota"
             className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Descripción
+          </label>
           <Input
             value={formData.descripcion}
-            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, descripcion: e.target.value })
+            }
             placeholder="Descripción adicional"
             className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Proveedor
+          </label>
           <Input
             value={formData.proveedor}
-            onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, proveedor: e.target.value })
+            }
             placeholder="Nombre del proveedor"
             className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Cantidad *
+            </label>
             <Input
               type="number"
               min="1"
               value={formData.cantidad}
-              onChange={(e) => setFormData({ ...formData, cantidad: parseInt(e.target.value) || 1 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  cantidad: parseInt(e.target.value) || 1,
+                })
+              }
               className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Precio Compra *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Precio Compra *
+            </label>
             <Input
               type="number"
               step="100"
               min="0"
               value={formData.precioCompra}
-              onChange={(e) => setFormData({ ...formData, precioCompra: parseFloat(e.target.value) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  precioCompra: parseFloat(e.target.value) || 0,
+                })
+              }
               className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Precio Venta *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Precio Venta *
+            </label>
             <Input
               type="number"
               step="100"
               min="0"
               value={formData.precioVenta}
-              onChange={(e) => setFormData({ ...formData, precioVenta: parseFloat(e.target.value) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  precioVenta: parseFloat(e.target.value) || 0,
+                })
+              }
               className="text-sm sm:text-base border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               required
             />
@@ -1128,22 +1506,36 @@ function RepuestoExternoModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onC
         <div className="bg-gray-50 p-4 rounded-lg space-y-2">
           <div className="flex justify-between items-center text-sm sm:text-base">
             <span className="text-gray-600">Total Compra:</span>
-            <span className="font-medium text-gray-800">${(formData.cantidad * formData.precioCompra).toLocaleString()}</span>
+            <span className="font-medium text-gray-800">
+              ${(formData.cantidad * formData.precioCompra).toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between items-center text-sm sm:text-base">
             <span className="text-gray-600">Total Venta:</span>
-            <span className="font-medium text-orange-600">${(formData.cantidad * formData.precioVenta).toLocaleString()}</span>
+            <span className="font-medium text-orange-600">
+              ${(formData.cantidad * formData.precioVenta).toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between items-center border-t pt-2 text-sm sm:text-base">
             <span className="font-medium text-gray-700">Utilidad:</span>
-            <span className="font-bold text-green-600">${calcularUtilidad().toLocaleString()}</span>
+            <span className="font-bold text-green-600">
+              ${calcularUtilidad().toLocaleString()}
+            </span>
           </div>
         </div>
         <div className="flex justify-end space-x-3 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} className="px-6 py-2 text-sm sm:text-base border-gray-200 shadow-sm hover:scale-105 transition-transform">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="px-6 py-2 text-sm sm:text-base border-gray-200 shadow-sm hover:scale-105 transition-transform"
+          >
             Cancelar
           </Button>
-          <Button type="submit" className="px-6 py-2 text-sm sm:text-base bg-orange-600 hover:bg-orange-700 hover:scale-105 transition-transform">
+          <Button
+            type="submit"
+            className="px-6 py-2 text-sm sm:text-base bg-orange-600 hover:bg-orange-700 hover:scale-105 transition-transform"
+          >
             Agregar Repuesto
           </Button>
         </div>

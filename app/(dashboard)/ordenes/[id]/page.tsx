@@ -66,15 +66,22 @@ export default function OrdenDetallePage() {
   const [serviciosCompletados, setServiciosCompletados] = useState<{
     [key: string]: boolean;
   }>({});
-  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>([]);
+  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>(
+    []
+  );
   const [showLubricacionModal, setShowLubricacionModal] = useState(false);
-  const [servicioLubricacionTemp, setServicioLubricacionTemp] = useState<Servicio | null>(null);
+  const [servicioLubricacionTemp, setServicioLubricacionTemp] =
+    useState<Servicio | null>(null);
   const [showAgregarServicios, setShowAgregarServicios] = useState(false);
 
-  const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(session?.user?.role || "");
-  const canAddServices = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER", "MECANICO"].includes(
+  const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
     session?.user?.role || ""
   );
+  const canAddServices = [
+    "SUPER_USUARIO",
+    "ADMIN_WAYRA_TALLER",
+    "MECANICO",
+  ].includes(session?.user?.role || "");
   const isMecanico = session?.user?.role === "MECANICO";
 
   useEffect(() => {
@@ -171,7 +178,11 @@ export default function OrdenDetallePage() {
           ...serviciosCompletados,
           [servicioId]: nuevoEstado,
         });
-        toast.success(nuevoEstado ? "Servicio marcado como completado" : "Servicio marcado como pendiente");
+        toast.success(
+          nuevoEstado
+            ? "Servicio marcado como completado"
+            : "Servicio marcado como pendiente"
+        );
       } else {
         toast.error("Error al actualizar servicio");
       }
@@ -212,41 +223,95 @@ export default function OrdenDetallePage() {
     }
   };
 
-  const handleLubricacionAdded = async (aceiteId: string, filtroId: string) => {
+  const handleLubricacionAdded = async (
+    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>
+  ) => {
     if (!servicioLubricacionTemp) return;
 
     try {
-      const [aceiteResponse, filtroResponse] = await Promise.all([
-        fetch(`/api/productos/${aceiteId}`),
-        fetch(`/api/productos/${filtroId}`),
-      ]);
+      console.log("🔧 Agregando lubricación a orden existente:", productos);
 
-      if (aceiteResponse.ok && filtroResponse.ok) {
-        const aceite = await aceiteResponse.json();
-        const filtro = await filtroResponse.json();
+      // Separar aceites y filtros
+      const aceites = productos.filter((p) => p.tipo === "ACEITE");
+      const filtros = productos.filter((p) => p.tipo === "FILTRO");
 
-        const precioTotal = aceite.precioVenta + filtro.precioVenta;
-        const descripcion = `${servicioLubricacionTemp.descripcion} (${aceite.nombre} + ${filtro.nombre})`;
+      if (aceites.length === 0 || filtros.length === 0) {
+        toast.error("❌ Debe haber al menos un aceite y un filtro");
+        return;
+      }
 
-        const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            descripcion,
-            precio: precioTotal,
-          }),
-        });
+      // Obtener información completa de todos los productos
+      const productosCompletos = await Promise.all(
+        productos.map(async (p) => {
+          const response = await fetch(`/api/productos/${p.id}`);
+          if (response.ok) {
+            return await response.json();
+          }
+          throw new Error(`No se pudo obtener el producto ${p.nombre}`);
+        })
+      );
 
-        if (response.ok) {
-          toast.success("Servicio de lubricación agregado");
-          fetchOrden();
-          setShowAgregarServicios(false);
-        } else {
-          toast.error("Error al agregar servicio");
-        }
+      // Calcular precio total
+      const precioTotal = productosCompletos.reduce(
+        (sum, p) => sum + p.precioVenta,
+        0
+      );
+
+      // Crear descripción detallada
+      const nombresAceites = aceites
+        .map((a) => {
+          const producto = productosCompletos.find((p) => p.id === a.id);
+          return producto?.nombre || a.nombre;
+        })
+        .join(", ");
+
+      const nombresFiltros = filtros
+        .map((f) => {
+          const producto = productosCompletos.find((p) => p.id === f.id);
+          return producto?.nombre || f.nombre;
+        })
+        .join(", ");
+
+      const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
+
+      // Agregar servicio a la orden
+      const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          descripcion: descripcion,
+          precio: precioTotal,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(
+          <div>
+            <div className="font-semibold">
+              ✅ Servicio de lubricación agregado
+            </div>
+            <div className="text-sm mt-1">
+              <div>
+                • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}
+              </div>
+              <div>
+                • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
+              </div>
+              <div className="font-semibold mt-1">
+                Total: ${precioTotal.toLocaleString()}
+              </div>
+            </div>
+          </div>,
+          { duration: 4000 }
+        );
+        fetchOrden(); // Recargar orden
+        setShowAgregarServicios(false);
+      } else {
+        toast.error("Error al agregar servicio");
       }
     } catch (error) {
-      toast.error("Error al agregar servicio");
+      console.error("❌ Error al agregar lubricación:", error);
+      toast.error("Error al agregar servicio de lubricación");
     } finally {
       setServicioLubricacionTemp(null);
     }
@@ -256,9 +321,12 @@ export default function OrdenDetallePage() {
     if (!confirm("¿Deseas eliminar este servicio?")) return;
 
     try {
-      const response = await fetch(`/api/ordenes/${params.id}/servicios/${servicioId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/ordenes/${params.id}/servicios/${servicioId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (response.ok) {
         toast.success("Servicio removido");
@@ -272,7 +340,11 @@ export default function OrdenDetallePage() {
   };
 
   const eliminarOrden = async () => {
-    if (!confirm("¿Estás seguro de que quieres eliminar esta orden cancelada? Esta acción no se puede deshacer.")) {
+    if (
+      !confirm(
+        "¿Estás seguro de que quieres eliminar esta orden cancelada? Esta acción no se puede deshacer."
+      )
+    ) {
       return;
     }
 
@@ -339,9 +411,13 @@ export default function OrdenDetallePage() {
   if (!orden) {
     return (
       <div className="text-center py-16 px-4 animate-fade-in">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Orden no encontrada</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+          Orden no encontrada
+        </h2>
         <Link href="/ordenes">
-          <Button size="sm" className="hover:scale-105 transition-transform">Volver a Órdenes</Button>
+          <Button size="sm" className="hover:scale-105 transition-transform">
+            Volver a Órdenes
+          </Button>
         </Link>
       </div>
     );
@@ -353,21 +429,33 @@ export default function OrdenDetallePage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
         <div className="flex items-center space-x-4">
           <Link href="/ordenes">
-            <Button variant="outline" size="sm" className="hover:scale-105 transition-transform">
+            <Button
+              variant="outline"
+              size="sm"
+              className="hover:scale-105 transition-transform"
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{orden.numeroOrden}</h1>
-            <p className="text-sm sm:text-base text-gray-600">Orden de trabajo</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
+              {orden.numeroOrden}
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              Orden de trabajo
+            </p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
           {getEstadoBadge(orden.estado)}
           {canEdit && (
             <Link href={`/ordenes/${orden.id}/edit`}>
-              <Button variant="outline" size="sm" className="hover:scale-105 transition-transform">
+              <Button
+                variant="outline"
+                size="sm"
+                className="hover:scale-105 transition-transform"
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </Button>
@@ -377,49 +465,53 @@ export default function OrdenDetallePage() {
       </div>
 
       {/* Estado Actions */}
-      {canEdit && orden.estado !== "COMPLETADO" && orden.estado !== "CANCELADO" && (
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Cambiar Estado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {orden.estado === "PENDIENTE" && (
+      {canEdit &&
+        orden.estado !== "COMPLETADO" &&
+        orden.estado !== "CANCELADO" && (
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
+                Cambiar Estado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {orden.estado === "PENDIENTE" && (
+                  <Button
+                    onClick={() => updateEstado("EN_PROCESO")}
+                    disabled={updating}
+                    className="bg-blue-600 hover:bg-blue-700 hover:scale-105 transition-transform w-full sm:w-auto"
+                    size="sm"
+                  >
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Iniciar Trabajo
+                  </Button>
+                )}
+                {orden.estado === "EN_PROCESO" && (
+                  <Button
+                    onClick={() => updateEstado("COMPLETADO")}
+                    disabled={updating}
+                    className="bg-green-600 hover:bg-green-700 hover:scale-105 transition-transform w-full sm:w-auto"
+                    size="sm"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Marcar Completado
+                  </Button>
+                )}
                 <Button
-                  onClick={() => updateEstado("EN_PROCESO")}
+                  onClick={() => updateEstado("CANCELADO")}
                   disabled={updating}
-                  className="bg-blue-600 hover:bg-blue-700 hover:scale-105 transition-transform w-full sm:w-auto"
+                  variant="outline"
+                  className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform w-full sm:w-auto"
                   size="sm"
                 >
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Iniciar Trabajo
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Cancelar Orden
                 </Button>
-              )}
-              {orden.estado === "EN_PROCESO" && (
-                <Button
-                  onClick={() => updateEstado("COMPLETADO")}
-                  disabled={updating}
-                  className="bg-green-600 hover:bg-green-700 hover:scale-105 transition-transform w-full sm:w-auto"
-                  size="sm"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Marcar Completado
-                </Button>
-              )}
-              <Button
-                onClick={() => updateEstado("CANCELADO")}
-                disabled={updating}
-                variant="outline"
-                className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform w-full sm:w-auto"
-                size="sm"
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Cancelar Orden
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {/* Información General */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -432,13 +524,18 @@ export default function OrdenDetallePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h4 className="font-semibold text-gray-900 text-base sm:text-lg">{orden.cliente.nombre}</h4>
+              <h4 className="font-semibold text-gray-900 text-base sm:text-lg">
+                {orden.cliente.nombre}
+              </h4>
               <div className="text-sm text-gray-600 space-y-1">
-                {orden.cliente.telefono && <div>📞 {orden.cliente.telefono}</div>}
+                {orden.cliente.telefono && (
+                  <div>📞 {orden.cliente.telefono}</div>
+                )}
                 {orden.cliente.email && <div>📧 {orden.cliente.email}</div>}
                 {orden.cliente.numeroDocumento && (
                   <div>
-                    {orden.cliente.tipoDocumento}: {orden.cliente.numeroDocumento}
+                    {orden.cliente.tipoDocumento}:{" "}
+                    {orden.cliente.numeroDocumento}
                   </div>
                 )}
               </div>
@@ -446,12 +543,16 @@ export default function OrdenDetallePage() {
             <div className="border-t pt-4">
               <h4 className="font-semibold text-gray-900 flex items-center space-x-2 text-base sm:text-lg">
                 <Car className="h-4 w-4" />
-                <span>{orden.vehiculo.marca} {orden.vehiculo.modelo}</span>
+                <span>
+                  {orden.vehiculo.marca} {orden.vehiculo.modelo}
+                </span>
               </h4>
               <div className="text-sm text-gray-600 space-y-1">
                 <div>Placa: {orden.vehiculo.placa}</div>
                 {orden.vehiculo.año && <div>Año: {orden.vehiculo.año}</div>}
-                {orden.vehiculo.color && <div>Color: {orden.vehiculo.color}</div>}
+                {orden.vehiculo.color && (
+                  <div>Color: {orden.vehiculo.color}</div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -472,24 +573,34 @@ export default function OrdenDetallePage() {
               </div>
               <div>
                 <span className="text-gray-600">Fecha Creación:</span>
-                <div className="font-medium">{new Date(orden.fechaCreacion).toLocaleDateString("es-CO")}</div>
+                <div className="font-medium">
+                  {new Date(orden.fechaCreacion).toLocaleDateString("es-CO")}
+                </div>
               </div>
               {orden.fechaInicio && (
                 <div>
                   <span className="text-gray-600">Fecha Inicio:</span>
-                  <div className="font-medium">{new Date(orden.fechaInicio).toLocaleDateString("es-CO")}</div>
+                  <div className="font-medium">
+                    {new Date(orden.fechaInicio).toLocaleDateString("es-CO")}
+                  </div>
                 </div>
               )}
               {orden.fechaFin && (
                 <div>
                   <span className="text-gray-600">Fecha Fin:</span>
-                  <div className="font-medium">{new Date(orden.fechaFin).toLocaleDateString("es-CO")}</div>
+                  <div className="font-medium">
+                    {new Date(orden.fechaFin).toLocaleDateString("es-CO")}
+                  </div>
                 </div>
               )}
             </div>
             <div className="border-t pt-4">
-              <h5 className="font-medium text-gray-700 mb-2 text-sm sm:text-base">Descripción:</h5>
-              <p className="text-gray-600 text-sm whitespace-normal break-words">{orden.descripcion}</p>
+              <h5 className="font-medium text-gray-700 mb-2 text-sm sm:text-base">
+                Descripción:
+              </h5>
+              <p className="text-gray-600 text-sm whitespace-normal break-words">
+                {orden.descripcion}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -503,7 +614,8 @@ export default function OrdenDetallePage() {
               <Wrench className="h-5 w-5 text-green-600" />
               <span className="text-lg sm:text-xl">Servicios</span>
               <span className="text-sm text-gray-600">
-                {Object.values(serviciosCompletados).filter(Boolean).length} de {orden.servicios.length} completados
+                {Object.values(serviciosCompletados).filter(Boolean).length} de{" "}
+                {orden.servicios.length} completados
               </span>
             </div>
             {canAddServices && (
@@ -522,19 +634,27 @@ export default function OrdenDetallePage() {
           {/* Lista de servicios disponibles para agregar */}
           {showAgregarServicios && canAddServices && (
             <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg max-h-64 overflow-y-auto">
-              <h4 className="font-semibold text-gray-800 mb-3 text-base sm:text-lg">Servicios Disponibles:</h4>
+              <h4 className="font-semibold text-gray-800 mb-3 text-base sm:text-lg">
+                Servicios Disponibles:
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {serviciosDisponibles.map((servicio) => (
                   <button
                     key={servicio.clave}
                     onClick={() => agregarServicio(servicio)}
-                    disabled={orden.servicios.some((s) => s.descripcion === servicio.descripcion)}
+                    disabled={orden.servicios.some(
+                      (s) => s.descripcion === servicio.descripcion
+                    )}
                     className="flex items-center justify-between p-3 border-2 border-blue-300 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all w-full min-w-0"
                   >
                     <div className="text-left flex-1">
-                      <div className="font-medium text-sm sm:text-base whitespace-normal break-words">{servicio.descripcion}</div>
+                      <div className="font-medium text-sm sm:text-base whitespace-normal break-words">
+                        {servicio.descripcion}
+                      </div>
                       {!servicio.requiereLubricacion && (
-                        <div className="text-sm text-gray-500">${servicio.precio.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500">
+                          ${servicio.precio.toLocaleString()}
+                        </div>
                       )}
                     </div>
                     <Plus className="h-4 w-4 text-green-600 flex-shrink-0" />
@@ -550,21 +670,27 @@ export default function OrdenDetallePage() {
               <div
                 key={servicio.id}
                 className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg border-2 transition-all duration-300 ${
-                  serviciosCompletados[servicio.id] ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
+                  serviciosCompletados[servicio.id]
+                    ? "bg-green-50 border-green-200"
+                    : "bg-gray-50 border-gray-200"
                 }`}
               >
                 <div className="flex items-center space-x-3 flex-1 w-full">
                   {!isMecanico && (
                     <Checkbox
                       checked={serviciosCompletados[servicio.id] || false}
-                      onCheckedChange={() => toggleServicioCompletado(servicio.id)}
+                      onCheckedChange={() =>
+                        toggleServicioCompletado(servicio.id)
+                      }
                       className="h-5 w-5"
                     />
                   )}
                   <div className="flex-1 min-w-0">
                     <span
                       className={`font-medium text-sm sm:text-base whitespace-normal break-words ${
-                        serviciosCompletados[servicio.id] ? "text-green-800 line-through" : "text-gray-900"
+                        serviciosCompletados[servicio.id]
+                          ? "text-green-800 line-through"
+                          : "text-gray-900"
                       }`}
                     >
                       {servicio.descripcion}
@@ -572,14 +698,18 @@ export default function OrdenDetallePage() {
                     {serviciosCompletados[servicio.id] && (
                       <div className="flex items-center mt-1">
                         <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
-                        <span className="text-xs text-green-600 font-medium">Completado</span>
+                        <span className="text-xs text-green-600 font-medium">
+                          Completado
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 mt-2 sm:mt-0 sm:ml-4 w-full sm:w-auto justify-between sm:justify-end">
                   {!isMecanico && (
-                    <span className="font-bold text-green-600 text-sm sm:text-base">${servicio.precio.toLocaleString()}</span>
+                    <span className="font-bold text-green-600 text-sm sm:text-base">
+                      ${servicio.precio.toLocaleString()}
+                    </span>
                   )}
                   {canAddServices && (
                     <Button
@@ -613,12 +743,20 @@ export default function OrdenDetallePage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">Producto</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Cantidad</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
+                        Producto
+                      </th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                        Cantidad
+                      </th>
                       {!isMecanico && (
                         <>
-                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Precio Unit.</th>
-                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Subtotal</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                            Precio Unit.
+                          </th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                            Subtotal
+                          </th>
                         </>
                       )}
                     </tr>
@@ -628,11 +766,17 @@ export default function OrdenDetallePage() {
                       <tr key={detalle.id} className="border-b border-gray-100">
                         <td className="py-3 px-3 min-w-0">
                           <div className="whitespace-normal break-words">
-                            <div className="font-medium text-sm sm:text-base">{detalle.producto.nombre}</div>
-                            <div className="text-xs sm:text-sm text-gray-500">{detalle.producto.codigo}</div>
+                            <div className="font-medium text-sm sm:text-base">
+                              {detalle.producto.nombre}
+                            </div>
+                            <div className="text-xs sm:text-sm text-gray-500">
+                              {detalle.producto.codigo}
+                            </div>
                           </div>
                         </td>
-                        <td className="py-3 px-3 font-medium text-sm sm:text-base">{detalle.cantidad}</td>
+                        <td className="py-3 px-3 font-medium text-sm sm:text-base">
+                          {detalle.cantidad}
+                        </td>
                         {!isMecanico && (
                           <>
                             <td className="py-3 px-3 font-medium text-blue-600 text-sm sm:text-base">
@@ -650,19 +794,35 @@ export default function OrdenDetallePage() {
               </div>
               <div className="lg:hidden space-y-4">
                 {orden.detalles.map((detalle: any) => (
-                  <div key={detalle.id} className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0">
+                  <div
+                    key={detalle.id}
+                    className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
+                  >
                     <div className="flex flex-col">
-                      <span className="font-medium text-sm sm:text-base whitespace-normal break-words">{detalle.producto.nombre}</span>
-                      <span className="text-xs sm:text-sm text-gray-500">{detalle.producto.codigo}</span>
+                      <span className="font-medium text-sm sm:text-base whitespace-normal break-words">
+                        {detalle.producto.nombre}
+                      </span>
+                      <span className="text-xs sm:text-sm text-gray-500">
+                        {detalle.producto.codigo}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <div className="text-sm sm:text-base">
-                        <span className="font-medium">Cantidad: </span>{detalle.cantidad}
+                        <span className="font-medium">Cantidad: </span>
+                        {detalle.cantidad}
                       </div>
                       {!isMecanico && (
                         <div className="text-sm sm:text-base text-right">
-                          <div><span className="font-medium">Precio Unit.: </span>${detalle.precioUnitario.toLocaleString()}</div>
-                          <div><span className="font-medium">Subtotal: </span><span className="font-bold text-blue-600">${detalle.subtotal.toLocaleString()}</span></div>
+                          <div>
+                            <span className="font-medium">Precio Unit.: </span>$
+                            {detalle.precioUnitario.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Subtotal: </span>
+                            <span className="font-bold text-blue-600">
+                              ${detalle.subtotal.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -689,34 +849,55 @@ export default function OrdenDetallePage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">Repuesto</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
+                        Repuesto
+                      </th>
                       {!isMecanico && (
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Proveedor</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                          Proveedor
+                        </th>
                       )}
-                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Cantidad</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                        Cantidad
+                      </th>
                       {!isMecanico && (
                         <>
-                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Precio Unit.</th>
-                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">Subtotal</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                            Precio Unit.
+                          </th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                            Subtotal
+                          </th>
                         </>
                       )}
                     </tr>
                   </thead>
                   <tbody>
                     {orden.repuestosExternos.map((repuesto: any) => (
-                      <tr key={repuesto.id} className="border-b border-gray-100">
+                      <tr
+                        key={repuesto.id}
+                        className="border-b border-gray-100"
+                      >
                         <td className="py-3 px-3 min-w-0">
                           <div className="whitespace-normal break-words">
-                            <div className="font-medium text-sm sm:text-base">{repuesto.nombre}</div>
+                            <div className="font-medium text-sm sm:text-base">
+                              {repuesto.nombre}
+                            </div>
                             {repuesto.descripcion && (
-                              <div className="text-xs sm:text-sm text-gray-500">{repuesto.descripcion}</div>
+                              <div className="text-xs sm:text-sm text-gray-500">
+                                {repuesto.descripcion}
+                              </div>
                             )}
                           </div>
                         </td>
                         {!isMecanico && (
-                          <td className="py-3 px-3 text-sm text-gray-600 whitespace-normal break-words">{repuesto.proveedor}</td>
+                          <td className="py-3 px-3 text-sm text-gray-600 whitespace-normal break-words">
+                            {repuesto.proveedor}
+                          </td>
                         )}
-                        <td className="py-3 px-3 font-medium text-sm sm:text-base">{repuesto.cantidad}</td>
+                        <td className="py-3 px-3 font-medium text-sm sm:text-base">
+                          {repuesto.cantidad}
+                        </td>
                         {!isMecanico && (
                           <>
                             <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">
@@ -734,24 +915,45 @@ export default function OrdenDetallePage() {
               </div>
               <div className="lg:hidden space-y-4">
                 {orden.repuestosExternos.map((repuesto: any) => (
-                  <div key={repuesto.id} className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0">
+                  <div
+                    key={repuesto.id}
+                    className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
+                  >
                     <div className="flex flex-col">
-                      <span className="font-medium text-sm sm:text-base whitespace-normal break-words">{repuesto.nombre}</span>
+                      <span className="font-medium text-sm sm:text-base whitespace-normal break-words">
+                        {repuesto.nombre}
+                      </span>
                       {repuesto.descripcion && (
-                        <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">{repuesto.descripcion}</span>
+                        <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">
+                          {repuesto.descripcion}
+                        </span>
                       )}
                     </div>
                     <div className="flex justify-between">
                       <div className="text-sm sm:text-base flex flex-col">
                         {!isMecanico && (
-                          <div><span className="font-medium">Proveedor: </span>{repuesto.proveedor}</div>
+                          <div>
+                            <span className="font-medium">Proveedor: </span>
+                            {repuesto.proveedor}
+                          </div>
                         )}
-                        <div><span className="font-medium">Cantidad: </span>{repuesto.cantidad}</div>
+                        <div>
+                          <span className="font-medium">Cantidad: </span>
+                          {repuesto.cantidad}
+                        </div>
                       </div>
                       {!isMecanico && (
                         <div className="text-sm sm:text-base text-right">
-                          <div><span className="font-medium">Precio Unit.: </span>${repuesto.precioUnitario.toLocaleString()}</div>
-                          <div><span className="font-medium">Subtotal: </span><span className="font-bold text-orange-600">${repuesto.subtotal.toLocaleString()}</span></div>
+                          <div>
+                            <span className="font-medium">Precio Unit.: </span>$
+                            {repuesto.precioUnitario.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Subtotal: </span>
+                            <span className="font-bold text-orange-600">
+                              ${repuesto.subtotal.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -776,11 +978,15 @@ export default function OrdenDetallePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Servicios</div>
-                <div className="text-lg sm:text-xl font-bold text-green-600">${orden.subtotalServicios.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold text-green-600">
+                  ${orden.subtotalServicios.toLocaleString()}
+                </div>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Productos</div>
-                <div className="text-lg sm:text-xl font-bold text-blue-600">${orden.subtotalProductos.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold text-blue-600">
+                  ${orden.subtotalProductos.toLocaleString()}
+                </div>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Repuestos Ext.</div>
@@ -791,7 +997,9 @@ export default function OrdenDetallePage() {
               {orden.manoDeObra > 0 && (
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
                   <div className="text-sm text-gray-600 mb-1">Mano de Obra</div>
-                  <div className="text-lg sm:text-xl font-bold text-purple-600">${orden.manoDeObra.toLocaleString()}</div>
+                  <div className="text-lg sm:text-xl font-bold text-purple-600">
+                    ${orden.manoDeObra.toLocaleString()}
+                  </div>
                 </div>
               )}
             </div>
@@ -799,11 +1007,15 @@ export default function OrdenDetallePage() {
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center text-base sm:text-lg">
                 <span className="font-semibold text-gray-700">Total:</span>
-                <span className="text-lg sm:text-2xl font-bold text-purple-600">${orden.total.toLocaleString()}</span>
+                <span className="text-lg sm:text-2xl font-bold text-purple-600">
+                  ${orden.total.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between items-center text-sm mt-2">
                 <span className="text-gray-600">Utilidad:</span>
-                <span className="font-bold text-green-600">${orden.utilidad.toLocaleString()}</span>
+                <span className="font-bold text-green-600">
+                  ${orden.utilidad.toLocaleString()}
+                </span>
               </div>
             </div>
           </CardContent>
