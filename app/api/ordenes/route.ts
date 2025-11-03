@@ -113,6 +113,18 @@ export async function POST(request: NextRequest) {
 
     const numeroOrden = `ORD-${anio}-${mes.toString().padStart(2, "0")}-${orderNumber.toString().padStart(3, "0")}`;
 
+    // Obtener tasa de cambio para CALAN
+    let tasaDolar = 4000;
+    try {
+      const tasaConfig = await prisma.configuracion.findUnique({
+        where: { clave: "TASA_USD_COP" },
+      });
+      tasaDolar = parseFloat(tasaConfig?.valor || "4000");
+      console.log(`💱 Tasa de cambio: $${tasaDolar}`);
+    } catch (error) {
+      console.error("Error obteniendo tasa:", error);
+    }
+
     // Calcular totales
     let subtotalServicios = 0;
     let subtotalProductos = 0;
@@ -145,7 +157,7 @@ export async function POST(request: NextRequest) {
     const manoDeObraNum = parseFloat(manoDeObra) || 0;
     const total = subtotal + manoDeObraNum;
 
-    // Calcular utilidad (solo sobre productos internos y repuestos externos)
+    // Calcular utilidad (sobre productos internos y repuestos externos)
     let utilidad = 0;
     
     if (productos?.length > 0) {
@@ -154,7 +166,14 @@ export async function POST(request: NextRequest) {
           where: { id: prod.id },
         });
         if (producto) {
-          const costoTotal = producto.precioCompra * parseInt(prod.cantidad);
+          // ✅ CONVERTIR PRECIO DE COMPRA SI ES CALAN
+          let precioCompraContable = producto.precioCompra;
+          if (producto.tipo === 'WAYRA_CALAN' && producto.monedaCompra === 'USD') {
+            precioCompraContable = producto.precioCompra * tasaDolar;
+            console.log(`💱 CALAN ${producto.nombre}: $${producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`);
+          }
+          
+          const costoTotal = precioCompraContable * parseInt(prod.cantidad);
           const ventaTotal = parseFloat(prod.precio) * parseInt(prod.cantidad);
           utilidad += ventaTotal - costoTotal;
         }
@@ -187,6 +206,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log(`✅ Orden creada: ${numeroOrden}`);
+
     // Crear servicios
     if (servicios?.length > 0) {
       await prisma.servicioOrden.createMany({
@@ -197,12 +218,22 @@ export async function POST(request: NextRequest) {
           ordenId: orden.id,
         })),
       });
+      console.log(`✅ ${servicios.length} servicios agregados`);
     }
 
-    // Crear detalles de productos y actualizar stock
-    // IMPORTANTE: NO registramos en contabilidad aquí, solo movimiento de inventario
+    // ✅ PROCESAR PRODUCTOS Y ACTUALIZAR INVENTARIO
     if (productos?.length > 0) {
       for (const prod of productos) {
+        const producto = await prisma.producto.findUnique({
+          where: { id: prod.id },
+        });
+
+        if (!producto) {
+          console.error(`❌ Producto ${prod.id} no encontrado`);
+          continue;
+        }
+
+        // Crear detalle de orden
         await prisma.detalleOrden.create({
           data: {
             cantidad: parseInt(prod.cantidad),
@@ -214,7 +245,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Actualizar stock y crear movimiento de inventario
+        // Actualizar stock
         await prisma.producto.update({
           where: { id: prod.id },
           data: {
@@ -224,6 +255,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Crear movimiento de inventario
         await prisma.movimientoInventario.create({
           data: {
             tipo: "SALIDA",
@@ -235,6 +267,8 @@ export async function POST(request: NextRequest) {
             usuarioId: session.user.id,
           },
         });
+
+        console.log(`✅ Producto ${producto.nombre}: -${prod.cantidad} stock`);
       }
     }
 
@@ -254,11 +288,12 @@ export async function POST(request: NextRequest) {
           ordenId: orden.id,
         })),
       });
+      console.log(`✅ ${repuestosExternos.length} repuestos externos agregados`);
     }
 
     return NextResponse.json(orden, { status: 201 });
   } catch (error) {
-    console.error("Error creating orden:", error);
+    console.error("❌ Error creating orden:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }

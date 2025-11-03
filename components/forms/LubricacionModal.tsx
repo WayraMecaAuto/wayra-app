@@ -119,7 +119,7 @@ export function LubricacionModal({
         inventarioOrigen: "TORNI_REPUESTO",
       }));
 
-      // Filtrar lubricantes de Wayra (NO incluir filtros)
+      // ✅ FILTRAR LUBRICANTES (aceites) - NO incluir filtros
       const wayraLubricantes = [
         ...wayraEniProductos,
         ...wayraCalanProductos,
@@ -135,7 +135,8 @@ export function LubricacionModal({
         return !esFiltro && p.stock > 0;
       });
 
-      // Filtrar filtros de Wayra (SOLO filtros)
+      // ✅ FILTRAR FILTROS DE ACEITE
+      // Para Wayra: buscar productos que contengan "filtro" Y "aceite"
       const wayraFiltros = [
         ...wayraEniProductos,
         ...wayraCalanProductos,
@@ -143,13 +144,30 @@ export function LubricacionModal({
         const nombre = (p.nombre || "").toLowerCase();
         const categoria = (p.categoria || "").toLowerCase();
         const descripcion = (p.descripcion || "").toLowerCase();
+        const texto = `${nombre} ${categoria} ${descripcion}`;
 
-        // Buscar que contenga "filtro" Y "aceite" en alguna parte
+        // Debe contener ambas palabras: "filtro" Y "aceite"
         const esFiltroAceite =
-          (nombre.includes("filtro") && nombre.includes("aceite")) ||
-          nombre.includes("filtro aceite") ||
-          (categoria.includes("filtro") && nombre.includes("aceite")) ||
-          (descripcion.includes("filtro") && descripcion.includes("aceite"));
+          texto.includes("filtro") &&
+          (texto.includes("aceite") || texto.includes("oil"));
+
+        return esFiltroAceite && p.stock > 0;
+      });
+
+      // ✅ Para TorniRepuestos: buscar en categoría FILTROS los que sean específicamente de aceite
+      const torniFiltrosAceite = torniFiltros.filter((p) => {
+        const nombre = (p.nombre || "").toLowerCase();
+        const descripcion = (p.descripcion || "").toLowerCase();
+        const texto = `${nombre} ${descripcion}`;
+
+        // Buscar que contenga "aceite" o "oil" o términos relacionados
+        const esFiltroAceite =
+          texto.includes("aceite") ||
+          texto.includes("oil") ||
+          texto.includes("motor") ||
+          // También incluir si dice "filtro de aceite" explícitamente
+          (texto.includes("filtro") &&
+            (texto.includes("aceite") || texto.includes("motor")));
 
         return esFiltroAceite && p.stock > 0;
       });
@@ -158,17 +176,20 @@ export function LubricacionModal({
         ...wayraLubricantes,
         ...torniLubricantes.filter((p) => p.stock > 0),
       ];
+
       const todosLosFiltros = [
         ...wayraFiltros,
-        ...torniFiltros.filter((p) => p.stock > 0),
+        ...torniFiltrosAceite, // ✅ Ahora incluye filtros de TorniRepuestos
       ];
 
       console.log(
         "✅ Aceites:",
         todosLosAceites.length,
-        "| Filtros:",
+        "| Filtros de aceite:",
         todosLosFiltros.length
       );
+      console.log("   - Wayra filtros:", wayraFiltros.length);
+      console.log("   - Torni filtros:", torniFiltrosAceite.length);
 
       setAceites(todosLosAceites);
       setFiltros(todosLosFiltros);

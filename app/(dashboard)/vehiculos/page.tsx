@@ -540,16 +540,6 @@ export default function VehiculosPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                VIN
-              </label>
-              <Input
-                {...register('vin')}
-                placeholder="Número de serie del vehículo"
-                className="transition-all duration-300 focus:scale-102"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Motor
               </label>
               <Input

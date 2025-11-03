@@ -31,6 +31,7 @@ import { Modal } from "@/components/ui/modal";
 import { ClienteForm } from "@/components/forms/ClienteForm";
 import { VehiculoForm } from "@/components/forms/VehiculoForm";
 import { LubricacionModal } from "@/components/forms/LubricacionModal";
+import { ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
 import toast from "react-hot-toast";
 
 interface OrdenForm {
@@ -117,6 +118,7 @@ export default function NuevaOrdenPage() {
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showRepuestoModal, setShowRepuestoModal] = useState(false);
   const [showLubricacionModal, setShowLubricacionModal] = useState(false);
+  const [showProductSelector, setShowProductSelector] = useState(false);
   const [servicioLubricacionTemp, setServicioLubricacionTemp] =
     useState<Servicio | null>(null);
 
@@ -251,6 +253,44 @@ export default function NuevaOrdenPage() {
       toast.error("Error al buscar producto");
     }
     setShowScanner(false);
+  };
+
+  const handleProductSelected = async (producto: any, tipoPrecio: string) => {
+    // Verificar si ya está agregado
+    const exists = productosSeleccionados.find((p) => p.id === producto.id);
+    if (exists) {
+      toast.error("Este producto ya está agregado a la orden");
+      return;
+    }
+
+    // Determinar el precio según el tipo seleccionado
+    let precio = producto.precioVenta;
+    switch (tipoPrecio) {
+      case "MINORISTA":
+        precio = producto.precioMinorista;
+        break;
+      case "MAYORISTA":
+        precio = producto.precioMayorista;
+        break;
+      case "VENTA":
+      default:
+        precio = producto.precioVenta;
+        break;
+    }
+
+    const nuevoProducto: ProductoOrden = {
+      id: producto.id,
+      nombre: producto.nombre,
+      codigo: producto.codigo,
+      cantidad: 1,
+      precio: precio,
+      tipoPrecio: tipoPrecio as "VENTA" | "MINORISTA" | "MAYORISTA",
+      subtotal: precio,
+      stock: producto.stock,
+    };
+
+    setProductosSeleccionados([...productosSeleccionados, nuevoProducto]);
+    toast.success(`${producto.nombre} agregado con precio ${tipoPrecio}`);
   };
 
   const agregarServicio = (servicio: Servicio) => {
@@ -806,14 +846,26 @@ export default function NuevaOrdenPage() {
                 <Package className="h-5 w-5" />
                 <span>Productos del Inventario</span>
               </div>
-              <Button
-                type="button"
-                onClick={() => setShowScanner(true)}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Escanear Producto
-              </Button>
+              <div className="flex space-x-2">
+                {/* ✅ BOTÓN NUEVO: Seleccionar Productos */}
+                <Button
+                  type="button"
+                  onClick={() => setShowProductSelector(true)}
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Seleccionar Productos
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Escanear Producto
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
@@ -1030,6 +1082,11 @@ export default function NuevaOrdenPage() {
               </div>
             )}
           </CardContent>
+          <ProductSelectorModal
+            isOpen={showProductSelector}
+            onClose={() => setShowProductSelector(false)}
+            onSelect={handleProductSelected}
+          />
         </Card>
 
         {/* Repuestos Externos */}

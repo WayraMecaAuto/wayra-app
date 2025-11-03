@@ -16,6 +16,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useEffect } from "react";
 
 interface MovementFormProps {
   isOpen: boolean;
@@ -42,7 +43,36 @@ export function MovementForm({
   restrictToSales = false,
 }: MovementFormProps) {
   const { data: session } = useSession();
+  const [tasaDolar, setTasaDolar] = useState<number>(4000);
+  const [precioCompraCOP, setPrecioCompraCOP] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchTasa = async () => {
+      try {
+        const response = await fetch("/api/configuracion?clave=TASA_USD_COP");
+        if (response.ok) {
+          const data = await response.json();
+          const tasa = parseFloat(data.valor || "4000");
+          setTasaDolar(tasa);
+
+          // Calcular precio en COP si es CALAN
+          if (
+            product?.tipo === "WAYRA_CALAN" &&
+            product?.monedaCompra === "USD"
+          ) {
+            setPrecioCompraCOP(product.precioCompra * tasa);
+          }
+        }
+      } catch (error) {
+        console.error("Error obteniendo tasa:", error);
+      }
+    };
+
+    if (isOpen && product) {
+      fetchTasa();
+    }
+  }, [isOpen, product]);
 
   const ROLES_ENTRADA = [
     "SUPER_USUARIO",
@@ -309,16 +339,32 @@ export function MovementForm({
               <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
                 Código: {product.codigo}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Tipo:{" "}
-                {product.tipo === "WAYRA_ENI"
-                  ? "Wayra ENI"
-                  : product.tipo === "WAYRA_CALAN"
-                    ? "Wayra CALAN"
-                    : product.tipo === "TORNI_REPUESTO"
-                      ? "TorniRepuestos"
-                      : "Tornillería"}
-              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <p className="text-xs text-gray-500">
+                  Tipo:{" "}
+                  {product.tipo === "WAYRA_ENI"
+                    ? "Wayra ENI"
+                    : product.tipo === "WAYRA_CALAN"
+                      ? "Wayra CALAN"
+                      : product.tipo === "TORNI_REPUESTO"
+                        ? "TorniRepuestos"
+                        : "Tornillería"}
+                </p>
+
+                {/* ✅ MOSTRAR CONVERSIÓN PARA CALAN */}
+                {product.tipo === "WAYRA_CALAN" &&
+                  product.monedaCompra === "USD" && (
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-medium">
+                        💱 Costo: ${product.precioCompra.toFixed(2)} USD
+                      </span>
+                      <span className="text-gray-400">≈</span>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                        ${precioCompraCOP.toLocaleString()} COP
+                      </span>
+                    </div>
+                  )}
+              </div>
             </div>
             <div className="text-right flex-shrink-0">
               <div className="text-xs sm:text-sm text-gray-600 mb-0.5">
@@ -329,6 +375,34 @@ export function MovementForm({
               </div>
             </div>
           </div>
+
+          {/* ✅ INFORMACIÓN ADICIONAL PARA CALAN */}
+          {product.tipo === "WAYRA_CALAN" && product.monedaCompra === "USD" && (
+            <div className="mt-3 pt-3 border-t border-blue-200">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-white p-2 rounded-lg">
+                  <div className="text-gray-600 mb-1">Precio Compra USD</div>
+                  <div className="font-bold text-orange-600">
+                    ${product.precioCompra.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-lg">
+                  <div className="text-gray-600 mb-1">Tasa Actual</div>
+                  <div className="font-bold text-blue-600">
+                    ${tasaDolar.toLocaleString()}
+                  </div>
+                </div>
+                <div className="col-span-2 bg-gradient-to-r from-green-50 to-emerald-50 p-2 rounded-lg border border-green-200">
+                  <div className="text-gray-700 mb-1 font-medium">
+                    💰 Costo en Pesos (para contabilidad)
+                  </div>
+                  <div className="font-bold text-green-700 text-lg">
+                    ${precioCompraCOP.toLocaleString()} COP
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tipo de movimiento */}
@@ -431,7 +505,7 @@ export function MovementForm({
             <Input
               {...register("precioUnitario")}
               type="number"
-              step="0.01"
+              step="50"
               placeholder="0.00"
               className="h-12 text-lg font-semibold"
             />
