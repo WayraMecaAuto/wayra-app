@@ -30,7 +30,7 @@ interface Producto {
   codigo: string;
   stock: number;
   precioVenta: number;
-  precioMinorista: number;
+  precioMinorista: number; // 🔥 Agregar precio minorista
   tipo?: string;
   categoria?: string;
 }
@@ -40,7 +40,7 @@ interface ProductoSeleccionado {
   nombre: string;
   codigo: string;
   precioVenta: number;
-  precioMinorista: number;
+  precioMinorista: number; // 🔥 Agregar
   tipo: "ACEITE" | "FILTRO";
   inventarioTipo?: string;
 }

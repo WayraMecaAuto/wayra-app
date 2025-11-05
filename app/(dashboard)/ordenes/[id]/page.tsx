@@ -25,6 +25,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnimatedCheckbox as Checkbox } from "@/components/ui/animated-checkbox";
 import { LubricacionModal } from "@/components/forms/LubricacionModal";
+import { ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
+import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -57,6 +60,85 @@ interface Servicio {
   requiereLubricacion?: boolean;
 }
 
+// Componente para agregar repuesto externo
+function RepuestoExternoModal({ isOpen, onClose, onAdd }: any) {
+  const [formData, setFormData] = useState({
+    nombre: "",
+    descripcion: "",
+    cantidad: 1,
+    precioCompra: 0,
+    precioVenta: 0,
+    proveedor: "",
+  });
+
+  const calcularUtilidad = () => {
+    const totalCompra = formData.cantidad * formData.precioCompra;
+    const totalVenta = formData.cantidad * formData.precioVenta;
+    return totalVenta - totalCompra;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.nombre || formData.precioVenta <= 0) {
+      toast.error("Completa todos los campos");
+      return;
+    }
+    onAdd({
+      ...formData,
+      subtotal: formData.cantidad * formData.precioVenta,
+      utilidad: calcularUtilidad(),
+    });
+    setFormData({ nombre: "", descripcion: "", cantidad: 1, precioCompra: 0, precioVenta: 0, proveedor: "" });
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Repuesto Externo">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          placeholder="Nombre del repuesto"
+          value={formData.nombre}
+          onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+          required
+        />
+        <Input
+          placeholder="Descripción"
+          value={formData.descripcion}
+          onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+        />
+        <Input
+          placeholder="Proveedor"
+          value={formData.proveedor}
+          onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+        />
+        <div className="grid grid-cols-3 gap-4">
+          <Input
+            type="number"
+            placeholder="Cantidad"
+            value={formData.cantidad}
+            onChange={(e) => setFormData({ ...formData, cantidad: parseInt(e.target.value) || 1 })}
+          />
+          <Input
+            type="number"
+            placeholder="Precio Compra"
+            value={formData.precioCompra}
+            onChange={(e) => setFormData({ ...formData, precioCompra: parseFloat(e.target.value) || 0 })}
+          />
+          <Input
+            type="number"
+            placeholder="Precio Venta"
+            value={formData.precioVenta}
+            onChange={(e) => setFormData({ ...formData, precioVenta: parseFloat(e.target.value) || 0 })}
+          />
+        </div>
+        <div className="flex justify-end space-x-3">
+          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button type="submit">Agregar</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function OrdenDetallePage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -72,6 +154,9 @@ export default function OrdenDetallePage() {
   const [showLubricacionModal, setShowLubricacionModal] = useState(false);
   const [servicioLubricacionTemp, setServicioLubricacionTemp] =
     useState<Servicio | null>(null);
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [showRepuestoExternoModal, setShowRepuestoExternoModal] =
+    useState(false);
   const [showAgregarServicios, setShowAgregarServicios] = useState(false);
 
   const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
@@ -300,6 +385,58 @@ export default function OrdenDetallePage() {
       toast.error("Error al agregar servicio de lubricación");
     } finally {
       setServicioLubricacionTemp(null);
+    }
+  };
+
+  const handleProductSelected = async (producto: any, tipoPrecio: string) => {
+    try {
+      const precio =
+        tipoPrecio === "MINORISTA"
+          ? producto.precioMinorista
+          : tipoPrecio === "MAYORISTA"
+            ? producto.precioMayorista
+            : producto.precioVenta;
+
+      const response = await fetch(`/api/ordenes/${params.id}/productos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productoId: producto.id,
+          cantidad: 1,
+          precioUnitario: precio,
+          tipoPrecio,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`${producto.nombre} agregado a la orden`);
+        fetchOrden();
+        setShowProductSelector(false);
+      } else {
+        toast.error("Error al agregar producto");
+      }
+    } catch (error) {
+      toast.error("Error al agregar producto");
+    }
+  };
+
+  const handleRepuestoExternoAdded = async (repuesto: any) => {
+    try {
+      const response = await fetch(`/api/ordenes/${params.id}/repuestos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(repuesto),
+      });
+
+      if (response.ok) {
+        toast.success("Repuesto externo agregado");
+        fetchOrden();
+        setShowRepuestoExternoModal(false);
+      } else {
+        toast.error("Error al agregar repuesto");
+      }
+    } catch (error) {
+      toast.error("Error al agregar repuesto");
     }
   };
 
@@ -718,9 +855,21 @@ export default function OrdenDetallePage() {
       {orden.detalles.length > 0 && (
         <Card className="animate-fade-in">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
-              <Package className="h-5 w-5 text-blue-600" />
-              <span>Productos</span>
+            <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
+              <div className="flex items-center space-x-2">
+                <Package className="h-5 w-5 text-blue-600" />
+                <span>Productos</span>
+              </div>
+              {canAddServices && orden.estado !== "COMPLETADO" && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowProductSelector(true)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Producto
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1016,6 +1165,17 @@ export default function OrdenDetallePage() {
           setServicioLubricacionTemp(null);
         }}
         onAdd={handleLubricacionAdded}
+      />
+      <ProductSelectorModal
+        isOpen={showProductSelector}
+        onClose={() => setShowProductSelector(false)}
+        onSelect={handleProductSelected}
+      />
+
+      <RepuestoExternoModal
+        isOpen={showRepuestoExternoModal}
+        onClose={() => setShowRepuestoExternoModal(false)}
+        onAdd={handleRepuestoExternoAdded}
       />
     </div>
   );
