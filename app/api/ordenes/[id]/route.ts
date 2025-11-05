@@ -202,7 +202,7 @@ export async function PATCH(
       },
     });
 
-    // Si se marca como COMPLETADA, registrar en contabilidad
+    // 🔥 Si se marca como COMPLETADA, registrar en contabilidad
     if (
       ordenData.estado === "COMPLETADO" &&
       ordenActual?.estado !== "COMPLETADO"
@@ -210,6 +210,18 @@ export async function PATCH(
       const ahora = new Date();
       const mes = ahora.getMonth() + 1;
       const anio = ahora.getFullYear();
+
+      // 🔥 Obtener tasa de cambio
+      let tasaDolar = 4000;
+      try {
+        const tasaConfig = await prisma.configuracion.findUnique({
+          where: { clave: 'TASA_USD_COP' }
+        });
+        tasaDolar = parseFloat(tasaConfig?.valor || '4000');
+        console.log(`💱 Tasa de cambio al completar orden: $${tasaDolar}`);
+      } catch (error) {
+        console.error('Error obteniendo tasa:', error);
+      }
 
       // 1. Registrar productos WAYRA en contabilidad WAYRA_PRODUCTOS
       const productosWayra = orden.detalles.filter(
@@ -238,19 +250,8 @@ export async function PATCH(
           },
         });
 
-        // Obtener tasa de cambio para conversión de CALAN
-        let tasaDolar = 4000;
-        try {
-          const tasaConfig = await prisma.configuracion.findUnique({
-            where: { clave: "TASA_USD_COP" },
-          });
-          tasaDolar = parseFloat(tasaConfig?.valor || "4000");
-        } catch (error) {
-          console.error("Error obteniendo tasa:", error);
-        }
-
         for (const detalle of productosWayra) {
-          // Convertir precio de compra si es CALAN
+          // 🔥 CONVERTIR PRECIO DE COMPRA SI ES CALAN
           let precioCompraContable = detalle.producto.precioCompra;
           if (
             detalle.producto.tipo === "WAYRA_CALAN" &&
@@ -258,7 +259,7 @@ export async function PATCH(
           ) {
             precioCompraContable = detalle.producto.precioCompra * tasaDolar;
             console.log(
-              `💱 Conversión CALAN en orden: $${detalle.producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`
+              `💱 Conversión CALAN en orden completada: $${detalle.producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`
             );
           }
 
@@ -267,7 +268,7 @@ export async function PATCH(
               movimientoContableId: movWayra.id,
               productoId: detalle.productoId,
               cantidad: detalle.cantidad,
-              precioCompra: precioCompraContable, // Usar precio convertido
+              precioCompra: precioCompraContable, // ✅ Precio convertido
               precioVenta: detalle.precioUnitario,
               subtotalCompra: precioCompraContable * detalle.cantidad,
               subtotalVenta: detalle.subtotal,
@@ -323,11 +324,60 @@ export async function PATCH(
           });
         }
       }
+
+      console.log('✅ Contabilidad registrada correctamente al completar orden');
     }
 
     return NextResponse.json(orden);
   } catch (error) {
     console.error("Error updating orden:", error);
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+      session?.user?.role || ""
+    );
+    if (!session || !hasAccess) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    // Verificar que la orden esté cancelada
+    const orden = await prisma.ordenServicio.findUnique({
+      where: { id }
+    });
+
+    if (!orden) {
+      return NextResponse.json({ error: "Orden no encontrada" }, { status: 404 });
+    }
+
+    if (orden.estado !== "CANCELADO") {
+      return NextResponse.json(
+        { error: "Solo se pueden eliminar órdenes canceladas" },
+        { status: 403 }
+      );
+    }
+
+    // Eliminar orden (Prisma eliminará automáticamente registros relacionados con onDelete: Cascade)
+    await prisma.ordenServicio.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ message: "Orden eliminada correctamente" });
+  } catch (error) {
+    console.error("Error deleting orden:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }

@@ -52,15 +52,23 @@ export async function GET(request: NextRequest) {
           ordenId: orden.id
         })
 
-        // Estadística de servicios más realizados
-        if (!serviciosPorDescripcion[servicio.descripcion]) {
-          serviciosPorDescripcion[servicio.descripcion] = {
+        // 🔥 Estadística de servicios más realizados - AGRUPAR LUBRICACIONES
+        let descripcionBase = servicio.descripcion
+        
+        // Si es lubricación, usar solo "Lubricación" sin detalles
+        if (descripcionBase.toLowerCase().includes('lubricación') || 
+            descripcionBase.toLowerCase().includes('lubricacion')) {
+          descripcionBase = 'Lubricación'
+        }
+
+        if (!serviciosPorDescripcion[descripcionBase]) {
+          serviciosPorDescripcion[descripcionBase] = {
             cantidad: 0,
             ingresoTotal: 0
           }
         }
-        serviciosPorDescripcion[servicio.descripcion].cantidad++
-        serviciosPorDescripcion[servicio.descripcion].ingresoTotal += servicio.precio
+        serviciosPorDescripcion[descripcionBase].cantidad++
+        serviciosPorDescripcion[descripcionBase].ingresoTotal += servicio.precio
       })
 
       // REPUESTOS EXTERNOS (solo estos van a Wayra Taller)
@@ -159,7 +167,6 @@ export async function POST(request: NextRequest) {
     const mes = ahora.getMonth() + 1
     const anio = ahora.getFullYear()
 
-    // Crear egreso
     const egreso = await prisma.movimientoContable.create({
       data: {
         tipo: 'EGRESO',

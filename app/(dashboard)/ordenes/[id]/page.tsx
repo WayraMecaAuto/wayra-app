@@ -224,7 +224,12 @@ export default function OrdenDetallePage() {
   };
 
   const handleLubricacionAdded = async (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>
+    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
+    productosCompletos?: Array<{
+      id: string;
+      nombre: string;
+      precioMinorista: number;
+    }>
   ) => {
     if (!servicioLubricacionTemp) return;
 
@@ -240,47 +245,25 @@ export default function OrdenDetallePage() {
         return;
       }
 
-      // Obtener información completa de todos los productos
-      const productosCompletos = await Promise.all(
-        productos.map(async (p) => {
-          const response = await fetch(`/api/productos/${p.id}`);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error(`No se pudo obtener el producto ${p.nombre}`);
-        })
-      );
-
-      // Calcular precio total
-      const precioTotal = productosCompletos.reduce(
-        (sum, p) => sum + p.precioVenta,
-        0
-      );
+      // Calcular precio total con precio MINORISTA
+      const precioTotal = productosCompletos
+        ? productosCompletos.reduce((sum, p) => sum + p.precioMinorista, 0)
+        : 0;
 
       // Crear descripción detallada
-      const nombresAceites = aceites
-        .map((a) => {
-          const producto = productosCompletos.find((p) => p.id === a.id);
-          return producto?.nombre || a.nombre;
-        })
-        .join(", ");
-
-      const nombresFiltros = filtros
-        .map((f) => {
-          const producto = productosCompletos.find((p) => p.id === f.id);
-          return producto?.nombre || f.nombre;
-        })
-        .join(", ");
+      const nombresAceites = aceites.map((a) => a.nombre).join(", ");
+      const nombresFiltros = filtros.map((f) => f.nombre).join(", ");
 
       const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
 
-      // Agregar servicio a la orden
+      // 🔥 Agregar servicio CON productos para descontar inventario
       const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           descripcion: descripcion,
           precio: precioTotal,
+          productosLubricacion: productosCompletos, // 🔥 Enviar productos completos
         }),
       });
 
@@ -298,11 +281,14 @@ export default function OrdenDetallePage() {
                 • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
               </div>
               <div className="font-semibold mt-1">
-                Total: ${precioTotal.toLocaleString()}
+                Total (Precio Minorista): ${precioTotal.toLocaleString()}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                Stock descontado automáticamente
               </div>
             </div>
           </div>,
-          { duration: 4000 }
+          { duration: 5000 }
         );
         fetchOrden(); // Recargar orden
         setShowAgregarServicios(false);

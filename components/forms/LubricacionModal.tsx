@@ -17,9 +17,10 @@ import toast from "react-hot-toast";
 interface LubricacionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // Ahora acepta array de aceites y un solo filtro
+  // Ahora recibe también los productos para descontar inventario
   onAdd: (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>
+    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
+    productosCompletos?: Array<{ id: string; nombre: string; precioMinorista: number }>
   ) => void;
 }
 
@@ -29,6 +30,7 @@ interface Producto {
   codigo: string;
   stock: number;
   precioVenta: number;
+  precioMinorista: number;
   tipo?: string;
   categoria?: string;
 }
@@ -38,6 +40,7 @@ interface ProductoSeleccionado {
   nombre: string;
   codigo: string;
   precioVenta: number;
+  precioMinorista: number;
   tipo: "ACEITE" | "FILTRO";
   inventarioTipo?: string;
 }
@@ -60,7 +63,6 @@ export function LubricacionModal({
 
   useEffect(() => {
     if (isOpen) {
-      // Limpiar estado al abrir
       setAceitesSeleccionados([]);
       setFiltroSeleccionado(null);
       setSearchAceite("");
@@ -119,7 +121,6 @@ export function LubricacionModal({
         inventarioOrigen: "TORNI_REPUESTO",
       }));
 
-      // ✅ FILTRAR LUBRICANTES (aceites) - NO incluir filtros
       const wayraLubricantes = [
         ...wayraEniProductos,
         ...wayraCalanProductos,
@@ -135,8 +136,6 @@ export function LubricacionModal({
         return !esFiltro && p.stock > 0;
       });
 
-      // ✅ FILTRAR FILTROS DE ACEITE
-      // Para Wayra: buscar productos que contengan "filtro" Y "aceite"
       const wayraFiltros = [
         ...wayraEniProductos,
         ...wayraCalanProductos,
@@ -146,7 +145,6 @@ export function LubricacionModal({
         const descripcion = (p.descripcion || "").toLowerCase();
         const texto = `${nombre} ${categoria} ${descripcion}`;
 
-        // Debe contener ambas palabras: "filtro" Y "aceite"
         const esFiltroAceite =
           texto.includes("filtro") &&
           (texto.includes("aceite") || texto.includes("oil"));
@@ -154,18 +152,15 @@ export function LubricacionModal({
         return esFiltroAceite && p.stock > 0;
       });
 
-      // ✅ Para TorniRepuestos: buscar en categoría FILTROS los que sean específicamente de aceite
       const torniFiltrosAceite = torniFiltros.filter((p) => {
         const nombre = (p.nombre || "").toLowerCase();
         const descripcion = (p.descripcion || "").toLowerCase();
         const texto = `${nombre} ${descripcion}`;
 
-        // Buscar que contenga "aceite" o "oil" o términos relacionados
         const esFiltroAceite =
           texto.includes("aceite") ||
           texto.includes("oil") ||
           texto.includes("motor") ||
-          // También incluir si dice "filtro de aceite" explícitamente
           (texto.includes("filtro") &&
             (texto.includes("aceite") || texto.includes("motor")));
 
@@ -179,7 +174,7 @@ export function LubricacionModal({
 
       const todosLosFiltros = [
         ...wayraFiltros,
-        ...torniFiltrosAceite, // ✅ Ahora incluye filtros de TorniRepuestos
+        ...torniFiltrosAceite,
       ];
 
       console.log(
@@ -188,8 +183,6 @@ export function LubricacionModal({
         "| Filtros de aceite:",
         todosLosFiltros.length
       );
-      console.log("   - Wayra filtros:", wayraFiltros.length);
-      console.log("   - Torni filtros:", torniFiltrosAceite.length);
 
       setAceites(todosLosAceites);
       setFiltros(todosLosFiltros);
@@ -222,6 +215,7 @@ export function LubricacionModal({
         nombre: producto.nombre,
         codigo: producto.codigo,
         precioVenta: producto.precioVenta,
+        precioMinorista: producto.precioMinorista, // 🔥 Guardar precio minorista
         tipo: "ACEITE",
         inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
       },
@@ -241,6 +235,7 @@ export function LubricacionModal({
       nombre: producto.nombre,
       codigo: producto.codigo,
       precioVenta: producto.precioVenta,
+      precioMinorista: producto.precioMinorista, // 🔥 Guardar precio minorista
       tipo: "FILTRO",
       inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
     });
@@ -268,7 +263,7 @@ export function LubricacionModal({
       `${filtroSeleccionado.nombre} (${filtroSeleccionado.id})`
     );
 
-    // Enviar todos los productos seleccionados
+    // Enviar productos para agregar como servicio
     const productosParaAgregar = [
       ...aceitesSeleccionados.map((a) => ({
         id: a.id,
@@ -282,7 +277,21 @@ export function LubricacionModal({
       },
     ];
 
-    onAdd(productosParaAgregar);
+    // 🔥 También enviar productos completos para descontar inventario
+    const productosCompletos = [
+      ...aceitesSeleccionados.map((a) => ({
+        id: a.id,
+        nombre: a.nombre,
+        precioMinorista: a.precioMinorista,
+      })),
+      {
+        id: filtroSeleccionado.id,
+        nombre: filtroSeleccionado.nombre,
+        precioMinorista: filtroSeleccionado.precioMinorista,
+      },
+    ];
+
+    onAdd(productosParaAgregar, productosCompletos);
     handleClose();
   };
 
@@ -294,12 +303,13 @@ export function LubricacionModal({
     onClose();
   };
 
+  // 🔥 Calcular con precio MINORISTA (venta a Wayra Taller)
   const calcularPrecioTotal = () => {
     const totalAceites = aceitesSeleccionados.reduce(
-      (sum, p) => sum + p.precioVenta,
+      (sum, p) => sum + p.precioMinorista,
       0
     );
-    const precioFiltro = filtroSeleccionado?.precioVenta || 0;
+    const precioFiltro = filtroSeleccionado?.precioMinorista || 0;
     return totalAceites + precioFiltro;
   };
 
@@ -357,13 +367,11 @@ export function LubricacionModal({
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-blue-900 mb-2">
-                Servicio de Lubricación Personalizado
+                Servicio de Lubricación - Precio Minorista
               </h4>
               <p className="text-sm text-blue-700">
-                Selecciona{" "}
-                <span className="font-semibold">uno o más aceites</span> y{" "}
-                <span className="font-semibold">un filtro</span> para este
-                servicio.
+                Selecciona <span className="font-semibold">uno o más aceites</span> y{" "}
+                <span className="font-semibold">un filtro</span>. El precio se calcula con <span className="font-semibold">precio minorista</span> (venta a Wayra Taller).
               </p>
             </div>
           </div>
@@ -411,7 +419,7 @@ export function LubricacionModal({
                           <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
                             <span>{aceite.codigo}</span>
                             <span className="font-bold text-green-600">
-                              ${aceite.precioVenta.toLocaleString()}
+                              Minorista: ${aceite.precioMinorista.toLocaleString()}
                             </span>
                             {aceite.inventarioTipo && (
                               <span
@@ -479,7 +487,7 @@ export function LubricacionModal({
                                   Stock: {aceite.stock}
                                 </span>
                                 <span className="font-bold text-blue-600">
-                                  ${aceite.precioVenta.toLocaleString()}
+                                  Min: ${aceite.precioMinorista.toLocaleString()}
                                 </span>
                                 {productoConOrigen.inventarioOrigen && (
                                   <span
@@ -543,7 +551,7 @@ export function LubricacionModal({
                       <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
                         <span>{filtroSeleccionado.codigo}</span>
                         <span className="font-bold text-green-600">
-                          ${filtroSeleccionado.precioVenta.toLocaleString()}
+                          Minorista: ${filtroSeleccionado.precioMinorista.toLocaleString()}
                         </span>
                         {filtroSeleccionado.inventarioTipo && (
                           <span
@@ -613,7 +621,7 @@ export function LubricacionModal({
                                   Stock: {filtro.stock}
                                 </span>
                                 <span className="font-bold text-green-600">
-                                  ${filtro.precioVenta.toLocaleString()}
+                                  Min: ${filtro.precioMinorista.toLocaleString()}
                                 </span>
                                 {productoConOrigen.inventarioOrigen && (
                                   <span
@@ -656,7 +664,7 @@ export function LubricacionModal({
               <ShoppingCart className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <h5 className="font-bold text-green-900 mb-3">
-                  Resumen del Servicio:
+                  Resumen del Servicio (Precio Minorista):
                 </h5>
                 <div className="grid grid-cols-2 gap-4 mb-3">
                   <div className="bg-white rounded-lg p-3 border border-green-200">
@@ -675,7 +683,7 @@ export function LubricacionModal({
                 <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-4 border-2 border-green-300">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-green-900">
-                      Precio Total:
+                      Total (Precio Minorista):
                     </span>
                     <span className="text-2xl font-bold text-green-700">
                       ${calcularPrecioTotal().toLocaleString()}

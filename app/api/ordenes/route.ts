@@ -7,7 +7,6 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    // Verificar permisos
     const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER", 'MECANICO'].includes(
       session?.user?.role || ""
     );
@@ -113,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     const numeroOrden = `ORD-${anio}-${mes.toString().padStart(2, "0")}-${orderNumber.toString().padStart(3, "0")}`;
 
-    // Obtener tasa de cambio para CALAN
+    // 🔥 Obtener tasa de cambio para CALAN
     let tasaDolar = 4000;
     try {
       const tasaConfig = await prisma.configuracion.findUnique({
@@ -157,7 +156,7 @@ export async function POST(request: NextRequest) {
     const manoDeObraNum = parseFloat(manoDeObra) || 0;
     const total = subtotal + manoDeObraNum;
 
-    // Calcular utilidad (sobre productos internos y repuestos externos)
+    // 🔥 Calcular utilidad con conversión CALAN
     let utilidad = 0;
     
     if (productos?.length > 0) {

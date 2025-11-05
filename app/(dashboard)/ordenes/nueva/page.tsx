@@ -309,12 +309,17 @@ export default function NuevaOrdenPage() {
   };
 
   const handleLubricacionAdded = async (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>
+    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
+    productosCompletos?: Array<{
+      id: string;
+      nombre: string;
+      precioMinorista: number;
+    }>
   ) => {
     if (!servicioLubricacionTemp) return;
 
     try {
-      console.log("🔧 Procesando lubricación con productos:", productos);
+      console.log("🔧 Procesando lubricación en nueva orden:", productos);
 
       // Separar aceites y filtros
       const aceites = productos.filter((p) => p.tipo === "ACEITE");
@@ -325,51 +330,23 @@ export default function NuevaOrdenPage() {
         return;
       }
 
-      // Obtener información completa de todos los productos
-      const productosCompletos = await Promise.all(
-        productos.map(async (p) => {
-          const response = await fetch(`/api/productos/${p.id}`);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error(`No se pudo obtener el producto ${p.nombre}`);
-        })
-      );
+      // 🔥 Calcular precio total con precio MINORISTA
+      const precioTotal = productosCompletos
+        ? productosCompletos.reduce((sum, p) => sum + p.precioMinorista, 0)
+        : 0;
 
-      // Calcular precio total
-      const precioTotal = productosCompletos.reduce(
-        (sum, p) => sum + p.precioVenta,
-        0
-      );
+      // Crear descripción SIN detalles de productos (para agrupar en reportes)
+      const descripcion = servicioLubricacionTemp.descripcion; // Solo "Lubricación"
 
-      // Crear descripción detallada
-      const nombresAceites = aceites
-        .map((a) => {
-          const producto = productosCompletos.find((p) => p.id === a.id);
-          return producto?.nombre || a.nombre;
-        })
-        .join(", ");
-
-      const nombresFiltros = filtros
-        .map((f) => {
-          const producto = productosCompletos.find((p) => p.id === f.id);
-          return producto?.nombre || f.nombre;
-        })
-        .join(", ");
-
-      const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
-
-      // Agregar servicio con precio calculado
-      const servicioConLubricacion: ServicioConLubricacion = {
+      // 🔥 Agregar SOLO el servicio (NO agregar productos a la lista)
+      const nuevoServicio: ServicioConLubricacion = {
         ...servicioLubricacionTemp,
         precio: precioTotal,
         descripcion: descripcion,
       };
 
-      setServiciosSeleccionados([
-        ...serviciosSeleccionados,
-        servicioConLubricacion,
-      ]);
+      setServiciosSeleccionados([...serviciosSeleccionados, nuevoServicio]);
+
       setServicioLubricacionTemp(null);
 
       toast.success(
@@ -379,22 +356,26 @@ export default function NuevaOrdenPage() {
           </div>
           <div className="text-sm mt-1">
             <div>
-              • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}
+              • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}:{" "}
+              {aceites.map((a) => a.nombre).join(", ")}
             </div>
             <div>
-              • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
+              • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}:{" "}
+              {filtros.map((f) => f.nombre).join(", ")}
             </div>
             <div className="font-semibold mt-1">
-              Total: ${precioTotal.toLocaleString()}
+              Total (Precio Minorista): ${precioTotal.toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              ⚠️ Los productos se descontarán al completar la orden
             </div>
           </div>
         </div>,
-        { duration: 4000 }
+        { duration: 5000 }
       );
     } catch (error) {
       console.error("❌ Error al procesar lubricación:", error);
-      toast.error("Error al agregar servicio de lubricación");
-      setServicioLubricacionTemp(null);
+      toast.error("Error al agregar servicio");
     }
   };
 
@@ -474,19 +455,36 @@ export default function NuevaOrdenPage() {
       );
       return;
     }
+
     setLoading(true);
     try {
+      // 🔥 Extraer productos de lubricación de los servicios
+      const serviciosParaEnviar = serviciosSeleccionados.map((servicio) => {
+        // Si es lubricación, agregar metadata de productos
+        if (
+          servicio.descripcion.includes("Lubricación") ||
+          servicio.descripcion.includes("lubricación")
+        ) {
+          return {
+            ...servicio,
+            // Los productos se descontarán automáticamente en el backend cuando se complete la orden
+          };
+        }
+        return servicio;
+      });
+
       const response = await fetch("/api/ordenes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
           manoDeObra: parseFloat(data.manoDeObra) || 0,
-          servicios: serviciosSeleccionados,
+          servicios: serviciosParaEnviar,
           productos: productosSeleccionados,
           repuestosExternos,
         }),
       });
+
       if (response.ok) {
         toast.success("Orden creada exitosamente");
         window.location.href = "/ordenes";
@@ -847,11 +845,11 @@ export default function NuevaOrdenPage() {
                 <span>Productos del Inventario</span>
               </div>
               <div className="flex space-x-2">
-                {/* ✅ BOTÓN NUEVO: Seleccionar Productos */}
+                {/* BOTÓN NUEVO: Seleccionar Productos */}
                 <Button
                   type="button"
                   onClick={() => setShowProductSelector(true)}
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
+                  className="bg-purple-600 hover:bg-purple-700 text-white border-white/30 hover:scale-105 transition-transform"
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Seleccionar Productos
