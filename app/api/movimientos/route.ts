@@ -175,6 +175,35 @@ export async function POST(request: NextRequest) {
         const mes = ahora.getMonth() + 1;
         const anio = ahora.getFullYear();
 
+        // 🔥 Obtener tasa de cambio para CALAN
+        let tasaDolar = 4000;
+        try {
+          const tasaConfig = await tx.configuracion.findUnique({
+            where: { clave: "TASA_USD_COP" },
+          });
+          tasaDolar = parseFloat(tasaConfig?.valor || "4000");
+        } catch (error) {
+          console.error("Error obteniendo tasa:", error);
+        }
+
+        // 🔥 Calcular precio de compra EN COP (SOLO SI ES CALAN EN USD)
+        let precioCompraContable = producto.precioCompra;
+
+        if (
+          producto.tipo === "WAYRA_CALAN" &&
+          producto.monedaCompra === "USD" &&
+          producto.precioCompra < 1000 // Si es menor a 1000, probablemente está en USD
+        ) {
+          precioCompraContable = producto.precioCompra * tasaDolar;
+          console.log(
+            `💱 Conversión venta directa CALAN: $${producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`
+          );
+        } else {
+          console.log(
+            `✅ Precio compra: $${precioCompraContable.toFixed(2)} COP`
+          );
+        }
+
         const movimientoContable = await tx.movimientoContable.create({
           data: {
             tipo: "INGRESO",
@@ -190,22 +219,29 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Crear detalle del ingreso (usando precioCompraCop si viene del frontend)
+        // Crear detalle del ingreso (usando precioCompraCop si viene del frontend, sino calcular)
+        const precioCompraFinal = precioCompraCop ?? precioCompraContable;
+        const subtotalCompra = precioCompraFinal * cantidadNum;
+        const subtotalVenta = precioUnitarioNum * cantidadNum;
+        const utilidadReal = subtotalVenta - subtotalCompra;
+
         await tx.detalleIngresoContable.create({
           data: {
             movimientoContableId: movimientoContable.id,
             productoId,
             cantidad: cantidadNum,
-            precioCompra: precioCompraCop ?? producto.precioCompra,
+            precioCompra: precioCompraFinal, //  Precio en COP
             precioVenta: precioUnitarioNum,
-            subtotalCompra:
-              (precioCompraCop ?? producto.precioCompra) * cantidadNum,
-            subtotalVenta: precioUnitarioNum * cantidadNum,
-            utilidad:
-              (precioUnitarioNum - (precioCompraCop ?? producto.precioCompra)) *
-              cantidadNum,
+            subtotalCompra: subtotalCompra,
+            subtotalVenta: subtotalVenta,
+            utilidad: utilidadReal, // Venta - Compra en COP
           },
         });
+
+        console.log(`✅ Venta directa registrada en ${entidadContable}`);
+        console.log(`   💰 Compra COP: $${precioCompraFinal.toFixed(2)}`);
+        console.log(`   💰 Venta: $${precioUnitarioNum}`);
+        console.log(`   💰 Utilidad: $${utilidadReal.toFixed(2)}`);
       }
 
       return nuevoMovimiento;

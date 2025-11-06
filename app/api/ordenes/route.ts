@@ -7,9 +7,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER", 'MECANICO'].includes(
-      session?.user?.role || ""
-    );
+    const hasAccess = [
+      "SUPER_USUARIO",
+      "ADMIN_WAYRA_TALLER",
+      "MECANICO",
+    ].includes(session?.user?.role || "");
     if (!session || !hasAccess) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -158,23 +160,46 @@ export async function POST(request: NextRequest) {
 
     // 🔥 Calcular utilidad con conversión CALAN
     let utilidad = 0;
-    
+
     if (productos?.length > 0) {
       for (const prod of productos) {
         const producto = await prisma.producto.findUnique({
           where: { id: prod.id },
         });
         if (producto) {
-          // ✅ CONVERTIR PRECIO DE COMPRA SI ES CALAN
+          // ✅ CALCULAR PRECIO DE COMPRA EN COP (SOLO SI ES CALAN EN USD)
           let precioCompraContable = producto.precioCompra;
-          if (producto.tipo === 'WAYRA_CALAN' && producto.monedaCompra === 'USD') {
+
+          // Solo convertir si es CALAN en USD Y el precio no está ya convertido
+          if (
+            producto.tipo === "WAYRA_CALAN" &&
+            producto.monedaCompra === "USD" &&
+            producto.precioCompra < 1000 // Si es menor a 1000, probablemente está en USD
+          ) {
             precioCompraContable = producto.precioCompra * tasaDolar;
-            console.log(`💱 CALAN ${producto.nombre}: $${producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`);
+            console.log(
+              `💱 CALAN ${producto.nombre}: $${producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`
+            );
+          } else {
+            console.log(
+              `✅ ${producto.nombre} precio compra: $${precioCompraContable.toFixed(2)} COP`
+            );
           }
-          
+
           const costoTotal = precioCompraContable * parseInt(prod.cantidad);
           const ventaTotal = parseFloat(prod.precio) * parseInt(prod.cantidad);
-          utilidad += ventaTotal - costoTotal;
+          const utilidadProducto = ventaTotal - costoTotal;
+
+          utilidad += utilidadProducto;
+
+          console.log(`   💰 Producto: ${producto.nombre}`);
+          console.log(
+            `   💰 Compra COP: $${precioCompraContable.toFixed(2)} x ${prod.cantidad} = $${costoTotal.toFixed(2)}`
+          );
+          console.log(
+            `   💰 Venta: $${parseFloat(prod.precio)} x ${prod.cantidad} = $${ventaTotal.toFixed(2)}`
+          );
+          console.log(`   💰 Utilidad: $${utilidadProducto.toFixed(2)}`);
         }
       }
     }
@@ -185,6 +210,8 @@ export async function POST(request: NextRequest) {
         0
       );
     }
+
+    console.log(`✅ Utilidad total calculada: $${utilidad.toFixed(2)}`);
 
     // Crear orden
     const orden = await prisma.ordenServicio.create({
@@ -279,15 +306,19 @@ export async function POST(request: NextRequest) {
           descripcion: r.descripcion || "",
           cantidad: parseInt(r.cantidad),
           precioCompra: parseFloat(r.precioCompra) || 0,
-          precioVenta: parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
-          precioUnitario: parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
+          precioVenta:
+            parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
+          precioUnitario:
+            parseFloat(r.precioVenta) || parseFloat(r.precioUnitario) || 0,
           subtotal: parseFloat(r.subtotal),
           utilidad: parseFloat(r.utilidad) || 0,
           proveedor: r.proveedor || "",
           ordenId: orden.id,
         })),
       });
-      console.log(`✅ ${repuestosExternos.length} repuestos externos agregados`);
+      console.log(
+        `✅ ${repuestosExternos.length} repuestos externos agregados`
+      );
     }
 
     return NextResponse.json(orden, { status: 201 });

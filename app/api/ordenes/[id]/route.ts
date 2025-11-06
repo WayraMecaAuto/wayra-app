@@ -215,12 +215,12 @@ export async function PATCH(
       let tasaDolar = 4000;
       try {
         const tasaConfig = await prisma.configuracion.findUnique({
-          where: { clave: 'TASA_USD_COP' }
+          where: { clave: "TASA_USD_COP" },
         });
-        tasaDolar = parseFloat(tasaConfig?.valor || '4000');
+        tasaDolar = parseFloat(tasaConfig?.valor || "4000");
         console.log(`💱 Tasa de cambio al completar orden: $${tasaDolar}`);
       } catch (error) {
-        console.error('Error obteniendo tasa:', error);
+        console.error("Error obteniendo tasa:", error);
       }
 
       // 1. Registrar productos WAYRA en contabilidad WAYRA_PRODUCTOS
@@ -251,31 +251,45 @@ export async function PATCH(
         });
 
         for (const detalle of productosWayra) {
-          // 🔥 CONVERTIR PRECIO DE COMPRA SI ES CALAN
+          // 🔥 CALCULAR PRECIO DE COMPRA EN COP (SOLO SI ES CALAN EN USD)
           let precioCompraContable = detalle.producto.precioCompra;
+
+          // ✅ SOLO convertir si es CALAN en USD Y el precio no está ya convertido
           if (
             detalle.producto.tipo === "WAYRA_CALAN" &&
-            detalle.producto.monedaCompra === "USD"
+            detalle.producto.monedaCompra === "USD" &&
+            detalle.producto.precioCompra < 1000 // Si es menor a 1000, probablemente está en USD
           ) {
             precioCompraContable = detalle.producto.precioCompra * tasaDolar;
             console.log(
               `💱 Conversión CALAN en orden completada: $${detalle.producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`
             );
+          } else {
+            console.log(
+              `✅ Precio compra ya en COP: $${precioCompraContable.toFixed(2)} (${detalle.producto.monedaCompra})`
+            );
           }
+
+          const subtotalCompra = precioCompraContable * detalle.cantidad;
+          const utilidadReal = detalle.subtotal - subtotalCompra;
 
           await prisma.detalleIngresoContable.create({
             data: {
               movimientoContableId: movWayra.id,
               productoId: detalle.productoId,
               cantidad: detalle.cantidad,
-              precioCompra: precioCompraContable, // ✅ Precio convertido
+              precioCompra: precioCompraContable, // ✅ Precio en COP (convertido solo si era USD)
               precioVenta: detalle.precioUnitario,
-              subtotalCompra: precioCompraContable * detalle.cantidad,
+              subtotalCompra: subtotalCompra,
               subtotalVenta: detalle.subtotal,
-              utilidad:
-                detalle.subtotal - precioCompraContable * detalle.cantidad,
+              utilidad: utilidadReal, // ✅ CORRECTO: Venta - (Compra en COP * cantidad)
             },
           });
+
+          console.log(`✅ CALAN ${detalle.producto.nombre}:`);
+          console.log(`   Compra COP: $${precioCompraContable.toFixed(2)}`);
+          console.log(`   Venta: $${detalle.precioUnitario}`);
+          console.log(`   Utilidad: $${utilidadReal.toFixed(2)}`);
         }
       }
 
@@ -308,6 +322,7 @@ export async function PATCH(
         });
 
         for (const detalle of productosTorni) {
+          // TorniRepuestos siempre en COP, no necesita conversión
           await prisma.detalleIngresoContable.create({
             data: {
               movimientoContableId: movTorni.id,
@@ -325,7 +340,9 @@ export async function PATCH(
         }
       }
 
-      console.log('✅ Contabilidad registrada correctamente al completar orden');
+      console.log(
+        "✅ Contabilidad registrada correctamente al completar orden"
+      );
     }
 
     return NextResponse.json(orden);
@@ -356,11 +373,14 @@ export async function DELETE(
 
     // Verificar que la orden esté cancelada
     const orden = await prisma.ordenServicio.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!orden) {
-      return NextResponse.json({ error: "Orden no encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Orden no encontrada" },
+        { status: 404 }
+      );
     }
 
     if (orden.estado !== "CANCELADO") {
@@ -372,7 +392,7 @@ export async function DELETE(
 
     // Eliminar orden (Prisma eliminará automáticamente registros relacionados con onDelete: Cascade)
     await prisma.ordenServicio.delete({
-      where: { id }
+      where: { id },
     });
 
     return NextResponse.json({ message: "Orden eliminada correctamente" });

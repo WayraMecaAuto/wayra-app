@@ -82,25 +82,23 @@ export async function POST(
           );
         }
 
-        // 🔥 Obtener precio de compra EN COP
-        // 🔥 Obtener precio de compra EN COP
+        // 🔥 Calcular precio de compra EN COP (SOLO SI ES CALAN EN USD)
         let precioCompraCOP = producto.precioCompra;
-        // Si es CALAN en USD, convertir SOLO UNA VEZ
+        
+        // ✅ SOLO convertir si es CALAN en USD Y el precio no está ya convertido
         if (
           producto.tipo === "WAYRA_CALAN" &&
-          producto.monedaCompra === "USD"
+          producto.monedaCompra === "USD" &&
+          producto.precioCompra < 1000 // Si es menor a 1000, probablemente está en USD
         ) {
-          // ✅ Verificar si ya está en COP (si es > 1000, probablemente ya está convertido)
-          if (producto.precioCompra < 1000) {
-            precioCompraCOP = producto.precioCompra * tasaDolar;
-            console.log(
-              `💱 Convirtiendo CALAN ${producto.nombre}: $${producto.precioCompra} USD → $${precioCompraCOP.toFixed(2)} COP`
-            );
-          } else {
-            console.log(
-              `✅ CALAN ${producto.nombre} ya está en COP: $${precioCompraCOP.toFixed(2)}`
-            );
-          }
+          precioCompraCOP = producto.precioCompra * tasaDolar;
+          console.log(
+            `💱 Convirtiendo CALAN ${producto.nombre}: $${producto.precioCompra} USD → $${precioCompraCOP.toFixed(2)} COP`
+          );
+        } else {
+          console.log(
+            `✅ ${producto.nombre} precio compra: $${precioCompraCOP.toFixed(2)} COP (${producto.monedaCompra})`
+          );
         }
 
         costoTotalProductos += precioCompraCOP;
@@ -111,7 +109,7 @@ export async function POST(
           entidadContable = "WAYRA_PRODUCTOS";
         }
 
-        // 🔥 Actualizar stock
+        // 🔥 1. Actualizar stock (DESCONTAR INVENTARIO)
         await prisma.producto.update({
           where: { id: prod.id },
           data: {
@@ -121,7 +119,7 @@ export async function POST(
           },
         });
 
-        // 🔥 Crear movimiento de inventario
+        // 🔥 2. Crear movimiento de inventario
         await prisma.movimientoInventario.create({
           data: {
             tipo: "SALIDA",
@@ -134,16 +132,16 @@ export async function POST(
           },
         });
 
-        console.log(`✅ ${producto.nombre}: -1 stock`);
+        console.log(`✅ ${producto.nombre}: -1 stock (movimiento registrado)`);
 
-        // 🔥 Registrar INGRESO en contabilidad
+        // 🔥 3. Registrar INGRESO en contabilidad (VENTA A WAYRA TALLER)
         const movimientoContable = await prisma.movimientoContable.create({
           data: {
             tipo: "INGRESO",
             concepto: "VENTA_DESDE_ORDEN",
-            monto: producto.precioMinorista,
+            monto: producto.precioMinorista, // 🔥 Precio MINORISTA (venta a Wayra Taller)
             fecha: ahora,
-            descripcion: `Venta a Wayra Taller - ${producto.nombre} (Lubricación)`,
+            descripcion: `Venta a Wayra Taller - ${producto.nombre} (Lubricación) - Orden ${ordenId}`,
             entidad: entidadContable,
             referencia: ordenId,
             mes,
@@ -152,17 +150,17 @@ export async function POST(
           },
         });
 
-        // 🔥 Crear detalle contable con precio en COP
+        // 🔥 4. Crear detalle contable con precio EN COP
         await prisma.detalleIngresoContable.create({
           data: {
             movimientoContableId: movimientoContable.id,
             productoId: prod.id,
             cantidad: 1,
-            precioCompra: precioCompraCOP, // ✅ Precio YA convertido a COP
-            precioVenta: producto.precioMinorista,
+            precioCompra: precioCompraCOP, // ✅ Precio YA en COP (convertido solo si era USD)
+            precioVenta: producto.precioMinorista, // 🔥 Precio MINORISTA
             subtotalCompra: precioCompraCOP,
             subtotalVenta: producto.precioMinorista,
-            utilidad: producto.precioMinorista - precioCompraCOP,
+            utilidad: producto.precioMinorista - precioCompraCOP, // ✅ CORRECTO: Venta - Compra en COP
           },
         });
 
@@ -170,24 +168,24 @@ export async function POST(
         console.log(
           `   💰 Precio Compra (COP): $${precioCompraCOP.toFixed(2)}`
         );
-        console.log(`   💰 Precio Minorista: $${producto.precioMinorista}`);
+        console.log(`   💰 Precio Minorista (Venta a Taller): $${producto.precioMinorista}`);
         console.log(
           `   💰 Utilidad: $${(producto.precioMinorista - precioCompraCOP).toFixed(2)}`
         );
       }
     }
 
-    // 🔥 Crear servicio SIN productos duplicados
+    // 🔥 5. Crear servicio de lubricación (SOLO el servicio, sin productos duplicados)
     const servicio = await prisma.servicioOrden.create({
       data: {
         descripcion: "Lubricación",
-        precio: parseFloat(precio),
+        precio: parseFloat(precio), // 🔥 Precio MANUAL que puso el usuario
         aplicaIva: false,
         ordenId,
       },
     });
 
-    // Actualizar totales de la orden
+    // 🔥 6. Actualizar totales de la orden
     const servicios = await prisma.servicioOrden.findMany({
       where: { ordenId },
     });
@@ -214,7 +212,7 @@ export async function POST(
       subtotalRepuestos +
       (orden?.manoDeObra || 0);
 
-    // 🔥 Calcular utilidad del servicio de lubricación
+    // 7. Calcular utilidad del servicio de lubricación para WAYRA TALLER
     const utilidadLubricacion = parseFloat(precio) - costoTotalProductos;
 
     await prisma.ordenServicio.update({
@@ -229,7 +227,7 @@ export async function POST(
     });
 
     console.log("✅ Servicio de lubricación completado");
-    console.log(`   💰 Precio Servicio: $${precio}`);
+    console.log(`   💰 Precio Servicio (Manual): $${precio}`);
     console.log(
       `   💰 Costo Productos (COP): $${costoTotalProductos.toFixed(2)}`
     );
