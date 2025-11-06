@@ -956,9 +956,31 @@ export default function NuevaOrdenPage() {
                               <option value="MAYORISTA">Mayorista</option>
                             </select>
                           </td>
-                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">
-                            ${producto.precio.toLocaleString()}
+                          <td className="py-3 px-3">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-500">$</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={producto.precio}
+                                onChange={(e) => {
+                                  const nuevoPrecio =
+                                    parseFloat(e.target.value) || 0;
+                                  const nuevosProductos = [
+                                    ...productosSeleccionados,
+                                  ];
+                                  nuevosProductos[index].precio = nuevoPrecio;
+                                  nuevosProductos[index].subtotal =
+                                    nuevosProductos[index].cantidad *
+                                    nuevoPrecio;
+                                  setProductosSeleccionados(nuevosProductos);
+                                }}
+                                className="w-24 h-8 text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                              />
+                            </div>
                           </td>
+
                           <td className="py-3 px-3 font-bold text-green-600 text-sm sm:text-base">
                             ${producto.subtotal.toLocaleString()}
                           </td>
@@ -1042,8 +1064,25 @@ export default function NuevaOrdenPage() {
                         </div>
                         <div className="text-sm sm:text-base text-right">
                           <div>
-                            <span className="font-medium">Precio Unit.: </span>$
-                            {producto.precio.toLocaleString()}
+                            <span className="font-medium">Precio Unit.: </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={producto.precio}
+                              onChange={(e) => {
+                                const nuevoPrecio =
+                                  parseFloat(e.target.value) || 0;
+                                const nuevosProductos = [
+                                  ...productosSeleccionados,
+                                ];
+                                nuevosProductos[index].precio = nuevoPrecio;
+                                nuevosProductos[index].subtotal =
+                                  nuevosProductos[index].cantidad * nuevoPrecio;
+                                setProductosSeleccionados(nuevosProductos);
+                              }}
+                              className="w-24 h-8 inline-block text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                            />
                           </div>
                           <div>
                             <span className="font-medium">Subtotal: </span>
@@ -1165,9 +1204,36 @@ export default function NuevaOrdenPage() {
                           <td className="py-3 px-3 text-sm sm:text-base text-gray-600">
                             ${repuesto.precioCompra.toLocaleString()}
                           </td>
-                          <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">
-                            ${repuesto.precioVenta.toLocaleString()}
+                          <td className="py-3 px-3">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-500">$</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={repuesto.precioVenta}
+                                onChange={(e) => {
+                                  const nuevoPrecio =
+                                    parseFloat(e.target.value) || 0;
+                                  const nuevosRepuestos = [
+                                    ...repuestosExternos,
+                                  ];
+                                  nuevosRepuestos[index].precioVenta =
+                                    nuevoPrecio;
+                                  nuevosRepuestos[index].subtotal =
+                                    nuevosRepuestos[index].cantidad *
+                                    nuevoPrecio;
+                                  nuevosRepuestos[index].utilidad =
+                                    nuevosRepuestos[index].subtotal -
+                                    nuevosRepuestos[index].cantidad *
+                                      nuevosRepuestos[index].precioCompra;
+                                  setRepuestosExternos(nuevosRepuestos);
+                                }}
+                                className="w-24 h-8 text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500 transition-all duration-200"
+                              />
+                            </div>
                           </td>
+
                           <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">
                             ${repuesto.utilidad.toLocaleString()}
                           </td>
@@ -1223,8 +1289,28 @@ export default function NuevaOrdenPage() {
                             {repuesto.precioCompra.toLocaleString()}
                           </div>
                           <div>
-                            <span className="font-medium">P. Venta: </span>$
-                            {repuesto.precioVenta.toLocaleString()}
+                            <span className="font-medium">P. Venta: </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={repuesto.precioVenta}
+                              onChange={(e) => {
+                                const nuevoPrecio =
+                                  parseFloat(e.target.value) || 0;
+                                const nuevosRepuestos = [...repuestosExternos];
+                                nuevosRepuestos[index].precioVenta =
+                                  nuevoPrecio;
+                                nuevosRepuestos[index].subtotal =
+                                  nuevosRepuestos[index].cantidad * nuevoPrecio;
+                                nuevosRepuestos[index].utilidad =
+                                  nuevosRepuestos[index].subtotal -
+                                  nuevosRepuestos[index].cantidad *
+                                    nuevosRepuestos[index].precioCompra;
+                                setRepuestosExternos(nuevosRepuestos);
+                              }}
+                              className="w-24 h-8 inline-block text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500 transition-all duration-200"
+                            />
                           </div>
                           <div>
                             <span className="font-medium">Utilidad: </span>

@@ -80,7 +80,7 @@ function RepuestoExternoModal({ isOpen, onClose, onAdd }: any) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nombre || formData.precioVenta <= 0) {
-      toast.error("Completa todos los campos");
+      toast.error("Completa todos los campos obligatorios");
       return;
     }
     onAdd({
@@ -88,54 +88,154 @@ function RepuestoExternoModal({ isOpen, onClose, onAdd }: any) {
       subtotal: formData.cantidad * formData.precioVenta,
       utilidad: calcularUtilidad(),
     });
-    setFormData({ nombre: "", descripcion: "", cantidad: 1, precioCompra: 0, precioVenta: 0, proveedor: "" });
+    setFormData({
+      nombre: "",
+      descripcion: "",
+      cantidad: 1,
+      precioCompra: 0,
+      precioVenta: 0,
+      proveedor: "",
+    });
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Repuesto Externo">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          placeholder="Nombre del repuesto"
-          value={formData.nombre}
-          onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-          required
-        />
-        <Input
-          placeholder="Descripción"
-          value={formData.descripcion}
-          onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-        />
-        <Input
-          placeholder="Proveedor"
-          value={formData.proveedor}
-          onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-        />
-        <div className="grid grid-cols-3 gap-4">
-          <Input
-            type="number"
-            placeholder="Cantidad"
-            value={formData.cantidad}
-            onChange={(e) => setFormData({ ...formData, cantidad: parseInt(e.target.value) || 1 })}
-          />
-          <Input
-            type="number"
-            placeholder="Precio Compra"
-            value={formData.precioCompra}
-            onChange={(e) => setFormData({ ...formData, precioCompra: parseFloat(e.target.value) || 0 })}
-          />
-          <Input
-            type="number"
-            placeholder="Precio Venta"
-            value={formData.precioVenta}
-            onChange={(e) => setFormData({ ...formData, precioVenta: parseFloat(e.target.value) || 0 })}
-          />
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-lg sm:max-w-xl md:max-w-2xl overflow-hidden border border-gray-200 animate-slide-up">
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+          <h2 className="text-lg sm:text-xl font-semibold">
+            Agregar Repuesto Externo
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-white hover:text-gray-100 transition-colors"
+          >
+            ✕
+          </button>
         </div>
-        <div className="flex justify-end space-x-3">
-          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button type="submit">Agregar</Button>
-        </div>
-      </form>
-    </Modal>
+
+        {/* Formulario */}
+        <form
+          onSubmit={handleSubmit}
+          className="p-6 space-y-5 max-h-[70vh] overflow-y-auto bg-white"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre del repuesto *
+              </label>
+              <Input
+                placeholder="Ej. Bujía NGK"
+                value={formData.nombre}
+                onChange={(e) =>
+                  setFormData({ ...formData, nombre: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Proveedor
+              </label>
+              <Input
+                placeholder="Ej. Importadora XYZ"
+                value={formData.proveedor}
+                onChange={(e) =>
+                  setFormData({ ...formData, proveedor: e.target.value })
+                }
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Descripción
+            </label>
+            <textarea
+              className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              placeholder="Detalles adicionales..."
+              value={formData.descripcion}
+              onChange={(e) =>
+                setFormData({ ...formData, descripcion: e.target.value })
+              }
+              rows={2}
+            ></textarea>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cantidad
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={formData.cantidad}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    cantidad: parseInt(e.target.value) || 1,
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Precio Compra
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={formData.precioCompra}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    precioCompra: parseFloat(e.target.value) || 0,
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Precio Venta *
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={formData.precioVenta}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    precioVenta: parseFloat(e.target.value) || 0,
+                  })
+                }
+                required
+              />
+            </div>
+          </div>
+
+          {/* Botones */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="border-gray-300 hover:bg-gray-100"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              className="bg-orange-600 hover:bg-orange-700 text-white px-6"
+            >
+              Agregar
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -145,6 +245,11 @@ export default function OrdenDetallePage() {
   const [orden, setOrden] = useState<OrdenDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [editando, setEditando] = useState<{ tipo: string; id: string } | null>(
+    null
+  );
+  const [precioTemporal, setPrecioTemporal] = useState<number>(0);
+
   const [serviciosCompletados, setServiciosCompletados] = useState<{
     [key: string]: boolean;
   }>({});
@@ -440,26 +545,132 @@ export default function OrdenDetallePage() {
     }
   };
 
-  const removerServicio = async (servicioId: string) => {
-    if (!confirm("¿Deseas eliminar este servicio?")) return;
+  const eliminarServicio = async (servicioId: string) => {
+    if (!confirm("¿Eliminar este servicio?")) return;
 
     try {
       const response = await fetch(
-        `/api/ordenes/${params.id}/servicios/${servicioId}`,
+        `/api/ordenes/${orden.id}/servicios/${servicioId}`,
         {
           method: "DELETE",
         }
       );
-
       if (response.ok) {
-        toast.success("Servicio removido");
+        toast.success("Servicio eliminado");
         fetchOrden();
-      } else {
-        toast.error("Error al eliminar servicio");
       }
     } catch (error) {
-      toast.error("Error al eliminar servicio");
+      toast.error("Error al eliminar");
     }
+  };
+
+  const eliminarProducto = async (detalleId: string) => {
+    if (!confirm("¿Eliminar este producto? El stock será devuelto.")) return;
+
+    try {
+      const response = await fetch(
+        `/api/ordenes/${orden.id}/productos/${detalleId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        toast.success("Producto eliminado, stock devuelto");
+        fetchOrden();
+      }
+    } catch (error) {
+      toast.error("Error al eliminar");
+    }
+  };
+
+  const eliminarRepuesto = async (repuestoId: string) => {
+    if (!confirm("¿Eliminar este repuesto externo?")) return;
+
+    try {
+      const response = await fetch(
+        `/api/ordenes/${orden.id}/repuestos/${repuestoId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        toast.success("Repuesto eliminado");
+        fetchOrden();
+      }
+    } catch (error) {
+      toast.error("Error al eliminar");
+    }
+  };
+
+  // 🔧 Función: actualizar precio localmente (no se guarda en BD)
+  const actualizarPrecioMomentaneo = (
+    tipo: "servicios" | "productos" | "repuestos",
+    id: string,
+    nuevoPrecio: number
+  ) => {
+    if (!orden) return;
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+      toast.error("Precio inválido");
+      return;
+    }
+
+    let nuevaOrden = { ...orden };
+
+    if (tipo === "servicios") {
+      nuevaOrden.servicios = orden.servicios.map((s) =>
+        s.id === id ? { ...s, precio: nuevoPrecio } : s
+      );
+    } else if (tipo === "productos") {
+      nuevaOrden.detalles = orden.detalles.map((d) =>
+        d.id === id
+          ? {
+              ...d,
+              precioUnitario: nuevoPrecio,
+              subtotal: nuevoPrecio * d.cantidad,
+            }
+          : d
+      );
+    } else if (tipo === "repuestos") {
+      nuevaOrden.repuestosExternos = orden.repuestosExternos.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              precioUnitario: nuevoPrecio,
+              subtotal: nuevoPrecio * r.cantidad,
+            }
+          : r
+      );
+    }
+
+    // Recalcular totales
+    const subtotalServicios = nuevaOrden.servicios.reduce(
+      (sum, s) => sum + s.precio,
+      0
+    );
+    const subtotalProductos = nuevaOrden.detalles.reduce(
+      (sum, d) => sum + d.subtotal,
+      0
+    );
+    const subtotalRepuestosExternos = nuevaOrden.repuestosExternos.reduce(
+      (sum, r) => sum + r.subtotal,
+      0
+    );
+    const total =
+      subtotalServicios +
+      subtotalProductos +
+      subtotalRepuestosExternos +
+      (nuevaOrden.manoDeObra || 0);
+
+    setOrden({
+      ...nuevaOrden,
+      subtotalServicios,
+      subtotalProductos,
+      subtotalRepuestosExternos,
+      total,
+    });
+
+    setEditando(null);
+    toast.success("💰 Precio actualizado temporalmente");
   };
 
   const eliminarOrden = async () => {
@@ -830,16 +1041,62 @@ export default function OrdenDetallePage() {
                 </div>
                 <div className="flex items-center space-x-3 mt-2 sm:mt-0 sm:ml-4 w-full sm:w-auto justify-between sm:justify-end">
                   {!isMecanico && (
-                    <span className="font-bold text-green-600 text-sm sm:text-base">
-                      ${servicio.precio.toLocaleString()}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      {editando?.tipo === "servicios" &&
+                      editando.id === servicio.id ? (
+                        <>
+                          <input
+                            type="number"
+                            className="border rounded-md px-2 py-1 w-24 text-sm"
+                            value={precioTemporal}
+                            onChange={(e) =>
+                              setPrecioTemporal(parseFloat(e.target.value) || 0)
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              actualizarPrecioMomentaneo(
+                                "servicios",
+                                servicio.id,
+                                precioTemporal
+                              )
+                            }
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-bold text-green-600 text-sm sm:text-base">
+                            ${servicio.precio.toLocaleString()}
+                          </span>
+                          {canEdit && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                setEditando({
+                                  tipo: "servicios",
+                                  id: servicio.id,
+                                });
+                                setPrecioTemporal(servicio.precio);
+                              }}
+                              className="p-1"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   )}
                   {canAddServices && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => removerServicio(servicio.id)}
-                      className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
+                      onClick={() => eliminarServicio(servicio.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -852,28 +1109,30 @@ export default function OrdenDetallePage() {
       </Card>
 
       {/* Productos */}
-      {orden.detalles.length > 0 && (
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
-              <div className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-blue-600" />
-                <span>Productos</span>
-              </div>
-              {canAddServices && orden.estado !== "COMPLETADO" && (
-                <Button
-                  size="sm"
-                  onClick={() => setShowProductSelector(true)}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Producto
-                </Button>
-              )}
-            </CardTitle>
-          </CardHeader>
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
+            <div className="flex items-center space-x-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              <span>Productos</span>
+            </div>
+
+            {/* Botón siempre visible */}
+            <Button
+              size="sm"
+              onClick={() => setShowProductSelector(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Producto
+            </Button>
+          </CardTitle>
+        </CardHeader>
+
+        {orden.detalles.length > 0 ? (
           <CardContent>
             <div className="max-h-96 overflow-y-auto">
+              {/* Vista escritorio */}
               <div className="hidden lg:block">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
@@ -892,6 +1151,9 @@ export default function OrdenDetallePage() {
                           <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
                             Subtotal
                           </th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                            Acciones
+                          </th>
                         </>
                       )}
                     </tr>
@@ -909,16 +1171,81 @@ export default function OrdenDetallePage() {
                             </div>
                           </div>
                         </td>
+
                         <td className="py-3 px-3 font-medium text-sm sm:text-base">
                           {detalle.cantidad}
                         </td>
+
                         {!isMecanico && (
                           <>
-                            <td className="py-3 px-3 font-medium text-blue-600 text-sm sm:text-base">
-                              ${detalle.precioUnitario.toLocaleString()}
+                            <td className="py-3 px-3">
+                              {editando?.tipo === "productos" &&
+                              editando.id === detalle.id ? (
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="number"
+                                    className="border rounded-md px-2 py-1 w-24 text-sm"
+                                    value={precioTemporal}
+                                    onChange={(e) =>
+                                      setPrecioTemporal(
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      actualizarPrecioMomentaneo(
+                                        "productos",
+                                        detalle.id,
+                                        precioTemporal
+                                      )
+                                    }
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium text-blue-600 text-sm sm:text-base">
+                                    ${detalle.precioUnitario.toLocaleString()}
+                                  </span>
+                                  {canEdit && (
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => {
+                                        setEditando({
+                                          tipo: "productos",
+                                          id: detalle.id,
+                                        });
+                                        setPrecioTemporal(
+                                          detalle.precioUnitario
+                                        );
+                                      }}
+                                      className="p-1"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
                             </td>
+
                             <td className="py-3 px-3 font-bold text-blue-600 text-sm sm:text-base">
                               ${detalle.subtotal.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {canAddServices && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => eliminarProducto(detalle.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </td>
                           </>
                         )}
@@ -927,6 +1254,8 @@ export default function OrdenDetallePage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Vista móvil */}
               <div className="lg:hidden space-y-4">
                 {orden.detalles.map((detalle: any) => (
                   <div
@@ -941,16 +1270,66 @@ export default function OrdenDetallePage() {
                         {detalle.producto.codigo}
                       </span>
                     </div>
+
                     <div className="flex justify-between">
                       <div className="text-sm sm:text-base">
                         <span className="font-medium">Cantidad: </span>
                         {detalle.cantidad}
                       </div>
+
                       {!isMecanico && (
                         <div className="text-sm sm:text-base text-right">
-                          <div>
-                            <span className="font-medium">Precio Unit.: </span>$
-                            {detalle.precioUnitario.toLocaleString()}
+                          <div className="flex items-center justify-end space-x-2">
+                            {editando?.tipo === "productos" &&
+                            editando.id === detalle.id ? (
+                              <>
+                                <input
+                                  type="number"
+                                  className="border rounded-md px-2 py-1 w-24 text-sm"
+                                  value={precioTemporal}
+                                  onChange={(e) =>
+                                    setPrecioTemporal(
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    actualizarPrecioMomentaneo(
+                                      "productos",
+                                      detalle.id,
+                                      precioTemporal
+                                    )
+                                  }
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-medium text-blue-600">
+                                  ${detalle.precioUnitario.toLocaleString()}
+                                </span>
+                                {canEdit && (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                      setEditando({
+                                        tipo: "productos",
+                                        id: detalle.id,
+                                      });
+                                      setPrecioTemporal(detalle.precioUnitario);
+                                    }}
+                                    className="p-1"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
                           </div>
                           <div>
                             <span className="font-medium">Subtotal: </span>
@@ -966,20 +1345,40 @@ export default function OrdenDetallePage() {
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+        ) : (
+          <CardContent className="text-center text-gray-500 py-8">
+            <div className="flex flex-col items-center space-y-2">
+              <Package className="h-8 w-8 text-blue-400" />
+              <p>No hay productos agregados aún.</p>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Repuestos Externos */}
-      {orden.repuestosExternos.length > 0 && (
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
+            <div className="flex items-center space-x-2">
               <FileText className="h-5 w-5 text-orange-600" />
               <span>Repuestos Externos</span>
-            </CardTitle>
-          </CardHeader>
+            </div>
+            {/* 🔥 Botón siempre visible */}
+            <Button
+              size="sm"
+              onClick={() => setShowRepuestoExternoModal(true)}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Repuesto Externo
+            </Button>
+          </CardTitle>
+        </CardHeader>
+
+        {orden.repuestosExternos.length > 0 ? (
           <CardContent>
             <div className="max-h-96 overflow-y-auto">
+              {/* Vista escritorio */}
               <div className="hidden lg:block">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
@@ -1002,6 +1401,9 @@ export default function OrdenDetallePage() {
                           </th>
                           <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
                             Subtotal
+                          </th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                            Acciones
                           </th>
                         </>
                       )}
@@ -1035,11 +1437,72 @@ export default function OrdenDetallePage() {
                         </td>
                         {!isMecanico && (
                           <>
-                            <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">
-                              ${repuesto.precioUnitario.toLocaleString()}
+                            <td className="py-3 px-3">
+                              {editando?.tipo === "repuestos" &&
+                              editando.id === repuesto.id ? (
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="number"
+                                    className="border rounded-md px-2 py-1 w-24 text-sm"
+                                    value={precioTemporal}
+                                    onChange={(e) =>
+                                      setPrecioTemporal(
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      actualizarPrecioMomentaneo(
+                                        "repuestos",
+                                        repuesto.id,
+                                        precioTemporal
+                                      )
+                                    }
+                                    className="bg-orange-600 hover:bg-orange-700"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium text-orange-600 text-sm sm:text-base">
+                                    ${repuesto.precioUnitario.toLocaleString()}
+                                  </span>
+                                  {canEdit && (
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => {
+                                        setEditando({
+                                          tipo: "repuestos",
+                                          id: repuesto.id,
+                                        });
+                                        setPrecioTemporal(
+                                          repuesto.precioUnitario
+                                        );
+                                      }}
+                                      className="p-1"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
                             </td>
+
                             <td className="py-3 px-3 font-bold text-orange-600 text-sm sm:text-base">
                               ${repuesto.subtotal.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => eliminarRepuesto(repuesto.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </td>
                           </>
                         )}
@@ -1048,6 +1511,8 @@ export default function OrdenDetallePage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Vista móvil */}
               <div className="lg:hidden space-y-4">
                 {orden.repuestosExternos.map((repuesto: any) => (
                   <div
@@ -1079,15 +1544,75 @@ export default function OrdenDetallePage() {
                       </div>
                       {!isMecanico && (
                         <div className="text-sm sm:text-base text-right">
-                          <div>
-                            <span className="font-medium">Precio Unit.: </span>$
-                            {repuesto.precioUnitario.toLocaleString()}
+                          <div className="flex items-center justify-end space-x-2">
+                            {editando?.tipo === "repuestos" &&
+                            editando.id === repuesto.id ? (
+                              <>
+                                <input
+                                  type="number"
+                                  className="border rounded-md px-2 py-1 w-24 text-sm"
+                                  value={precioTemporal}
+                                  onChange={(e) =>
+                                    setPrecioTemporal(
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    actualizarPrecioMomentaneo(
+                                      "repuestos",
+                                      repuesto.id,
+                                      precioTemporal
+                                    )
+                                  }
+                                  className="bg-orange-600 hover:bg-orange-700"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-medium text-orange-600">
+                                  ${repuesto.precioUnitario.toLocaleString()}
+                                </span>
+                                {canEdit && (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                      setEditando({
+                                        tipo: "repuestos",
+                                        id: repuesto.id,
+                                      });
+                                      setPrecioTemporal(
+                                        repuesto.precioUnitario
+                                      );
+                                    }}
+                                    className="p-1"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
                           </div>
                           <div>
                             <span className="font-medium">Subtotal: </span>
                             <span className="font-bold text-orange-600">
                               ${repuesto.subtotal.toLocaleString()}
                             </span>
+                          </div>
+
+                          <div className="mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => eliminarRepuesto(repuesto.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -1097,8 +1622,15 @@ export default function OrdenDetallePage() {
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+        ) : (
+          <CardContent className="text-center text-gray-500 py-8">
+            <div className="flex flex-col items-center space-y-2">
+              <FileText className="h-8 w-8 text-orange-400" />
+              <p>No hay repuestos externos agregados aún.</p>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Totales - Solo para Admin */}
       {!isMecanico && (

@@ -66,6 +66,85 @@ export default function EditOrdenPage() {
     }
   }, [params.id]);
 
+  // Productos y Repuestos Externos
+  const [productos, setProductos] = useState<any[]>([]);
+  const [productosOrden, setProductosOrden] = useState<any[]>([]);
+  const [repuestosExternos, setRepuestosExternos] = useState<any[]>([]);
+  const [repuestosOrden, setRepuestosOrden] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchProductos();
+    fetchRepuestosExternos();
+  }, []);
+
+  const fetchProductos = async () => {
+    try {
+      const res = await fetch("/api/productos");
+      if (res.ok) setProductos(await res.json());
+    } catch (err) {
+      console.error("Error cargando productos", err);
+    }
+  };
+
+  const fetchRepuestosExternos = async () => {
+    try {
+      const res = await fetch("/api/repuestos-externos");
+      if (res.ok) setRepuestosExternos(await res.json());
+    } catch (err) {
+      console.error("Error cargando repuestos externos", err);
+    }
+  };
+
+  // Agregar producto a la orden
+  const agregarProducto = (p: any) => {
+    const yaExiste = productosOrden.find((x) => x.id === p.id);
+    if (yaExiste) return toast.error("Este producto ya fue agregado");
+
+    const nuevo = { ...p, cantidad: 1, subtotal: p.precioVenta };
+    setProductosOrden([...productosOrden, nuevo]);
+    toast.success("Producto agregado");
+  };
+
+  // Agregar repuesto externo
+  const agregarRepuestoExterno = (r: any) => {
+    const yaExiste = repuestosOrden.find((x) => x.id === r.id);
+    if (yaExiste) return toast.error("Este repuesto ya fue agregado");
+
+    const nuevo = { ...r, cantidad: 1, subtotal: r.precioVenta };
+    setRepuestosOrden([...repuestosOrden, nuevo]);
+    toast.success("Repuesto externo agregado");
+  };
+
+  // Editar precios manualmente (solo locales)
+  const actualizarPrecioLocal = (
+    tipo: string,
+    index: number,
+    nuevoPrecio: number
+  ) => {
+    if (tipo === "producto") {
+      const nuevos = [...productosOrden];
+      nuevos[index].precioVenta = nuevoPrecio;
+      nuevos[index].subtotal = nuevos[index].cantidad * nuevoPrecio;
+      setProductosOrden(nuevos);
+    } else if (tipo === "repuesto") {
+      const nuevos = [...repuestosOrden];
+      nuevos[index].precioVenta = nuevoPrecio;
+      nuevos[index].subtotal = nuevos[index].cantidad * nuevoPrecio;
+      setRepuestosOrden(nuevos);
+    } else if (tipo === "servicio") {
+      const nuevos = [...serviciosOrden];
+      nuevos[index].precio = nuevoPrecio;
+      setServiciosOrden(nuevos);
+    }
+  };
+
+  // Calcular totales
+  const totalProductos = productosOrden.reduce((sum, p) => sum + p.subtotal, 0);
+  const totalRepuestosExternos = repuestosOrden.reduce(
+    (sum, r) => sum + r.subtotal,
+    0
+  );
+
   const fetchOrden = async () => {
     try {
       const response = await fetch(`/api/ordenes/${params.id}`);
@@ -302,6 +381,8 @@ export default function EditOrdenPage() {
     );
   }
 
+  
+
   return (
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
@@ -537,6 +618,85 @@ export default function EditOrdenPage() {
             </CardContent>
           </Card>
         )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <span className="text-blue-600">🧴 Productos</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <h4 className="font-semibold text-gray-800 mb-3">
+              Agregar Productos:
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+              {productos.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  <div>
+                    <div className="font-medium">{p.nombre}</div>
+                    <div className="text-sm text-gray-500">
+                      ${p.precioVenta.toLocaleString()}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => agregarProducto(p)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {productosOrden.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold mb-2">Productos en esta orden:</h4>
+                {productosOrden.map((p, i) => (
+                  <div
+                    key={p.id}
+                    className="flex justify-between items-center border p-3 rounded-lg mb-2"
+                  >
+                    <div>
+                      <div className="font-medium">{p.nombre}</div>
+                      <div className="text-sm text-gray-500">
+                        Cantidad: {p.cantidad}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="number"
+                        className="w-24 text-sm"
+                        value={p.precioVenta}
+                        onChange={(e) =>
+                          actualizarPrecioLocal(
+                            "producto",
+                            i,
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                      <span className="font-semibold text-blue-600">
+                        ${p.subtotal.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg mt-2">
+                  <span className="font-semibold">Total Productos:</span>
+                  <span className="font-bold text-blue-600">
+                    ${totalProductos.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        
 
         {/* Botones */}
         <div className="flex justify-end space-x-4">
