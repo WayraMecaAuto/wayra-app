@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Droplets,
   Filter,
@@ -11,16 +12,24 @@ import {
   ShoppingCart,
   Plus,
   X,
+  DollarSign,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface LubricacionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // Ahora recibe también los productos para descontar inventario
   onAdd: (
     productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
-    productosCompletos?: Array<{ id: string; nombre: string; precioMinorista: number }>
+    productosCompletos?: Array<{ 
+      id: string; 
+      nombre: string; 
+      precioMinorista: number;
+      precioCompra: number;
+      tipo: string;
+      monedaCompra: string;
+    }>,
+    precioServicioTotal?: number
   ) => void;
 }
 
@@ -30,7 +39,9 @@ interface Producto {
   codigo: string;
   stock: number;
   precioVenta: number;
-  precioMinorista: number; // 🔥 Agregar precio minorista
+  precioMinorista: number;
+  precioCompra: number;
+  monedaCompra: string;
   tipo?: string;
   categoria?: string;
 }
@@ -40,7 +51,9 @@ interface ProductoSeleccionado {
   nombre: string;
   codigo: string;
   precioVenta: number;
-  precioMinorista: number; // 🔥 Agregar
+  precioMinorista: number;
+  precioCompra: number;
+  monedaCompra: string;
   tipo: "ACEITE" | "FILTRO";
   inventarioTipo?: string;
 }
@@ -60,6 +73,7 @@ export function LubricacionModal({
   const [loading, setLoading] = useState(false);
   const [searchAceite, setSearchAceite] = useState("");
   const [searchFiltro, setSearchFiltro] = useState("");
+  const [precioServicioTotal, setPrecioServicioTotal] = useState<string>("");
 
   useEffect(() => {
     if (isOpen) {
@@ -67,6 +81,7 @@ export function LubricacionModal({
       setFiltroSeleccionado(null);
       setSearchAceite("");
       setSearchFiltro("");
+      setPrecioServicioTotal("");
       fetchProductos();
     }
   }, [isOpen]);
@@ -74,22 +89,17 @@ export function LubricacionModal({
   const fetchProductos = async () => {
     setLoading(true);
     try {
-      console.log("📄 Iniciando carga de productos para lubricación...");
-
       const [wayraEniRes, wayraCalanRes, torniLubricantesRes, torniFiltrosRes] =
         await Promise.all([
           fetch("/api/productos?tipo=WAYRA_ENI")
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
-
           fetch("/api/productos?tipo=WAYRA_CALAN")
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
-
           fetch("/api/productos?tipo=TORNI_REPUESTO&categoria=LUBRICANTES")
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
-
           fetch("/api/productos?tipo=TORNI_REPUESTO&categoria=FILTROS")
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => []),
@@ -128,7 +138,6 @@ export function LubricacionModal({
         const nombre = (p.nombre || "").toLowerCase();
         const categoria = (p.categoria || "").toLowerCase();
         const descripcion = (p.descripcion || "").toLowerCase();
-
         const esFiltro =
           nombre.includes("filtro") ||
           categoria.includes("filtro") ||
@@ -144,11 +153,9 @@ export function LubricacionModal({
         const categoria = (p.categoria || "").toLowerCase();
         const descripcion = (p.descripcion || "").toLowerCase();
         const texto = `${nombre} ${categoria} ${descripcion}`;
-
         const esFiltroAceite =
           texto.includes("filtro") &&
           (texto.includes("aceite") || texto.includes("oil"));
-
         return esFiltroAceite && p.stock > 0;
       });
 
@@ -156,14 +163,12 @@ export function LubricacionModal({
         const nombre = (p.nombre || "").toLowerCase();
         const descripcion = (p.descripcion || "").toLowerCase();
         const texto = `${nombre} ${descripcion}`;
-
         const esFiltroAceite =
           texto.includes("aceite") ||
           texto.includes("oil") ||
           texto.includes("motor") ||
           (texto.includes("filtro") &&
             (texto.includes("aceite") || texto.includes("motor")));
-
         return esFiltroAceite && p.stock > 0;
       });
 
@@ -172,17 +177,7 @@ export function LubricacionModal({
         ...torniLubricantes.filter((p) => p.stock > 0),
       ];
 
-      const todosLosFiltros = [
-        ...wayraFiltros,
-        ...torniFiltrosAceite,
-      ];
-
-      console.log(
-        "✅ Aceites:",
-        todosLosAceites.length,
-        "| Filtros de aceite:",
-        todosLosFiltros.length
-      );
+      const todosLosFiltros = [...wayraFiltros, ...torniFiltrosAceite];
 
       setAceites(todosLosAceites);
       setFiltros(todosLosFiltros);
@@ -215,7 +210,9 @@ export function LubricacionModal({
         nombre: producto.nombre,
         codigo: producto.codigo,
         precioVenta: producto.precioVenta,
-        precioMinorista: producto.precioMinorista, // 🔥 Guardar precio minorista
+        precioMinorista: producto.precioMinorista,
+        precioCompra: producto.precioCompra,
+        monedaCompra: producto.monedaCompra || 'COP',
         tipo: "ACEITE",
         inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
       },
@@ -235,7 +232,9 @@ export function LubricacionModal({
       nombre: producto.nombre,
       codigo: producto.codigo,
       precioVenta: producto.precioVenta,
-      precioMinorista: producto.precioMinorista, // 🔥 Guardar precio minorista
+      precioMinorista: producto.precioMinorista,
+      precioCompra: producto.precioCompra,
+      monedaCompra: producto.monedaCompra || 'COP',
       tipo: "FILTRO",
       inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
     });
@@ -253,17 +252,26 @@ export function LubricacionModal({
       return;
     }
 
-    console.log("✅ Lubricación completa:");
-    console.log(
-      "   Aceites:",
-      aceitesSeleccionados.map((p) => `${p.nombre} (${p.id})`)
-    );
-    console.log(
-      "   Filtro:",
-      `${filtroSeleccionado.nombre} (${filtroSeleccionado.id})`
-    );
+    if (!precioServicioTotal || parseFloat(precioServicioTotal) <= 0) {
+      toast.error("⚠️ Debes ingresar el precio total del servicio");
+      return;
+    }
 
-    // Enviar productos para agregar como servicio
+    const precioTotal = parseFloat(precioServicioTotal);
+    const costoProductos = calcularCostoProductos();
+
+    if (precioTotal < costoProductos) {
+      toast.error("⚠️ El precio del servicio no puede ser menor al costo de los productos");
+      return;
+    }
+
+    console.log("✅ Lubricación completa:");
+    console.log("   Aceites:", aceitesSeleccionados.map((p) => `${p.nombre} (${p.id})`));
+    console.log("   Filtro:", `${filtroSeleccionado.nombre} (${filtroSeleccionado.id})`);
+    console.log("   Precio Total Servicio:", precioTotal);
+    console.log("   Costo Productos (Minorista):", costoProductos);
+    console.log("   Utilidad Servicio:", precioTotal - costoProductos);
+
     const productosParaAgregar = [
       ...aceitesSeleccionados.map((a) => ({
         id: a.id,
@@ -277,21 +285,26 @@ export function LubricacionModal({
       },
     ];
 
-    // 🔥 También enviar productos completos para descontar inventario
     const productosCompletos = [
       ...aceitesSeleccionados.map((a) => ({
         id: a.id,
         nombre: a.nombre,
         precioMinorista: a.precioMinorista,
+        precioCompra: a.precioCompra,
+        tipo: a.inventarioTipo || 'WAYRA_ENI',
+        monedaCompra: a.monedaCompra,
       })),
       {
         id: filtroSeleccionado.id,
         nombre: filtroSeleccionado.nombre,
         precioMinorista: filtroSeleccionado.precioMinorista,
+        precioCompra: filtroSeleccionado.precioCompra,
+        tipo: filtroSeleccionado.inventarioTipo || 'WAYRA_ENI',
+        monedaCompra: filtroSeleccionado.monedaCompra,
       },
     ];
 
-    onAdd(productosParaAgregar, productosCompletos);
+    onAdd(productosParaAgregar, productosCompletos, precioTotal);
     handleClose();
   };
 
@@ -300,17 +313,24 @@ export function LubricacionModal({
     setFiltroSeleccionado(null);
     setSearchAceite("");
     setSearchFiltro("");
+    setPrecioServicioTotal("");
     onClose();
   };
 
-  // 🔥 Calcular con precio MINORISTA (venta a Wayra Taller)
-  const calcularPrecioTotal = () => {
+  const calcularCostoProductos = () => {
     const totalAceites = aceitesSeleccionados.reduce(
       (sum, p) => sum + p.precioMinorista,
       0
     );
     const precioFiltro = filtroSeleccionado?.precioMinorista || 0;
     return totalAceites + precioFiltro;
+  };
+
+  const calcularUtilidadServicio = () => {
+    if (!precioServicioTotal || parseFloat(precioServicioTotal) <= 0) {
+      return 0;
+    }
+    return parseFloat(precioServicioTotal) - calcularCostoProductos();
   };
 
   const getInventarioLabel = (tipo: string) => {
@@ -367,12 +387,20 @@ export function LubricacionModal({
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-blue-900 mb-2">
-                Servicio de Lubricación - Precio Minorista
+                Servicio de Lubricación - Configuración de Precios
               </h4>
-              <p className="text-sm text-blue-700">
-                Selecciona <span className="font-semibold">uno o más aceites</span> y{" "}
-                <span className="font-semibold">un filtro</span>. El precio se calcula con <span className="font-semibold">precio minorista</span> (venta a Wayra Taller).
-              </p>
+              <div className="text-sm text-blue-700 space-y-1">
+                <p>
+                  1. Selecciona <span className="font-semibold">aceite(s)</span> y{" "}
+                  <span className="font-semibold">filtro</span>
+                </p>
+                <p>
+                  2. Ingresa el <span className="font-semibold">precio total del servicio</span> (lo que cobras al cliente)
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Los productos se registrarán en su contabilidad con precio minorista, y el servicio se registrará con la diferencia como utilidad para Wayra Taller
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -419,7 +447,7 @@ export function LubricacionModal({
                           <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
                             <span>{aceite.codigo}</span>
                             <span className="font-bold text-green-600">
-                              Minorista: ${aceite.precioMinorista.toLocaleString()}
+                              Min: ${aceite.precioMinorista.toLocaleString()}
                             </span>
                             {aceite.inventarioTipo && (
                               <span
@@ -551,7 +579,7 @@ export function LubricacionModal({
                       <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
                         <span>{filtroSeleccionado.codigo}</span>
                         <span className="font-bold text-green-600">
-                          Minorista: ${filtroSeleccionado.precioMinorista.toLocaleString()}
+                          Min: ${filtroSeleccionado.precioMinorista.toLocaleString()}
                         </span>
                         {filtroSeleccionado.inventarioTipo && (
                           <span
@@ -657,6 +685,40 @@ export function LubricacionModal({
           </div>
         )}
 
+        {/* Precio del Servicio */}
+        {(aceitesSeleccionados.length > 0 || filtroSeleccionado) && (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl p-5">
+            <div className="flex items-start space-x-3 mb-4">
+              <DollarSign className="h-6 w-6 text-indigo-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <label className="block font-bold text-indigo-900 mb-2">
+                  Precio Total del Servicio *
+                </label>
+                <p className="text-sm text-indigo-700 mb-3">
+                  Ingresa el precio que cobrarás al cliente por el servicio completo de lubricación
+                </p>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 font-medium text-lg">
+                    $
+                  </span>
+                  <Input
+                    type="number"
+                    step="1000"
+                    min={calcularCostoProductos()}
+                    value={precioServicioTotal}
+                    onChange={(e) => setPrecioServicioTotal(e.target.value)}
+                    placeholder="0"
+                    className="pl-8 h-14 text-2xl font-bold border-2 border-indigo-300 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <p className="text-xs text-indigo-600 mt-2">
+                  Mínimo: ${calcularCostoProductos().toLocaleString()} (costo de productos)
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Resumen */}
         {(aceitesSeleccionados.length > 0 || filtroSeleccionado) && (
           <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 border-2 border-green-300 rounded-xl p-5">
@@ -664,7 +726,7 @@ export function LubricacionModal({
               <ShoppingCart className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <h5 className="font-bold text-green-900 mb-3">
-                  Resumen del Servicio (Precio Minorista):
+                  Resumen del Servicio:
                 </h5>
                 <div className="grid grid-cols-2 gap-4 mb-3">
                   <div className="bg-white rounded-lg p-3 border border-green-200">
@@ -680,14 +742,42 @@ export function LubricacionModal({
                     </div>
                   </div>
                 </div>
+
+                {/* Desglose financiero */}
+                <div className="space-y-2 mb-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Costo productos (Minorista):</span>
+                    <span className="font-bold text-gray-900">
+                      ${calcularCostoProductos().toLocaleString()}
+                    </span>
+                  </div>
+                  {precioServicioTotal && parseFloat(precioServicioTotal) > 0 && (
+                    <>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Precio servicio:</span>
+                        <span className="font-bold text-indigo-600">
+                          ${parseFloat(precioServicioTotal).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200">
+                        <span className="font-semibold text-gray-700">Utilidad servicio:</span>
+                        <span className={`font-bold text-lg ${calcularUtilidadServicio() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${calcularUtilidadServicio().toLocaleString()}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-4 border-2 border-green-300">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-green-900">
-                      Total (Precio Minorista):
-                    </span>
-                    <span className="text-2xl font-bold text-green-700">
-                      ${calcularPrecioTotal().toLocaleString()}
-                    </span>
+                  <div className="text-xs text-green-700 mb-2">
+                    📊 Distribución contable:
+                  </div>
+                  <div className="space-y-1 text-xs text-green-800">
+                    <div>• Wayra Productos/TorniRepuestos: Venta ${calcularCostoProductos().toLocaleString()}</div>
+                    {precioServicioTotal && parseFloat(precioServicioTotal) > 0 && (
+                      <div>• Wayra Taller: Servicio con utilidad ${calcularUtilidadServicio().toLocaleString()}</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -696,21 +786,23 @@ export function LubricacionModal({
         )}
 
         {/* Advertencia */}
-        {(aceitesSeleccionados.length === 0 || !filtroSeleccionado) &&
+        {(aceitesSeleccionados.length === 0 || !filtroSeleccionado || !precioServicioTotal) &&
           !loading && (
             <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
               <div className="flex items-start space-x-3">
                 <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-amber-900">
-                    Selección incompleta
+                    Información requerida
                   </p>
                   <p className="text-sm text-amber-700 mt-1">
-                    {aceitesSeleccionados.length === 0 && !filtroSeleccionado
-                      ? "Debes agregar al menos un aceite y seleccionar un filtro"
+                    {aceitesSeleccionados.length === 0 && !filtroSeleccionado && !precioServicioTotal
+                      ? "Debes agregar aceite(s), seleccionar filtro e ingresar el precio del servicio"
                       : aceitesSeleccionados.length === 0
                         ? "Debes agregar al menos un aceite"
-                        : "Debes seleccionar un filtro"}
+                        : !filtroSeleccionado
+                          ? "Debes seleccionar un filtro"
+                          : "Debes ingresar el precio total del servicio"}
                   </p>
                 </div>
               </div>
@@ -733,6 +825,8 @@ export function LubricacionModal({
             disabled={
               aceitesSeleccionados.length === 0 ||
               !filtroSeleccionado ||
+              !precioServicioTotal ||
+              parseFloat(precioServicioTotal) <= 0 ||
               loading
             }
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 disabled:opacity-50 disabled:cursor-not-allowed"

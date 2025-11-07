@@ -314,12 +314,17 @@ export default function NuevaOrdenPage() {
       id: string;
       nombre: string;
       precioMinorista: number;
-    }>
+      precioCompra: number;
+      tipo: string;
+      monedaCompra: string;
+    }>,
+    precioServicioTotal?: number
   ) => {
     if (!servicioLubricacionTemp) return;
 
     try {
       console.log("🔧 Procesando lubricación en nueva orden:", productos);
+      console.log("💰 Precio total servicio:", precioServicioTotal);
 
       // Separar aceites y filtros
       const aceites = productos.filter((p) => p.tipo === "ACEITE");
@@ -330,18 +335,30 @@ export default function NuevaOrdenPage() {
         return;
       }
 
-      // 🔥 Calcular precio total con precio MINORISTA
-      const precioTotal = productosCompletos
+      if (!precioServicioTotal || precioServicioTotal <= 0) {
+        toast.error("❌ Debe ingresar el precio total del servicio");
+        return;
+      }
+
+      // Calcular costo total minorista
+      const costoTotalMinorista = productosCompletos
         ? productosCompletos.reduce((sum, p) => sum + p.precioMinorista, 0)
         : 0;
+
+      // Calcular utilidad del servicio
+      const utilidadServicio = precioServicioTotal - costoTotalMinorista;
+
+      console.log(`💰 Costo productos (Minorista): $${costoTotalMinorista}`);
+      console.log(`💰 Precio servicio (Cliente): $${precioServicioTotal}`);
+      console.log(`💰 Utilidad servicio: $${utilidadServicio}`);
 
       // Crear descripción SIN detalles de productos (para agrupar en reportes)
       const descripcion = servicioLubricacionTemp.descripcion; // Solo "Lubricación"
 
-      // 🔥 Agregar SOLO el servicio (NO agregar productos a la lista)
+      //  Agregar SOLO el servicio (NO agregar productos a la lista)
       const nuevoServicio: ServicioConLubricacion = {
         ...servicioLubricacionTemp,
-        precio: precioTotal,
+        precio: precioServicioTotal, // Precio que cobra al cliente
         descripcion: descripcion,
       };
 
@@ -364,14 +381,18 @@ export default function NuevaOrdenPage() {
               {filtros.map((f) => f.nombre).join(", ")}
             </div>
             <div className="font-semibold mt-1">
-              Total (Precio Minorista): ${precioTotal.toLocaleString()}
+              Precio Cliente: ${precioServicioTotal.toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              Costo productos: ${costoTotalMinorista.toLocaleString()} |
+              Utilidad: ${utilidadServicio.toLocaleString()}
             </div>
             <div className="text-xs text-gray-600 mt-1">
               ⚠️ Los productos se descontarán al completar la orden
             </div>
           </div>
         </div>,
-        { duration: 5000 }
+        { duration: 6000 }
       );
     } catch (error) {
       console.error("❌ Error al procesar lubricación:", error);

@@ -419,12 +419,17 @@ export default function OrdenDetallePage() {
       id: string;
       nombre: string;
       precioMinorista: number;
-    }>
+      precioCompra: number;
+      tipo: string;
+      monedaCompra: string;
+    }>,
+    precioServicioTotal?: number
   ) => {
     if (!servicioLubricacionTemp) return;
 
     try {
       console.log("🔧 Agregando lubricación a orden existente:", productos);
+      console.log("💰 Precio total servicio:", precioServicioTotal);
 
       // Separar aceites y filtros
       const aceites = productos.filter((p) => p.tipo === "ACEITE");
@@ -435,25 +440,32 @@ export default function OrdenDetallePage() {
         return;
       }
 
-      // Calcular precio total con precio MINORISTA
-      const precioTotal = productosCompletos
+      if (!precioServicioTotal || precioServicioTotal <= 0) {
+        toast.error("❌ Debe ingresar el precio total del servicio");
+        return;
+      }
+
+      // Calcular costo total minorista
+      const costoTotalMinorista = productosCompletos
         ? productosCompletos.reduce((sum, p) => sum + p.precioMinorista, 0)
         : 0;
 
-      // Crear descripción detallada
-      const nombresAceites = aceites.map((a) => a.nombre).join(", ");
-      const nombresFiltros = filtros.map((f) => f.nombre).join(", ");
+      // Calcular utilidad del servicio
+      const utilidadServicio = precioServicioTotal - costoTotalMinorista;
 
-      const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
+      console.log(`💰 Costo productos (Minorista): $${costoTotalMinorista}`);
+      console.log(`💰 Precio servicio (Cliente): $${precioServicioTotal}`);
+      console.log(`💰 Utilidad servicio: $${utilidadServicio}`);
 
-      // 🔥 Agregar servicio CON productos para descontar inventario
+      // 🔥 Agregar servicio CON productos y precio total
       const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          descripcion: descripcion,
-          precio: precioTotal,
-          productosLubricacion: productosCompletos, // 🔥 Enviar productos completos
+          descripcion: "Lubricación",
+          precio: precioServicioTotal, // 🔥 Precio que cobra al cliente
+          precioServicioTotal: precioServicioTotal,
+          productosLubricacion: productosCompletos,
         }),
       });
 
@@ -471,16 +483,17 @@ export default function OrdenDetallePage() {
                 • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
               </div>
               <div className="font-semibold mt-1">
-                Total (Precio Minorista): ${precioTotal.toLocaleString()}
+                Precio Cliente: ${precioServicioTotal.toLocaleString()}
               </div>
               <div className="text-xs text-gray-600 mt-1">
-                Stock descontado automáticamente
+                Costo productos: ${costoTotalMinorista.toLocaleString()} |
+                Utilidad: ${utilidadServicio.toLocaleString()}
               </div>
             </div>
           </div>,
-          { duration: 5000 }
+          { duration: 6000 }
         );
-        fetchOrden(); // Recargar orden
+        fetchOrden();
         setShowAgregarServicios(false);
       } else {
         toast.error("Error al agregar servicio");
