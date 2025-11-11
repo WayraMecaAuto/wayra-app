@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
           data: {
             cantidad: parseInt(prod.cantidad),
             precioUnitario: parseFloat(prod.precio),
-            tipoPrecio: prod.tipoPrecio || "VENTA",
+            tipoPrecio: prod.tipoPrecio || "MINORISTA",
             subtotal: parseFloat(prod.precio) * parseInt(prod.cantidad),
             ordenId: orden.id,
             productoId: prod.id,
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
           data: {
             tipo: "SALIDA",
             cantidad: parseInt(prod.cantidad),
-            motivo: `Orden de trabajo ${numeroOrden}`,
+            motivo: `Orden de trabajo ${numeroOrden} - Lubricación`,
             precioUnitario: parseFloat(prod.precio),
             total: parseFloat(prod.precio) * parseInt(prod.cantidad),
             productoId: prod.id,

@@ -13,24 +13,31 @@ import {
   Plus,
   X,
   DollarSign,
+  PackagePlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface LubricacionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
-    productosCompletos?: Array<{ 
-      id: string; 
-      nombre: string; 
-      precioMinorista: number;
+  onAdd: (data: {
+    productosInventario: Array<{
+      id: string;
+      nombre: string;
+      cantidad: number;
+      precio: number;
+      tipoPrecio: string;
+    }>;
+    repuestosExternos: Array<{
+      nombre: string;
+      descripcion: string;
+      cantidad: number;
       precioCompra: number;
-      tipo: string;
-      monedaCompra: string;
-    }>,
-    precioServicioTotal?: number
-  ) => void;
+      precioVenta: number;
+      proveedor: string;
+    }>;
+    precioManoObra: number;
+  }) => void;
 }
 
 interface Producto {
@@ -56,6 +63,18 @@ interface ProductoSeleccionado {
   monedaCompra: string;
   tipo: "ACEITE" | "FILTRO";
   inventarioTipo?: string;
+  cantidad: number;
+}
+
+interface ProductoExterno {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  tipo: "ACEITE" | "FILTRO";
+  cantidad: number;
+  precioCompra: number;
+  precioVenta: number;
+  proveedor: string;
 }
 
 export function LubricacionModal({
@@ -65,26 +84,48 @@ export function LubricacionModal({
 }: LubricacionModalProps) {
   const [aceites, setAceites] = useState<Producto[]>([]);
   const [filtros, setFiltros] = useState<Producto[]>([]);
-  const [aceitesSeleccionados, setAceitesSeleccionados] = useState<
-    ProductoSeleccionado[]
-  >([]);
-  const [filtroSeleccionado, setFiltroSeleccionado] =
-    useState<ProductoSeleccionado | null>(null);
+  const [productosInventario, setProductosInventario] = useState<ProductoSeleccionado[]>([]);
+  const [productosExternos, setProductosExternos] = useState<ProductoExterno[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchAceite, setSearchAceite] = useState("");
   const [searchFiltro, setSearchFiltro] = useState("");
   const [precioServicioTotal, setPrecioServicioTotal] = useState<string>("");
+  const [showExternoForm, setShowExternoForm] = useState(false);
+  const [tipoExternoForm, setTipoExternoForm] = useState<"ACEITE" | "FILTRO">("ACEITE");
+
+  // Form externo
+  const [nombreExterno, setNombreExterno] = useState("");
+  const [descripcionExterno, setDescripcionExterno] = useState("");
+  const [cantidadExterno, setCantidadExterno] = useState("1");
+  const [precioCompraExterno, setPrecioCompraExterno] = useState("");
+  const [precioVentaExterno, setPrecioVentaExterno] = useState("");
+  const [proveedorExterno, setProveedorExterno] = useState("");
 
   useEffect(() => {
     if (isOpen) {
-      setAceitesSeleccionados([]);
-      setFiltroSeleccionado(null);
-      setSearchAceite("");
-      setSearchFiltro("");
-      setPrecioServicioTotal("");
+      resetForm();
       fetchProductos();
     }
   }, [isOpen]);
+
+  const resetForm = () => {
+    setProductosInventario([]);
+    setProductosExternos([]);
+    setSearchAceite("");
+    setSearchFiltro("");
+    setPrecioServicioTotal("");
+    setShowExternoForm(false);
+    resetExternoForm();
+  };
+
+  const resetExternoForm = () => {
+    setNombreExterno("");
+    setDescripcionExterno("");
+    setCantidadExterno("1");
+    setPrecioCompraExterno("");
+    setPrecioVentaExterno("");
+    setProveedorExterno("");
+  };
 
   const fetchProductos = async () => {
     setLoading(true);
@@ -107,12 +148,8 @@ export function LubricacionModal({
 
       const wayraEniArray = Array.isArray(wayraEniRes) ? wayraEniRes : [];
       const wayraCalanArray = Array.isArray(wayraCalanRes) ? wayraCalanRes : [];
-      const torniLubricantesArray = Array.isArray(torniLubricantesRes)
-        ? torniLubricantesRes
-        : [];
-      const torniFiltrosArray = Array.isArray(torniFiltrosRes)
-        ? torniFiltrosRes
-        : [];
+      const torniLubricantesArray = Array.isArray(torniLubricantesRes) ? torniLubricantesRes : [];
+      const torniFiltrosArray = Array.isArray(torniFiltrosRes) ? torniFiltrosRes : [];
 
       const wayraEniProductos = wayraEniArray.map((p) => ({
         ...p,
@@ -195,15 +232,15 @@ export function LubricacionModal({
     }
   };
 
-  const agregarAceite = (producto: Producto) => {
-    if (aceitesSeleccionados.some((p) => p.id === producto.id)) {
-      toast.error("Este aceite ya está agregado");
+  const agregarProductoInventario = (producto: Producto, tipo: "ACEITE" | "FILTRO") => {
+    if (productosInventario.some((p) => p.id === producto.id)) {
+      toast.error("Este producto ya está agregado");
       return;
     }
 
     const productoConOrigen = producto as any;
 
-    setAceitesSeleccionados((prev) => [
+    setProductosInventario((prev) => [
       ...prev,
       {
         id: producto.id,
@@ -213,42 +250,113 @@ export function LubricacionModal({
         precioMinorista: producto.precioMinorista,
         precioCompra: producto.precioCompra,
         monedaCompra: producto.monedaCompra || 'COP',
-        tipo: "ACEITE",
+        tipo,
         inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
+        cantidad: 1,
       },
     ]);
     toast.success(`✅ ${producto.nombre} agregado`);
   };
 
-  const removerAceite = (id: string) => {
-    setAceitesSeleccionados((prev) => prev.filter((p) => p.id !== id));
+  const removerProductoInventario = (id: string) => {
+    setProductosInventario((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const seleccionarFiltro = (producto: Producto) => {
-    const productoConOrigen = producto as any;
+  const actualizarCantidadInventario = (id: string, cantidad: number) => {
+    if (cantidad < 1) return;
+    setProductosInventario((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, cantidad } : p))
+    );
+  };
 
-    setFiltroSeleccionado({
-      id: producto.id,
-      nombre: producto.nombre,
-      codigo: producto.codigo,
-      precioVenta: producto.precioVenta,
-      precioMinorista: producto.precioMinorista,
-      precioCompra: producto.precioCompra,
-      monedaCompra: producto.monedaCompra || 'COP',
-      tipo: "FILTRO",
-      inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
-    });
-    toast.success(`✅ ${producto.nombre} seleccionado`);
+  const agregarProductoExterno = () => {
+    if (!nombreExterno.trim()) {
+      toast.error("Ingresa el nombre del producto");
+      return;
+    }
+
+    if (!cantidadExterno || parseInt(cantidadExterno) < 1) {
+      toast.error("Ingresa una cantidad válida");
+      return;
+    }
+
+    if (!precioCompraExterno || parseFloat(precioCompraExterno) < 0) {
+      toast.error("Ingresa el precio de compra");
+      return;
+    }
+
+    if (!precioVentaExterno || parseFloat(precioVentaExterno) <= 0) {
+      toast.error("Ingresa el precio de venta");
+      return;
+    }
+
+    if (parseFloat(precioVentaExterno) < parseFloat(precioCompraExterno)) {
+      toast.error("El precio de venta no puede ser menor al precio de compra");
+      return;
+    }
+
+    const nuevoExterno: ProductoExterno = {
+      id: Date.now().toString() + Math.random(),
+      nombre: nombreExterno.trim(),
+      descripcion: descripcionExterno.trim() || nombreExterno.trim(),
+      tipo: tipoExternoForm,
+      cantidad: parseInt(cantidadExterno),
+      precioCompra: parseFloat(precioCompraExterno),
+      precioVenta: parseFloat(precioVentaExterno),
+      proveedor: proveedorExterno.trim() || "Sin especificar",
+    };
+
+    setProductosExternos((prev) => [...prev, nuevoExterno]);
+    toast.success(`✅ ${tipoExternoForm === "ACEITE" ? "Aceite" : "Filtro"} externo agregado`);
+    resetExternoForm();
+    setShowExternoForm(false);
+  };
+
+  const removerProductoExterno = (id: string) => {
+    setProductosExternos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const calcularTotalProductosInventario = () => {
+    return productosInventario.reduce(
+      (sum, p) => sum + p.precioMinorista * p.cantidad,
+      0
+    );
+  };
+
+  const calcularTotalProductosExternos = () => {
+    return productosExternos.reduce(
+      (sum, p) => sum + p.precioVenta * p.cantidad,
+      0
+    );
+  };
+
+  const calcularTotalProductos = () => {
+    return calcularTotalProductosInventario() + calcularTotalProductosExternos();
+  };
+
+  const calcularPrecioManoObra = () => {
+    if (!precioServicioTotal || parseFloat(precioServicioTotal) <= 0) {
+      return 0;
+    }
+    const totalProductos = calcularTotalProductos();
+    const manoObra = parseFloat(precioServicioTotal) - totalProductos;
+    return Math.max(0, manoObra);
   };
 
   const handleSubmit = () => {
-    if (aceitesSeleccionados.length === 0) {
+    // Validaciones
+    const totalAceites = productosInventario.filter(p => p.tipo === "ACEITE").length + 
+                        productosExternos.filter(p => p.tipo === "ACEITE").length;
+    const totalFiltros = productosInventario.filter(p => p.tipo === "FILTRO").length + 
+                        productosExternos.filter(p => p.tipo === "FILTRO").length;
+
+    if (totalAceites === 0) {
       toast.error("⚠️ Debes agregar al menos un aceite");
       return;
     }
 
-    if (!filtroSeleccionado) {
-      toast.error("⚠️ Debes seleccionar un filtro");
+    if (totalFiltros === 0) {
+      toast.error("⚠️ Debes agregar al menos un filtro");
       return;
     }
 
@@ -258,79 +366,49 @@ export function LubricacionModal({
     }
 
     const precioTotal = parseFloat(precioServicioTotal);
-    const costoProductos = calcularCostoProductos();
+    const costoProductos = calcularTotalProductos();
 
     if (precioTotal < costoProductos) {
       toast.error("⚠️ El precio del servicio no puede ser menor al costo de los productos");
       return;
     }
 
+    const precioManoObra = calcularPrecioManoObra();
+
     console.log("✅ Lubricación completa:");
-    console.log("   Aceites:", aceitesSeleccionados.map((p) => `${p.nombre} (${p.id})`));
-    console.log("   Filtro:", `${filtroSeleccionado.nombre} (${filtroSeleccionado.id})`);
+    console.log("   Productos Inventario:", productosInventario);
+    console.log("   Productos Externos:", productosExternos);
     console.log("   Precio Total Servicio:", precioTotal);
-    console.log("   Costo Productos (Minorista):", costoProductos);
-    console.log("   Utilidad Servicio:", precioTotal - costoProductos);
+    console.log("   Costo Productos:", costoProductos);
+    console.log("   Mano de Obra:", precioManoObra);
 
-    const productosParaAgregar = [
-      ...aceitesSeleccionados.map((a) => ({
-        id: a.id,
-        nombre: a.nombre,
-        tipo: "ACEITE" as const,
+    // Preparar datos para enviar
+    const data = {
+      productosInventario: productosInventario.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        cantidad: p.cantidad,
+        precio: p.precioMinorista,
+        tipoPrecio: "MINORISTA",
       })),
-      {
-        id: filtroSeleccionado.id,
-        nombre: filtroSeleccionado.nombre,
-        tipo: "FILTRO" as const,
-      },
-    ];
-
-    const productosCompletos = [
-      ...aceitesSeleccionados.map((a) => ({
-        id: a.id,
-        nombre: a.nombre,
-        precioMinorista: a.precioMinorista,
-        precioCompra: a.precioCompra,
-        tipo: a.inventarioTipo || 'WAYRA_ENI',
-        monedaCompra: a.monedaCompra,
+      repuestosExternos: productosExternos.map((p) => ({
+        nombre: p.nombre,
+        descripcion: p.descripcion,
+        cantidad: p.cantidad,
+        precioCompra: p.precioCompra,
+        precioVenta: p.precioVenta,
+        proveedor: p.proveedor,
       })),
-      {
-        id: filtroSeleccionado.id,
-        nombre: filtroSeleccionado.nombre,
-        precioMinorista: filtroSeleccionado.precioMinorista,
-        precioCompra: filtroSeleccionado.precioCompra,
-        tipo: filtroSeleccionado.inventarioTipo || 'WAYRA_ENI',
-        monedaCompra: filtroSeleccionado.monedaCompra,
-      },
-    ];
+      precioManoObra,
+    };
 
-    onAdd(productosParaAgregar, productosCompletos, precioTotal);
+    onAdd(data);
     handleClose();
   };
 
   const handleClose = () => {
-    setAceitesSeleccionados([]);
-    setFiltroSeleccionado(null);
-    setSearchAceite("");
-    setSearchFiltro("");
-    setPrecioServicioTotal("");
+    resetForm();
     onClose();
-  };
-
-  const calcularCostoProductos = () => {
-    const totalAceites = aceitesSeleccionados.reduce(
-      (sum, p) => sum + p.precioMinorista,
-      0
-    );
-    const precioFiltro = filtroSeleccionado?.precioMinorista || 0;
-    return totalAceites + precioFiltro;
-  };
-
-  const calcularUtilidadServicio = () => {
-    if (!precioServicioTotal || parseFloat(precioServicioTotal) <= 0) {
-      return 0;
-    }
-    return parseFloat(precioServicioTotal) - calcularCostoProductos();
   };
 
   const getInventarioLabel = (tipo: string) => {
@@ -387,23 +465,125 @@ export function LubricacionModal({
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-blue-900 mb-2">
-                Servicio de Lubricación - Configuración de Precios
+                Servicio de Lubricación
               </h4>
               <div className="text-sm text-blue-700 space-y-1">
                 <p>
-                  1. Selecciona <span className="font-semibold">aceite(s)</span> y{" "}
-                  <span className="font-semibold">filtro</span>
+                  1. Selecciona <span className="font-semibold">productos del inventario</span> y/o{" "}
+                  <span className="font-semibold">productos externos</span>
                 </p>
                 <p>
-                  2. Ingresa el <span className="font-semibold">precio total del servicio</span> (lo que cobras al cliente)
+                  2. Ingresa el <span className="font-semibold">precio total del servicio</span>
                 </p>
                 <p className="text-xs text-blue-600 mt-2">
-                  💡 Los productos se registrarán en su contabilidad con precio minorista, y el servicio se registrará con la diferencia como utilidad para Wayra Taller
+                  💡 Los productos del inventario descontarán stock. Los externos se registrarán como repuestos. La diferencia será mano de obra.
                 </p>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Productos seleccionados */}
+        {(productosInventario.length > 0 || productosExternos.length > 0) && (
+          <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
+            <h5 className="font-bold text-green-900 mb-3 flex items-center">
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              Productos Seleccionados
+            </h5>
+            
+            {/* Inventario */}
+            {productosInventario.length > 0 && (
+              <div className="mb-3">
+                <div className="text-sm font-semibold text-gray-700 mb-2">Del Inventario:</div>
+                <div className="space-y-2">
+                  {productosInventario.map((prod) => (
+                    <div key={prod.id} className="bg-white border border-green-300 rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 text-sm">
+                            {prod.tipo === "ACEITE" ? "🛢️" : "🔧"} {prod.nombre}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                            <span>{prod.codigo}</span>
+                            <span className="font-bold text-green-600">
+                              ${prod.precioMinorista.toLocaleString()} c/u
+                            </span>
+                            {prod.inventarioTipo && (
+                              <span className={`px-2 py-0.5 rounded-full ${getInventarioColor(prod.inventarioTipo)}`}>
+                                {getInventarioLabel(prod.inventarioTipo)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Cantidad:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={prod.cantidad}
+                              onChange={(e) => actualizarCantidadInventario(prod.id, parseInt(e.target.value))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                            <span className="text-sm font-bold text-green-700">
+                              Subtotal: ${(prod.precioMinorista * prod.cantidad).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removerProductoInventario(prod.id)}
+                          className="text-red-600 hover:bg-red-50 ml-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Externos */}
+            {productosExternos.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold text-gray-700 mb-2">Externos:</div>
+                <div className="space-y-2">
+                  {productosExternos.map((prod) => (
+                    <div key={prod.id} className="bg-white border border-purple-300 rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 text-sm">
+                            {prod.tipo === "ACEITE" ? "🛢️" : "🔧"} {prod.nombre}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">{prod.descripcion}</div>
+                          <div className="flex items-center gap-2 text-xs mt-1">
+                            <span className="text-gray-600">Cant: {prod.cantidad}</span>
+                            <span className="text-orange-600">Compra: ${prod.precioCompra.toLocaleString()}</span>
+                            <span className="font-bold text-green-600">Venta: ${prod.precioVenta.toLocaleString()}</span>
+                            <span className="text-purple-600">Proveedor: {prod.proveedor}</span>
+                          </div>
+                          <div className="mt-1 text-sm font-bold text-purple-700">
+                            Subtotal: ${(prod.precioVenta * prod.cantidad).toLocaleString()}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removerProductoExterno(prod.id)}
+                          className="text-red-600 hover:bg-red-50 ml-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-16">
@@ -421,59 +601,22 @@ export function LubricacionModal({
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Droplets className="h-4 w-4 text-blue-600" />
                   </div>
-                  <label className="font-semibold text-gray-800">
-                    Aceites Lubricantes
-                  </label>
+                  <label className="font-semibold text-gray-800">Aceites</label>
                 </div>
-                <span className="text-sm font-medium text-gray-600">
-                  {aceitesSeleccionados.length} agregado
-                  {aceitesSeleccionados.length !== 1 ? "s" : ""}
-                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setTipoExternoForm("ACEITE");
+                    setShowExternoForm(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-xs"
+                >
+                  <PackagePlus className="h-3 w-3 mr-1" />
+                  Externo
+                </Button>
               </div>
 
-              {/* Aceites seleccionados */}
-              {aceitesSeleccionados.length > 0 && (
-                <div className="space-y-2 max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-gray-100">
-                  {aceitesSeleccionados.map((aceite) => (
-                    <div
-                      key={aceite.id}
-                      className="bg-green-50 border border-green-200 rounded-lg p-3"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 text-sm truncate">
-                            {aceite.nombre}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
-                            <span>{aceite.codigo}</span>
-                            <span className="font-bold text-green-600">
-                              Min: ${aceite.precioMinorista.toLocaleString()}
-                            </span>
-                            {aceite.inventarioTipo && (
-                              <span
-                                className={`px-2 py-0.5 rounded-full ${getInventarioColor(aceite.inventarioTipo)}`}
-                              >
-                                {getInventarioLabel(aceite.inventarioTipo)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removerAceite(aceite.id)}
-                          className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Búsqueda aceites */}
               <div className="relative">
                 <input
                   type="text"
@@ -485,22 +628,19 @@ export function LubricacionModal({
                 <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
 
-              {/* Lista aceites */}
-              <div className="border-2 border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-gray-100">
+              <div className="border-2 border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y-auto">
                 {filteredAceites.length > 0 ? (
                   <div className="divide-y divide-gray-200">
                     {filteredAceites.map((aceite) => {
                       const productoConOrigen = aceite as any;
-                      const yaAgregado = aceitesSeleccionados.some(
-                        (p) => p.id === aceite.id
-                      );
+                      const yaAgregado = productosInventario.some((p) => p.id === aceite.id);
 
                       return (
                         <button
                           key={aceite.id}
-                          onClick={() => agregarAceite(aceite)}
+                          onClick={() => agregarProductoInventario(aceite, "ACEITE")}
                           disabled={yaAgregado}
-                          className="w-full text-left p-3 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                          className="w-full text-left p-3 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
@@ -508,29 +648,19 @@ export function LubricacionModal({
                                 {aceite.nombre}
                               </h5>
                               <div className="flex flex-wrap gap-2 text-xs mt-1">
-                                <span className="text-gray-600">
-                                  {aceite.codigo}
-                                </span>
-                                <span className="text-green-600 font-medium">
-                                  Stock: {aceite.stock}
-                                </span>
+                                <span className="text-gray-600">{aceite.codigo}</span>
+                                <span className="text-green-600 font-medium">Stock: {aceite.stock}</span>
                                 <span className="font-bold text-blue-600">
-                                  Min: ${aceite.precioMinorista.toLocaleString()}
+                                  ${aceite.precioMinorista.toLocaleString()}
                                 </span>
                                 {productoConOrigen.inventarioOrigen && (
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}
-                                  >
-                                    {getInventarioLabel(
-                                      productoConOrigen.inventarioOrigen
-                                    )}
+                                  <span className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}>
+                                    {getInventarioLabel(productoConOrigen.inventarioOrigen)}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            {!yaAgregado && (
-                              <Plus className="h-4 w-4 text-blue-600 ml-2 flex-shrink-0" />
-                            )}
+                            {!yaAgregado && <Plus className="h-4 w-4 text-blue-600 ml-2" />}
                           </div>
                         </button>
                       );
@@ -540,9 +670,7 @@ export function LubricacionModal({
                   <div className="text-center py-8">
                     <Box className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
-                      {searchAceite
-                        ? "No se encontraron aceites"
-                        : "No hay aceites disponibles"}
+                      {searchAceite ? "No se encontraron aceites" : "No hay aceites disponibles"}
                     </p>
                   </div>
                 )}
@@ -556,56 +684,22 @@ export function LubricacionModal({
                   <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                     <Filter className="h-4 w-4 text-green-600" />
                   </div>
-                  <label className="font-semibold text-gray-800">
-                    Filtro de Aceite
-                  </label>
+                  <label className="font-semibold text-gray-800">Filtros</label>
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setTipoExternoForm("FILTRO");
+                    setShowExternoForm(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-xs"
+                >
+                  <PackagePlus className="h-3 w-3 mr-1" />
+                  Externo
+                </Button>
               </div>
 
-              {/* Filtro seleccionado */}
-              {filtroSeleccionado && (
-                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold text-green-800">
-                      Seleccionado:
-                    </span>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 text-sm truncate">
-                        {filtroSeleccionado.nombre}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
-                        <span>{filtroSeleccionado.codigo}</span>
-                        <span className="font-bold text-green-600">
-                          Min: ${filtroSeleccionado.precioMinorista.toLocaleString()}
-                        </span>
-                        {filtroSeleccionado.inventarioTipo && (
-                          <span
-                            className={`px-2 py-0.5 rounded-full ${getInventarioColor(filtroSeleccionado.inventarioTipo)}`}
-                          >
-                            {getInventarioLabel(
-                              filtroSeleccionado.inventarioTipo
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setFiltroSeleccionado(null)}
-                      className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Búsqueda filtros */}
               <div className="relative">
                 <input
                   type="text"
@@ -617,24 +711,19 @@ export function LubricacionModal({
                 <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
 
-              {/* Lista filtros */}
-              <div className="border-2 border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-green-300 scrollbar-track-gray-100">
+              <div className="border-2 border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y-auto">
                 {filteredFiltros.length > 0 ? (
                   <div className="divide-y divide-gray-200">
                     {filteredFiltros.map((filtro) => {
                       const productoConOrigen = filtro as any;
-                      const estaSeleccionado =
-                        filtroSeleccionado?.id === filtro.id;
+                      const yaAgregado = productosInventario.some((p) => p.id === filtro.id);
 
                       return (
                         <button
                           key={filtro.id}
-                          onClick={() => seleccionarFiltro(filtro)}
-                          className={`w-full text-left p-3 transition-colors ${
-                            estaSeleccionado
-                              ? "bg-green-100 border-l-4 border-green-500"
-                              : "hover:bg-green-50"
-                          }`}
+                          onClick={() => agregarProductoInventario(filtro, "FILTRO")}
+                          disabled={yaAgregado}
+                          className="w-full text-left p-3 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
@@ -642,29 +731,19 @@ export function LubricacionModal({
                                 {filtro.nombre}
                               </h5>
                               <div className="flex flex-wrap gap-2 text-xs mt-1">
-                                <span className="text-gray-600">
-                                  {filtro.codigo}
-                                </span>
-                                <span className="text-green-600 font-medium">
-                                  Stock: {filtro.stock}
-                                </span>
+                                <span className="text-gray-600">{filtro.codigo}</span>
+                                <span className="text-green-600 font-medium">Stock: {filtro.stock}</span>
                                 <span className="font-bold text-green-600">
-                                  Min: ${filtro.precioMinorista.toLocaleString()}
+                                  ${filtro.precioMinorista.toLocaleString()}
                                 </span>
                                 {productoConOrigen.inventarioOrigen && (
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}
-                                  >
-                                    {getInventarioLabel(
-                                      productoConOrigen.inventarioOrigen
-                                    )}
+                                  <span className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}>
+                                    {getInventarioLabel(productoConOrigen.inventarioOrigen)}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            {estaSeleccionado && (
-                              <CheckCircle2 className="h-5 w-5 text-green-600 ml-2 flex-shrink-0" />
-                            )}
+                            {!yaAgregado && <Plus className="h-4 w-4 text-green-600 ml-2" />}
                           </div>
                         </button>
                       );
@@ -674,9 +753,7 @@ export function LubricacionModal({
                   <div className="text-center py-8">
                     <Box className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
-                      {searchFiltro
-                        ? "No se encontraron filtros"
-                        : "No hay filtros disponibles"}
+                      {searchFiltro ? "No se encontraron filtros" : "No hay filtros disponibles"}
                     </p>
                   </div>
                 )}
@@ -685,8 +762,136 @@ export function LubricacionModal({
           </div>
         )}
 
+        {/* Formulario Producto Externo */}
+        {showExternoForm && (
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h5 className="font-bold text-purple-900">
+                Agregar {tipoExternoForm === "ACEITE" ? "Aceite" : "Filtro"} Externo
+              </h5>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowExternoForm(false);
+                  resetExternoForm();
+                }}
+                className="text-gray-600 hover:bg-purple-100"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre *
+                </label>
+                <Input
+                  type="text"
+                  value={nombreExterno}
+                  onChange={(e) => setNombreExterno(e.target.value)}
+                  placeholder="Ej: Aceite Castrol 20W50"
+                  className="border-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción
+                </label>
+                <Input
+                  type="text"
+                  value={descripcionExterno}
+                  onChange={(e) => setDescripcionExterno(e.target.value)}
+                  placeholder="Descripción adicional"
+                  className="border-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cantidad *
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={cantidadExterno}
+                  onChange={(e) => setCantidadExterno(e.target.value)}
+                  className="border-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Proveedor
+                </label>
+                <Input
+                  type="text"
+                  value={proveedorExterno}
+                  onChange={(e) => setProveedorExterno(e.target.value)}
+                  placeholder="Nombre del proveedor"
+                  className="border-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Precio Compra *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600">
+                    $
+                  </span>
+                  <Input
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={precioCompraExterno}
+                    onChange={(e) => setPrecioCompraExterno(e.target.value)}
+                    placeholder="0"
+                    className="pl-7 border-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Precio Venta *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600">
+                    $
+                  </span>
+                  <Input
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={precioVentaExterno}
+                    onChange={(e) => setPrecioVentaExterno(e.target.value)}
+                    placeholder="0"
+                    className="pl-7 border-2"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-4">
+              <Button
+                type="button"
+                onClick={agregarProductoExterno}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Producto
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Precio del Servicio */}
-        {(aceitesSeleccionados.length > 0 || filtroSeleccionado) && (
+        {(productosInventario.length > 0 || productosExternos.length > 0) && (
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl p-5">
             <div className="flex items-start space-x-3 mb-4">
               <DollarSign className="h-6 w-6 text-indigo-600 flex-shrink-0 mt-0.5" />
@@ -695,7 +900,7 @@ export function LubricacionModal({
                   Precio Total del Servicio *
                 </label>
                 <p className="text-sm text-indigo-700 mb-3">
-                  Ingresa el precio que cobrarás al cliente por el servicio completo de lubricación
+                  Ingresa el precio total que cobrarás al cliente (incluye productos + mano de obra)
                 </p>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 font-medium text-lg">
@@ -704,7 +909,7 @@ export function LubricacionModal({
                   <Input
                     type="number"
                     step="1000"
-                    min={calcularCostoProductos()}
+                    min={calcularTotalProductos()}
                     value={precioServicioTotal}
                     onChange={(e) => setPrecioServicioTotal(e.target.value)}
                     placeholder="0"
@@ -712,7 +917,7 @@ export function LubricacionModal({
                   />
                 </div>
                 <p className="text-xs text-indigo-600 mt-2">
-                  Mínimo: ${calcularCostoProductos().toLocaleString()} (costo de productos)
+                  Mínimo: ${calcularTotalProductos().toLocaleString()} (costo de productos)
                 </p>
               </div>
             </div>
@@ -720,7 +925,7 @@ export function LubricacionModal({
         )}
 
         {/* Resumen */}
-        {(aceitesSeleccionados.length > 0 || filtroSeleccionado) && (
+        {(productosInventario.length > 0 || productosExternos.length > 0) && (
           <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 border-2 border-green-300 rounded-xl p-5">
             <div className="flex items-start space-x-3">
               <ShoppingCart className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
@@ -728,17 +933,30 @@ export function LubricacionModal({
                 <h5 className="font-bold text-green-900 mb-3">
                   Resumen del Servicio:
                 </h5>
-                <div className="grid grid-cols-2 gap-4 mb-3">
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <div className="bg-white rounded-lg p-3 border border-green-200">
-                    <div className="text-sm text-gray-600 mb-1">Aceites</div>
-                    <div className="text-xl font-bold text-blue-600">
-                      {aceitesSeleccionados.length}
+                    <div className="text-xs text-gray-600 mb-1">Aceites Inventario</div>
+                    <div className="text-lg font-bold text-blue-600">
+                      {productosInventario.filter(p => p.tipo === "ACEITE").length}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-green-200">
-                    <div className="text-sm text-gray-600 mb-1">Filtro</div>
-                    <div className="text-xl font-bold text-green-600">
-                      {filtroSeleccionado ? "1" : "0"}
+                    <div className="text-xs text-gray-600 mb-1">Filtros Inventario</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {productosInventario.filter(p => p.tipo === "FILTRO").length}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-purple-200">
+                    <div className="text-xs text-gray-600 mb-1">Aceites Externos</div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {productosExternos.filter(p => p.tipo === "ACEITE").length}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-purple-200">
+                    <div className="text-xs text-gray-600 mb-1">Filtros Externos</div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {productosExternos.filter(p => p.tipo === "FILTRO").length}
                     </div>
                   </div>
                 </div>
@@ -746,23 +964,35 @@ export function LubricacionModal({
                 {/* Desglose financiero */}
                 <div className="space-y-2 mb-3">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Costo productos (Minorista):</span>
+                    <span className="text-gray-600">Productos Inventario:</span>
+                    <span className="font-bold text-blue-700">
+                      ${calcularTotalProductosInventario().toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Productos Externos:</span>
+                    <span className="font-bold text-purple-700">
+                      ${calcularTotalProductosExternos().toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200">
+                    <span className="font-semibold text-gray-700">Total Productos:</span>
                     <span className="font-bold text-gray-900">
-                      ${calcularCostoProductos().toLocaleString()}
+                      ${calcularTotalProductos().toLocaleString()}
                     </span>
                   </div>
                   {precioServicioTotal && parseFloat(precioServicioTotal) > 0 && (
                     <>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">Precio servicio:</span>
+                        <span className="text-gray-600">Precio Total Servicio:</span>
                         <span className="font-bold text-indigo-600">
                           ${parseFloat(precioServicioTotal).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200">
-                        <span className="font-semibold text-gray-700">Utilidad servicio:</span>
-                        <span className={`font-bold text-lg ${calcularUtilidadServicio() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${calcularUtilidadServicio().toLocaleString()}
+                        <span className="font-semibold text-gray-700">Mano de Obra:</span>
+                        <span className={`font-bold text-lg ${calcularPrecioManoObra() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${calcularPrecioManoObra().toLocaleString()}
                         </span>
                       </div>
                     </>
@@ -774,9 +1004,14 @@ export function LubricacionModal({
                     📊 Distribución contable:
                   </div>
                   <div className="space-y-1 text-xs text-green-800">
-                    <div>• Wayra Productos/TorniRepuestos: Venta ${calcularCostoProductos().toLocaleString()}</div>
+                    {productosInventario.length > 0 && (
+                      <div>• Wayra Productos: Venta ${calcularTotalProductosInventario().toLocaleString()} (descuenta stock)</div>
+                    )}
+                    {productosExternos.length > 0 && (
+                      <div>• Repuestos Externos: ${calcularTotalProductosExternos().toLocaleString()}</div>
+                    )}
                     {precioServicioTotal && parseFloat(precioServicioTotal) > 0 && (
-                      <div>• Wayra Taller: Servicio con utilidad ${calcularUtilidadServicio().toLocaleString()}</div>
+                      <div>• Wayra Taller: Mano de obra ${calcularPrecioManoObra().toLocaleString()}</div>
                     )}
                   </div>
                 </div>
@@ -786,28 +1021,24 @@ export function LubricacionModal({
         )}
 
         {/* Advertencia */}
-        {(aceitesSeleccionados.length === 0 || !filtroSeleccionado || !precioServicioTotal) &&
-          !loading && (
-            <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-900">
-                    Información requerida
-                  </p>
-                  <p className="text-sm text-amber-700 mt-1">
-                    {aceitesSeleccionados.length === 0 && !filtroSeleccionado && !precioServicioTotal
-                      ? "Debes agregar aceite(s), seleccionar filtro e ingresar el precio del servicio"
-                      : aceitesSeleccionados.length === 0
-                        ? "Debes agregar al menos un aceite"
-                        : !filtroSeleccionado
-                          ? "Debes seleccionar un filtro"
-                          : "Debes ingresar el precio total del servicio"}
-                  </p>
-                </div>
+        {(productosInventario.length === 0 && productosExternos.length === 0) ||
+         !precioServicioTotal ? (
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Información requerida
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  {productosInventario.length === 0 && productosExternos.length === 0
+                    ? "Debes agregar al menos un producto (del inventario o externo)"
+                    : "Debes ingresar el precio total del servicio"}
+                </p>
               </div>
             </div>
-          )}
+          </div>
+        ) : null}
 
         {/* Botones */}
         <div className="flex justify-end space-x-3 pt-4 border-t-2 border-gray-200">
@@ -823,8 +1054,7 @@ export function LubricacionModal({
           <Button
             onClick={handleSubmit}
             disabled={
-              aceitesSeleccionados.length === 0 ||
-              !filtroSeleccionado ||
+              (productosInventario.length === 0 && productosExternos.length === 0) ||
               !precioServicioTotal ||
               parseFloat(precioServicioTotal) <= 0 ||
               loading

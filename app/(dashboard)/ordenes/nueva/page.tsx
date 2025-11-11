@@ -308,95 +308,96 @@ export default function NuevaOrdenPage() {
     }
   };
 
-  const handleLubricacionAdded = async (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
-    productosCompletos?: Array<{
+  const handleLubricacionAdded = async (data: {
+    productosInventario: Array<{
       id: string;
       nombre: string;
-      precioMinorista: number;
+      cantidad: number;
+      precio: number;
+      tipoPrecio: string;
+    }>;
+    repuestosExternos: Array<{
+      nombre: string;
+      descripcion: string;
+      cantidad: number;
       precioCompra: number;
-      tipo: string;
-      monedaCompra: string;
-    }>,
-    precioServicioTotal?: number
-  ) => {
-    if (!servicioLubricacionTemp) return;
-
+      precioVenta: number;
+      proveedor: string;
+    }>;
+    precioManoObra: number;
+  }) => {
     try {
-      console.log("🔧 Procesando lubricación en nueva orden:", productos);
-      console.log("💰 Precio total servicio:", precioServicioTotal);
+      console.log("🔧 Procesando lubricación en nueva orden:", data);
 
-      // Separar aceites y filtros
-      const aceites = productos.filter((p) => p.tipo === "ACEITE");
-      const filtros = productos.filter((p) => p.tipo === "FILTRO");
+      // 1. Agregar productos del inventario a la lista de productos
+      data.productosInventario.forEach((prod) => {
+        const exists = productosSeleccionados.find((p) => p.id === prod.id);
+        if (!exists) {
+          const nuevoProducto: ProductoOrden = {
+            id: prod.id,
+            nombre: prod.nombre,
+            codigo: "", // Se obtendrá del inventario
+            cantidad: prod.cantidad,
+            precio: prod.precio,
+            tipoPrecio: prod.tipoPrecio as "VENTA" | "MINORISTA" | "MAYORISTA",
+            subtotal: prod.precio * prod.cantidad,
+            stock: 999, // Temporal, se verificará en backend
+          };
+          setProductosSeleccionados((prev) => [...prev, nuevoProducto]);
+        }
+      });
 
-      if (aceites.length === 0 || filtros.length === 0) {
-        toast.error("❌ Debe haber al menos un aceite y un filtro");
-        return;
+      // 2. Agregar repuestos externos a la lista
+      data.repuestosExternos.forEach((rep) => {
+        const nuevoRepuesto: RepuestoExterno = {
+          id: Date.now().toString() + Math.random(),
+          nombre: rep.nombre,
+          descripcion: rep.descripcion,
+          cantidad: rep.cantidad,
+          precioCompra: rep.precioCompra,
+          precioVenta: rep.precioVenta,
+          subtotal: rep.precioVenta * rep.cantidad,
+          utilidad: (rep.precioVenta - rep.precioCompra) * rep.cantidad,
+          proveedor: rep.proveedor,
+        };
+        setRepuestosExternos((prev) => [...prev, nuevoRepuesto]);
+      });
+
+      // 3. Agregar servicio de mano de obra si es mayor a 0
+      if (data.precioManoObra > 0) {
+        // Buscar el servicio de lubricación en los disponibles
+        const servicioLubricacion = serviciosDisponibles.find(
+          (s) => s.clave === "SERVICIO_LUBRICACION"
+        );
+
+        if (servicioLubricacion) {
+          const nuevoServicio = {
+            clave: servicioLubricacion.clave,
+            descripcion: "Mano de Obra - Lubricación",
+            precio: data.precioManoObra,
+          };
+          setServiciosSeleccionados((prev) => [...prev, nuevoServicio]);
+        }
       }
-
-      if (!precioServicioTotal || precioServicioTotal <= 0) {
-        toast.error("❌ Debe ingresar el precio total del servicio");
-        return;
-      }
-
-      // Calcular costo total minorista
-      const costoTotalMinorista = productosCompletos
-        ? productosCompletos.reduce((sum, p) => sum + p.precioMinorista, 0)
-        : 0;
-
-      // Calcular utilidad del servicio
-      const utilidadServicio = precioServicioTotal - costoTotalMinorista;
-
-      console.log(`💰 Costo productos (Minorista): $${costoTotalMinorista}`);
-      console.log(`💰 Precio servicio (Cliente): $${precioServicioTotal}`);
-      console.log(`💰 Utilidad servicio: $${utilidadServicio}`);
-
-      // Crear descripción SIN detalles de productos (para agrupar en reportes)
-      const descripcion = servicioLubricacionTemp.descripcion; // Solo "Lubricación"
-
-      //  Agregar SOLO el servicio (NO agregar productos a la lista)
-      const nuevoServicio: ServicioConLubricacion = {
-        ...servicioLubricacionTemp,
-        precio: precioServicioTotal, // Precio que cobra al cliente
-        descripcion: descripcion,
-      };
-
-      setServiciosSeleccionados([...serviciosSeleccionados, nuevoServicio]);
-
-      setServicioLubricacionTemp(null);
 
       toast.success(
         <div>
-          <div className="font-semibold">
-            ✅ Servicio de lubricación agregado
-          </div>
+          <div className="font-semibold">✅ Lubricación agregada</div>
           <div className="text-sm mt-1">
             <div>
-              • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}:{" "}
-              {aceites.map((a) => a.nombre).join(", ")}
+              • {data.productosInventario.length} productos del inventario
             </div>
-            <div>
-              • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}:{" "}
-              {filtros.map((f) => f.nombre).join(", ")}
-            </div>
-            <div className="font-semibold mt-1">
-              Precio Cliente: ${precioServicioTotal.toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-600 mt-1">
-              Costo productos: ${costoTotalMinorista.toLocaleString()} |
-              Utilidad: ${utilidadServicio.toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-600 mt-1">
-              ⚠️ Los productos se descontarán al completar la orden
-            </div>
+            <div>• {data.repuestosExternos.length} repuestos externos</div>
+            {data.precioManoObra > 0 && (
+              <div>• Mano de obra: ${data.precioManoObra.toLocaleString()}</div>
+            )}
           </div>
         </div>,
-        { duration: 6000 }
+        { duration: 5000 }
       );
     } catch (error) {
       console.error("❌ Error al procesar lubricación:", error);
-      toast.error("Error al agregar servicio");
+      toast.error("Error al agregar lubricación");
     }
   };
 

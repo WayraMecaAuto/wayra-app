@@ -413,96 +413,112 @@ export default function OrdenDetallePage() {
     }
   };
 
-  const handleLubricacionAdded = async (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>,
-    productosCompletos?: Array<{
+  const handleLubricacionAdded = async (data: {
+    productosInventario: Array<{
       id: string;
       nombre: string;
-      precioMinorista: number;
+      cantidad: number;
+      precio: number;
+      tipoPrecio: string;
+    }>;
+    repuestosExternos: Array<{
+      nombre: string;
+      descripcion: string;
+      cantidad: number;
       precioCompra: number;
-      tipo: string;
-      monedaCompra: string;
-    }>,
-    precioServicioTotal?: number
-  ) => {
-    if (!servicioLubricacionTemp) return;
-
+      precioVenta: number;
+      proveedor: string;
+    }>;
+    precioManoObra: number;
+  }) => {
     try {
-      console.log("🔧 Agregando lubricación a orden existente:", productos);
-      console.log("💰 Precio total servicio:", precioServicioTotal);
+      console.log("🔧 Procesando lubricación en orden existente:", data);
 
-      // Separar aceites y filtros
-      const aceites = productos.filter((p) => p.tipo === "ACEITE");
-      const filtros = productos.filter((p) => p.tipo === "FILTRO");
+      // 1. Agregar productos del inventario
+      for (const prod of data.productosInventario) {
+        const response = await fetch(`/api/ordenes/${params.id}/productos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productoId: prod.id,
+            cantidad: prod.cantidad,
+            precioUnitario: prod.precio,
+            tipoPrecio: prod.tipoPrecio,
+          }),
+        });
 
-      if (aceites.length === 0 || filtros.length === 0) {
-        toast.error("❌ Debe haber al menos un aceite y un filtro");
-        return;
+        if (!response.ok) {
+          throw new Error(`Error al agregar producto ${prod.nombre}`);
+        }
+        console.log(`✅ Producto agregado: ${prod.nombre}`);
       }
 
-      if (!precioServicioTotal || precioServicioTotal <= 0) {
-        toast.error("❌ Debe ingresar el precio total del servicio");
-        return;
+      // 2. Agregar repuestos externos
+      for (const rep of data.repuestosExternos) {
+        const response = await fetch(`/api/ordenes/${params.id}/repuestos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: rep.nombre,
+            descripcion: rep.descripcion,
+            cantidad: rep.cantidad,
+            precioCompra: rep.precioCompra,
+            precioVenta: rep.precioVenta,
+            subtotal: rep.precioVenta * rep.cantidad,
+            utilidad: (rep.precioVenta - rep.precioCompra) * rep.cantidad,
+            proveedor: rep.proveedor,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error al agregar repuesto ${rep.nombre}`);
+        }
+        console.log(`✅ Repuesto externo agregado: ${rep.nombre}`);
       }
 
-      // Calcular costo total minorista
-      const costoTotalMinorista = productosCompletos
-        ? productosCompletos.reduce((sum, p) => sum + p.precioMinorista, 0)
-        : 0;
+      // 3. Agregar servicio de mano de obra si es mayor a 0
+      if (data.precioManoObra > 0) {
+        const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            descripcion: "Mano de Obra - Lubricación",
+            precio: data.precioManoObra,
+          }),
+        });
 
-      // Calcular utilidad del servicio
-      const utilidadServicio = precioServicioTotal - costoTotalMinorista;
+        if (!response.ok) {
+          throw new Error("Error al agregar servicio de mano de obra");
+        }
+        console.log(`✅ Mano de obra agregada: $${data.precioManoObra}`);
+      }
 
-      console.log(`💰 Costo productos (Minorista): $${costoTotalMinorista}`);
-      console.log(`💰 Precio servicio (Cliente): $${precioServicioTotal}`);
-      console.log(`💰 Utilidad servicio: $${utilidadServicio}`);
-
-      // 🔥 Agregar servicio CON productos y precio total
-      const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          descripcion: "Lubricación",
-          precio: precioServicioTotal, // 🔥 Precio que cobra al cliente
-          precioServicioTotal: precioServicioTotal,
-          productosLubricacion: productosCompletos,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success(
-          <div>
-            <div className="font-semibold">
-              ✅ Servicio de lubricación agregado
+      toast.success(
+        <div>
+          <div className="font-semibold">
+            ✅ Lubricación agregada correctamente
+          </div>
+          <div className="text-sm mt-1">
+            <div>
+              • {data.productosInventario.length} productos del inventario
             </div>
-            <div className="text-sm mt-1">
-              <div>
-                • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}
-              </div>
-              <div>
-                • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
-              </div>
-              <div className="font-semibold mt-1">
-                Precio Cliente: ${precioServicioTotal.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray-600 mt-1">
-                Costo productos: ${costoTotalMinorista.toLocaleString()} |
-                Utilidad: ${utilidadServicio.toLocaleString()}
-              </div>
+            <div>• {data.repuestosExternos.length} repuestos externos</div>
+            {data.precioManoObra > 0 && (
+              <div>• Mano de obra: ${data.precioManoObra.toLocaleString()}</div>
+            )}
+            <div className="text-xs text-gray-600 mt-1">
+              Se descontó el stock de los productos del inventario
             </div>
-          </div>,
-          { duration: 6000 }
-        );
-        fetchOrden();
-        setShowAgregarServicios(false);
-      } else {
-        toast.error("Error al agregar servicio");
-      }
+          </div>
+        </div>,
+        { duration: 6000 }
+      );
+
+      fetchOrden(); // Recargar la orden
+      setShowAgregarServicios(false);
     } catch (error) {
       console.error("❌ Error al agregar lubricación:", error);
-      toast.error("Error al agregar servicio de lubricación");
-    } finally {
-      setServicioLubricacionTemp(null);
+      toast.error("Error al agregar lubricación");
     }
   };
 
