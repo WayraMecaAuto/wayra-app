@@ -114,7 +114,7 @@ const menuItems: MenuItem[] = [
       { title: 'Vehículos', href: '/vehiculos', icon: Car, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Facturación', href: '/facturacion', icon: FileText, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Config. Servicios', href: '/taller/configuracion', icon: Settings, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
-      { title: 'Reportes Mecánicos', href: '/reportes/mecanicos', icon: PieChart, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] },
+      { title: 'Reportes Mecánicos', href: '/reportes/wayra-taller', icon: PieChart, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] },
       { 
         title: 'Contabilidad Taller', 
         href: '/contabilidad/wayra-taller', 

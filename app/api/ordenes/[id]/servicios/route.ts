@@ -30,6 +30,64 @@ export async function POST(
       );
     }
 
+    // 🔥 DETECTAR SI ES SERVICIO DE LUBRICACIÓN
+    const esLubricacion = productosLubricacion && Array.isArray(productosLubricacion) && productosLubricacion.length > 0;
+
+    if (!esLubricacion) {
+      // ✅ SERVICIO NORMAL (NO LUBRICACIÓN)
+      console.log("🔧 Procesando servicio normal...");
+      console.log("   - Descripción:", descripcion);
+      console.log("   - Precio:", precio);
+
+      const servicio = await prisma.servicioOrden.create({
+        data: {
+          descripcion: descripcion, // ✅ Usar la descripción que viene del frontend
+          precio: parseFloat(precio),
+          aplicaIva: false,
+          ordenId,
+        },
+      });
+
+      // Actualizar totales de la orden
+      const servicios = await prisma.servicioOrden.findMany({
+        where: { ordenId },
+      });
+
+      const subtotalServicios = servicios.reduce((sum, s) => sum + s.precio, 0);
+
+      const detalles = await prisma.detalleOrden.findMany({
+        where: { ordenId },
+      });
+      const repuestos = await prisma.repuestoExterno.findMany({
+        where: { ordenId },
+      });
+
+      const subtotalProductos = detalles.reduce((sum, d) => sum + d.subtotal, 0);
+      const subtotalRepuestos = repuestos.reduce((sum, r) => sum + r.subtotal, 0);
+
+      const orden = await prisma.ordenServicio.findUnique({
+        where: { id: ordenId },
+      });
+
+      const total =
+        subtotalServicios +
+        subtotalProductos +
+        subtotalRepuestos +
+        (orden?.manoDeObra || 0);
+
+      await prisma.ordenServicio.update({
+        where: { id: ordenId },
+        data: {
+          subtotalServicios,
+          total,
+        },
+      });
+
+      console.log("✅ Servicio normal agregado");
+      return NextResponse.json(servicio, { status: 201 });
+    }
+
+    // ✅ SERVICIO DE LUBRICACIÓN CON PRODUCTOS
     console.log("🔧 Procesando servicio de lubricación...");
     console.log("   - Descripción:", descripcion);
     console.log("   - Precio Total Servicio (Cliente):", precioServicioTotal || precio);
@@ -53,142 +111,132 @@ export async function POST(
     const mes = ahora.getMonth() + 1;
     const anio = ahora.getFullYear();
 
-    if (
-      productosLubricacion &&
-      Array.isArray(productosLubricacion) &&
-      productosLubricacion.length > 0
-    ) {
-      console.log(
-        `🔧 Procesando ${productosLubricacion.length} productos de lubricación`
-      );
+    for (const prod of productosLubricacion) {
+      const producto = await prisma.producto.findUnique({
+        where: { id: prod.id },
+      });
 
-      for (const prod of productosLubricacion) {
-        const producto = await prisma.producto.findUnique({
-          where: { id: prod.id },
-        });
+      if (!producto) {
+        console.error(`❌ Producto ${prod.id} no encontrado`);
+        continue;
+      }
 
-        if (!producto) {
-          console.error(`❌ Producto ${prod.id} no encontrado`);
-          continue;
-        }
-
-        // Verificar stock
-        if (producto.stock < 1) {
-          return NextResponse.json(
-            {
-              error: `Stock insuficiente para ${producto.nombre}`,
-            },
-            { status: 400 }
-          );
-        }
-
-        //  Calcular precio de compra EN COP (SOLO SI ES CALAN EN USD)
-        let precioCompraCOP = producto.precioCompra;
-        
-        if (
-          producto.tipo === "WAYRA_CALAN" &&
-          producto.monedaCompra === "USD" &&
-          producto.precioCompra < 1000
-        ) {
-          precioCompraCOP = producto.precioCompra * tasaDolar;
-          console.log(
-            `💱 Convirtiendo CALAN ${producto.nombre}: $${producto.precioCompra} USD → $${precioCompraCOP.toFixed(2)} COP`
-          );
-        } else {
-          console.log(
-            `✅ ${producto.nombre} precio compra: $${precioCompraCOP.toFixed(2)} COP (${producto.monedaCompra})`
-          );
-        }
-
-        //  Acumular costo minorista para calcular utilidad del servicio
-        costoTotalProductosMinorista += producto.precioMinorista;
-
-        // Determinar entidad contable
-        let entidadContable = "TORNIREPUESTOS";
-        if (producto.tipo === "WAYRA_ENI" || producto.tipo === "WAYRA_CALAN") {
-          entidadContable = "WAYRA_PRODUCTOS";
-        }
-
-        // 1. Actualizar stock (DESCONTAR INVENTARIO)
-        await prisma.producto.update({
-          where: { id: prod.id },
-          data: {
-            stock: {
-              decrement: 1,
-            },
+      // Verificar stock
+      if (producto.stock < 1) {
+        return NextResponse.json(
+          {
+            error: `Stock insuficiente para ${producto.nombre}`,
           },
-        });
-
-        //  2. Crear movimiento de inventario
-        await prisma.movimientoInventario.create({
-          data: {
-            tipo: "SALIDA",
-            cantidad: 1,
-            motivo: `Servicio de lubricación - Orden ${ordenId}`,
-            precioUnitario: producto.precioMinorista,
-            total: producto.precioMinorista,
-            productoId: prod.id,
-            usuarioId: session.user.id,
-          },
-        });
-
-        console.log(`✅ ${producto.nombre}: -1 stock (movimiento registrado)`);
-
-        //  3. Registrar INGRESO en contabilidad (VENTA A WAYRA TALLER CON PRECIO MINORISTA)
-        const movimientoContable = await prisma.movimientoContable.create({
-          data: {
-            tipo: "INGRESO",
-            concepto: "VENTA_DESDE_ORDEN",
-            monto: producto.precioMinorista,
-            fecha: ahora,
-            descripcion: `Venta a Wayra Taller - ${producto.nombre} (Lubricación) - Orden ${ordenId}`,
-            entidad: entidadContable,
-            referencia: ordenId,
-            mes,
-            anio,
-            usuarioId: session.user.id,
-          },
-        });
-
-        //  4. Crear detalle contable con precio EN COP
-        const utilidadProducto = producto.precioMinorista - precioCompraCOP;
-
-        await prisma.detalleIngresoContable.create({
-          data: {
-            movimientoContableId: movimientoContable.id,
-            productoId: prod.id,
-            cantidad: 1,
-            precioCompra: precioCompraCOP,
-            precioVenta: producto.precioMinorista,
-            subtotalCompra: precioCompraCOP,
-            subtotalVenta: producto.precioMinorista,
-            utilidad: utilidadProducto,
-          },
-        });
-
-        console.log(`✅ Contabilidad registrada en ${entidadContable}`);
-        console.log(
-          `   💰 Precio Compra (COP): $${precioCompraCOP.toFixed(2)}`
-        );
-        console.log(`   💰 Precio Minorista (Venta a Taller): $${producto.precioMinorista}`);
-        console.log(
-          `   💰 Utilidad ${entidadContable}: $${utilidadProducto.toFixed(2)}`
+          { status: 400 }
         );
       }
+
+      //  Calcular precio de compra EN COP (SOLO SI ES CALAN EN USD)
+      let precioCompraCOP = producto.precioCompra;
+      
+      if (
+        producto.tipo === "WAYRA_CALAN" &&
+        producto.monedaCompra === "USD" &&
+        producto.precioCompra < 1000
+      ) {
+        precioCompraCOP = producto.precioCompra * tasaDolar;
+        console.log(
+          `💱 Convirtiendo CALAN ${producto.nombre}: $${producto.precioCompra} USD → $${precioCompraCOP.toFixed(2)} COP`
+        );
+      } else {
+        console.log(
+          `✅ ${producto.nombre} precio compra: $${precioCompraCOP.toFixed(2)} COP (${producto.monedaCompra})`
+        );
+      }
+
+      //  Acumular costo minorista para calcular utilidad del servicio
+      costoTotalProductosMinorista += producto.precioMinorista;
+
+      // Determinar entidad contable
+      let entidadContable = "TORNIREPUESTOS";
+      if (producto.tipo === "WAYRA_ENI" || producto.tipo === "WAYRA_CALAN") {
+        entidadContable = "WAYRA_PRODUCTOS";
+      }
+
+      // 1. Actualizar stock (DESCONTAR INVENTARIO)
+      await prisma.producto.update({
+        where: { id: prod.id },
+        data: {
+          stock: {
+            decrement: 1,
+          },
+        },
+      });
+
+      //  2. Crear movimiento de inventario
+      await prisma.movimientoInventario.create({
+        data: {
+          tipo: "SALIDA",
+          cantidad: 1,
+          motivo: `Servicio de lubricación - Orden ${ordenId}`,
+          precioUnitario: producto.precioMinorista,
+          total: producto.precioMinorista,
+          productoId: prod.id,
+          usuarioId: session.user.id,
+        },
+      });
+
+      console.log(`✅ ${producto.nombre}: -1 stock (movimiento registrado)`);
+
+      //  3. Registrar INGRESO en contabilidad (VENTA A WAYRA TALLER CON PRECIO MINORISTA)
+      const movimientoContable = await prisma.movimientoContable.create({
+        data: {
+          tipo: "INGRESO",
+          concepto: "VENTA_DESDE_ORDEN",
+          monto: producto.precioMinorista,
+          fecha: ahora,
+          descripcion: `Venta a Wayra Taller - ${producto.nombre} (Lubricación) - Orden ${ordenId}`,
+          entidad: entidadContable,
+          referencia: ordenId,
+          mes,
+          anio,
+          usuarioId: session.user.id,
+        },
+      });
+
+      //  4. Crear detalle contable con precio EN COP
+      const utilidadProducto = producto.precioMinorista - precioCompraCOP;
+
+      await prisma.detalleIngresoContable.create({
+        data: {
+          movimientoContableId: movimientoContable.id,
+          productoId: prod.id,
+          cantidad: 1,
+          precioCompra: precioCompraCOP,
+          precioVenta: producto.precioMinorista,
+          subtotalCompra: precioCompraCOP,
+          subtotalVenta: producto.precioMinorista,
+          utilidad: utilidadProducto,
+        },
+      });
+
+      console.log(`✅ Contabilidad registrada en ${entidadContable}`);
+      console.log(
+        `   💰 Precio Compra (COP): $${precioCompraCOP.toFixed(2)}`
+      );
+      console.log(`   💰 Precio Minorista (Venta a Taller): $${producto.precioMinorista}`);
+      console.log(
+        `   💰 Utilidad ${entidadContable}: $${utilidadProducto.toFixed(2)}`
+      );
     }
 
     //  5. Crear servicio de lubricación con el PRECIO TOTAL que cobra al cliente
     const precioServicio = precioServicioTotal || parseFloat(precio);
     const utilidadServicioWayraTaller = precioServicio - costoTotalProductosMinorista;
 
-    console.log(`\n RESUMEN FINANCIERO:`);
+    console.log(`\n📊 RESUMEN FINANCIERO:`);
     console.log(`   Precio cobrado al cliente: $${precioServicio.toLocaleString()}`);
     console.log(`   Costo productos (Minorista): $${costoTotalProductosMinorista.toLocaleString()}`);
     console.log(`   Utilidad Wayra Taller: $${utilidadServicioWayraTaller.toLocaleString()}`);
 
     const servicio = await prisma.servicioOrden.create({
       data: {
-        descripcion: "Lubricación",
+        descripcion: descripcion, // ✅ Mantener descripción original
         precio: precioServicio,
         aplicaIva: false,
         ordenId,

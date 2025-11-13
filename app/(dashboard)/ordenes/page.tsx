@@ -6,24 +6,26 @@ import { redirect } from "next/navigation";
 import {
   Search,
   Eye,
-  Edit,
   CircleCheck as CheckCircle,
   Clock,
   TriangleAlert as AlertTriangle,
   Car,
   User,
   Calendar,
+  CalendarDays,
   Wrench,
   FileText,
-  ListFilter as Filter,
+  Filter,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EditarOrdenModal } from "@/components/forms/EditarOrdenModal";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { motion } from "framer-motion";
+import Dropdown from "@/components/forms/Dropdown";
 
 interface OrdenServicio {
   id: string;
@@ -35,142 +37,142 @@ interface OrdenServicio {
   fechaFin?: string;
   total: number;
   utilidad: number;
-  cliente: {
-    nombre: string;
-    telefono?: string;
-  };
-  vehiculo: {
-    placa: string;
-    marca: string;
-    modelo: string;
-    año?: number;
-  };
-  mecanico: {
-    name: string;
-  };
+  cliente: { nombre: string; telefono?: string };
+  vehiculo: { placa: string; marca: string; modelo: string; año?: number };
+  mecanico: { name: string };
   servicios: any[];
   detalles: any[];
   repuestosExternos: any[];
 }
 
+/* ------------------------------------------------------------------ */
+/* Animaciones                                                        */
+/* ------------------------------------------------------------------ */
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 120, damping: 14 },
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Componente Principal                                               */
+/* ------------------------------------------------------------------ */
 export default function OrdenesPage() {
   const { data: session } = useSession();
+
   const [ordenes, setOrdenes] = useState<OrdenServicio[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterEstado, setFilterEstado] = useState<string>("ALL");
-  const [filterMes, setFilterMes] = useState<string>(
-    new Date().getMonth() + 1 + ""
-  );
-  const [filterAño, setFilterAño] = useState<string>(
-    new Date().getFullYear() + ""
-  );
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedOrdenId, setSelectedOrdenId] = useState<string | null>(null);
-  const currenteYear = new Date().getFullYear();
-  const years = [];
+  const [filterEstado, setFilterEstado] = useState("ALL");
 
-  for (let year = 2025; year <= currenteYear + 10; year++) {
-    years.push(year);
-  }
+  // Mes y Año actuales por defecto
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+  const [filterMes, setFilterMes] = useState(currentMonth.toString());
+  const [filterAño, setFilterAño] = useState(currentYear.toString());
 
-  // Verificar permisos - Mecánicos ahora pueden ver
-  const hasAccess = [
-    "SUPER_USUARIO",
-    "ADMIN_WAYRA_TALLER",
-    "MECANICO",
-  ].includes(session?.user?.role || "");
-  const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
-    session?.user?.role || ""
+  const years = Array.from(
+    { length: currentYear + 10 - 2025 + 1 },
+    (_, i) => 2025 + i
   );
 
+  const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER", "MECANICO"].includes(
+    session?.user?.role ?? ""
+  );
+  const canCreate = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+    session?.user?.role ?? ""
+  );
+
+  /* --------------------------------------------------------------- */
   useEffect(() => {
-    if (hasAccess) {
-      fetchOrdenes();
-    }
+    if (hasAccess) fetchOrdenes();
   }, [hasAccess, filterMes, filterAño, filterEstado]);
 
   const fetchOrdenes = async () => {
+    setLoading(true);
     try {
-      let url = "/api/ordenes?";
       const params = new URLSearchParams();
-
       if (filterMes !== "ALL") params.append("mes", filterMes);
       if (filterAño !== "ALL") params.append("año", filterAño);
       if (filterEstado !== "ALL") params.append("estado", filterEstado);
 
-      const response = await fetch(`${url}${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setOrdenes(data);
+      const res = await fetch(`/api/ordenes?${params.toString()}`);
+      if (res.ok) {
+        setOrdenes(await res.json());
       } else {
         toast.error("Error al cargar órdenes");
       }
-    } catch (error) {
-      toast.error("Error al cargar órdenes");
+    } catch {
+      toast.error("Error de conexión");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditOrden = (ordenId: string) => {
-    if (!canEdit) {
-      toast.error("No tienes permisos para editar órdenes");
-      return;
-    }
-    setSelectedOrdenId(ordenId);
-    setShowEditModal(true);
-  };
+  if (!hasAccess) redirect("/dashboard");
 
-  const handleEditSuccess = () => {
-    fetchOrdenes();
-  };
-
-  if (!hasAccess) {
-    redirect("/dashboard");
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+          className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full"
+        />
+      </div>
+    );
   }
 
+  /* --------------------------------------------------------------- */
   const getEstadoBadge = (estado: string) => {
+    const base = "flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full";
     switch (estado) {
       case "PENDIENTE":
         return (
-          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-400">
-            <Clock className="h-3 w-3 mr-1" />
-            Pendiente
+          <Badge className={`${base} bg-yellow-100 text-yellow-800`}>
+            <Clock className="h-3 w-3" /> Pendiente
           </Badge>
         );
       case "EN_PROCESO":
         return (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-            <Wrench className="h-3 w-3 mr-1" />
-            En Proceso
+          <Badge className={`${base} bg-blue-100 text-blue-800`}>
+            <Wrench className="h-3 w-3" /> En Proceso
           </Badge>
         );
       case "COMPLETADO":
         return (
-          <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-400">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Completado
+          <Badge className={`${base} bg-green-100 text-green-800`}>
+            <CheckCircle className="h-3 w-3" /> Completado
           </Badge>
         );
       case "CANCELADO":
         return (
-          <Badge className="bg-red-100 text-red-800 border-red-300 hover:bg-red-400">
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            Cancelado
+          <Badge className={`${base} bg-red-100 text-red-800`}>
+            <AlertTriangle className="h-3 w-3" /> Cancelado
           </Badge>
         );
       default:
-        return <Badge>{estado}</Badge>;
+        return <Badge className={base}>{estado}</Badge>;
     }
   };
 
   const filteredOrdenes = ordenes.filter(
-    (orden) =>
-      orden.numeroOrden.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      orden.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      orden.vehiculo.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      orden.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+    (o) =>
+      o.numeroOrden.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.vehiculo.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
@@ -179,358 +181,334 @@ export default function OrdenesPage() {
     completadas: ordenes.filter((o) => o.estado === "COMPLETADO").length,
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
+  /* --------------------------------------------------------------- */
   return (
-    <div className="space-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <Wrench className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8"
+    >
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <motion.div
+          variants={itemVariants}
+          className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-2xl p-6 shadow-xl text-white"
+        >
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-14 h-14 bg-white/25 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <Wrench className="h-8 w-8" />
             </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+            <div className="text-center sm:text-left">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
                 Órdenes de Trabajo
               </h1>
-              <p className="text-blue-100 text-base sm:text-lg">
-                Gestión de órdenes de servicio -{" "}
-                {filterMes !== "ALL"
+              <p className="text-indigo-100 text-sm mt-1">
+                {filterMes !== "ALL" && filterAño !== "ALL"
                   ? `${filterMes}/${filterAño}`
-                  : "Todos los meses"}
+                  : "Todos los períodos"}
               </p>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-yellow-700">
-              Pendientes
-            </CardTitle>
-            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-xl sm:text-3xl font-bold text-yellow-800">
-              {stats.pendientes}
-            </div>
-            <p className="text-xs text-yellow-600 mt-1">En cola</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-blue-700">
-              En Proceso
-            </CardTitle>
-            <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-xl sm:text-3xl font-bold text-blue-800">
-              {stats.enProceso}
-            </div>
-            <p className="text-xs text-blue-600 mt-1">Activas</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-green-700">
-              Completadas
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-xl sm:text-3xl font-bold text-green-800">
-              {stats.completadas}
-            </div>
-            <p className="text-xs text-green-600 mt-1">Este período</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card className="shadow-lg border-0 bg-gradient-to-r from-white to-gray-50">
-        <CardContent className="p-4 sm:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <Input
-                placeholder="Buscar órdenes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-12 text-base border-0 bg-white shadow-md focus:shadow-lg transition-shadow"
-              />
-            </div>
-
-            <select
-              value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="h-12 px-4 border-0 bg-white shadow-md rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">Todos los estados</option>
-              <option value="PENDIENTE">Pendientes</option>
-              <option value="EN_PROCESO">En Proceso</option>
-              <option value="COMPLETADO">Completadas</option>
-              <option value="CANCELADO">Canceladas</option>
-            </select>
-
-            <select
-              value={filterMes}
-              onChange={(e) => setFilterMes(e.target.value)}
-              className="h-12 px-4 border-0 bg-white shadow-md rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">Todos los meses</option>
-              <option value="1">Enero</option>
-              <option value="2">Febrero</option>
-              <option value="3">Marzo</option>
-              <option value="4">Abril</option>
-              <option value="5">Mayo</option>
-              <option value="6">Junio</option>
-              <option value="7">Julio</option>
-              <option value="8">Agosto</option>
-              <option value="9">Septiembre</option>
-              <option value="10">Octubre</option>
-              <option value="11">Noviembre</option>
-              <option value="12">Diciembre</option>
-            </select>
-
-            <select
-              value={filterAño}
-              onChange={(e) => setFilterAño(e.target.value)}
-              className="h-12 px-4 border-0 bg-white shadow-md rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">Todos los años</option>
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Órdenes Table */}
-      <Card className="shadow-xl border-0 bg-white">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b p-4 sm:p-6">
-          <CardTitle className="text-lg sm:text-xl text-gray-800 flex items-center justify-between">
-            <span>Órdenes de Trabajo ({filteredOrdenes.length})</span>
-            {canEdit && (
-              <Link href="/ordenes/nueva">
-                <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg">
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Nueva Orden
-                </Button>
-              </Link>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {/* Mobile View */}
-          <div className="block lg:hidden">
-            {filteredOrdenes.map((orden) => (
-              <div
-                key={orden.id}
-                className="p-4 border-b border-gray-100 hover:bg-gray-50"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="font-semibold text-gray-900">
-                    {orden.numeroOrden}
-                  </div>
-                  {getEstadoBadge(orden.estado)}
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span>
-                      <strong>Cliente:</strong> {orden.cliente.nombre}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Car className="h-4 w-4 text-gray-400" />
-                    <span>
-                      <strong>Vehículo:</strong> {orden.vehiculo.marca}{" "}
-                      {orden.vehiculo.modelo} - {orden.vehiculo.placa}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Wrench className="h-4 w-4 text-gray-400" />
-                    <span>
-                      <strong>Mecánico:</strong> {orden.mecanico.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span>
-                      <strong>Fecha:</strong>{" "}
-                      {new Date(orden.fechaCreacion).toLocaleDateString(
-                        "es-CO"
-                      )}
-                    </span>
+        </motion.div>
+        {/* Filtros */}
+        <motion.div variants={itemVariants}>
+          <Card className="shadow-sm border-0 rounded-2xl overflow-hidden">
+            <CardContent className="p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Buscar
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Orden, cliente, placa..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-10 rounded-xl"
+                    />
                   </div>
                 </div>
-                <div className="flex space-x-2 mt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() =>
-                      (window.location.href = `/ordenes/${orden.id}`)
-                    }
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Ver
-                  </Button>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Mes
+                  </label>
+                  <Dropdown
+                    options={[
+                      { value: "ALL", label: "Todos" },
+                      ...Array.from({ length: 12 }, (_, i) => ({
+                        value: (i + 1).toString(),
+                        label: new Date(2024, i)
+                          .toLocaleString("es-CO", { month: "long" })
+                          .replace(/^\w/, (c) => c.toUpperCase()),
+                      })),
+                    ]}
+                    value={filterMes}
+                    onChange={setFilterMes}
+                    placeholder="Mes"
+                    icon={<Calendar className="h-4 w-4 text-slate-500" />}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Año
+                  </label>
+                  <Dropdown
+                    options={[
+                      { value: "ALL", label: "Todos" },
+                      ...years.map((y) => ({ value: y.toString(), label: y.toString() })),
+                    ]}
+                    value={filterAño}
+                    onChange={setFilterAño}
+                    placeholder="Año"
+                    icon={<CalendarDays className="h-4 w-4 text-slate-500" />}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Estado
+                  </label>
+                  <Dropdown
+                    options={[
+                      { value: "ALL", label: "Todos" },
+                      { value: "PENDIENTE", label: "Pendiente" },
+                      { value: "EN_PROCESO", label: "En Proceso" },
+                      { value: "COMPLETADO", label: "Completado" },
+                      { value: "CANCELADO", label: "Cancelado" },
+                    ]}
+                    value={filterEstado}
+                    onChange={setFilterEstado}
+                    placeholder="Estado"
+                    icon={<Filter className="h-4 w-4 text-slate-500" />}
+                  />
                 </div>
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-          {/* Desktop View */}
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
-                    Orden
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
-                    Cliente
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
-                    Vehículo
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
-                    Estado
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
-                    Mecánico
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrdenes.map((orden, index) => (
-                  <tr
-                    key={orden.id}
-                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-25"
-                    }`}
-                  >
-                    <td className="py-4 px-6">
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {orden.numeroOrden}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(orden.fechaCreacion).toLocaleDateString(
-                            "es-CO"
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {orden.cliente.nombre}
-                        </div>
-                        {orden.cliente.telefono && (
-                          <div className="text-sm text-gray-500">
-                            {orden.cliente.telefono}
+        {/* Estadísticas */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {[
+            {
+              title: "Pendientes",
+              value: stats.pendientes,
+              icon: Clock,
+              color: "from-yellow-500 to-yellow-600",
+            },
+            {
+              title: "En Proceso",
+              value: stats.enProceso,
+              icon: Wrench,
+              color: "from-blue-500 to-blue-600",
+            },
+            {
+              title: "Completadas",
+              value: stats.completadas,
+              icon: CheckCircle,
+              color: "from-green-500 to-green-600",
+            },
+          ].map((s, i) => (
+            <motion.div
+              key={i}
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <Card
+                className={`bg-gradient-to-br ${s.color} text-white border-0 rounded-2xl shadow-lg`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold">
+                      {s.title}
+                    </CardTitle>
+                    <s.icon className="h-5 w-5 opacity-80" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{s.value}</div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Lista de Órdenes */}
+        <motion.div variants={itemVariants}>
+          <Card className="shadow-sm border-0 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="h-5 w-5" />
+                  Órdenes ({filteredOrdenes.length})
+                </CardTitle>
+                {canCreate && (
+                  <Link href="/ordenes/nueva">
+                    <Button className="bg-white text-indigo-600 hover:bg-indigo-50 h-9">
+                      <Plus className="h-4 w-4 mr-1" /> Nueva
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="max-h-96 overflow-y-auto">
+                {/* Mobile View */}
+                <div className="lg:hidden p-4 space-y-3">
+                  {filteredOrdenes.map((orden, i) => (
+                    <motion.div
+                      key={orden.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.02 }}
+                      className="bg-white rounded-xl shadow-sm p-4 border"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="font-semibold text-indigo-700">
+                            {orden.numeroOrden}
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {orden.vehiculo.marca} {orden.vehiculo.modelo}
+                          <div className="text-sm text-gray-600">
+                            {orden.descripcion}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {orden.vehiculo.placa}{" "}
-                          {orden.vehiculo.año && `(${orden.vehiculo.año})`}
+                        {getEstadoBadge(orden.estado)}
+                      </div>
+
+                      <div className="space-y-1 text-sm text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5" /> {orden.cliente.nombre}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Car className="h-3.5 w-3.5" />{" "}
+                          {orden.vehiculo.marca} {orden.vehiculo.modelo} -{" "}
+                          {orden.vehiculo.placa}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Wrench className="h-3.5 w-3.5" /> {orden.mecanico.name}
                         </div>
                       </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      {getEstadoBadge(orden.estado)}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="font-medium text-gray-900">
-                        {orden.mecanico.name}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex space-x-2">
+
+                      <div className="mt-3">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="hover:bg-blue-50"
+                          className="w-full"
                           onClick={() =>
                             (window.location.href = `/ordenes/${orden.id}`)
                           }
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 mr-1" /> Ver
                         </Button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </motion.div>
+                  ))}
+                </div>
 
-          {filteredOrdenes.length === 0 && (
-            <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Wrench className="h-12 w-12 text-blue-500" />
-              </div>
-              <div className="text-gray-500 text-xl font-medium">
-                No se encontraron órdenes
-              </div>
-              <p className="text-gray-400 mt-2">
-                {searchTerm
-                  ? "Intenta con otros términos de búsqueda"
-                  : "No hay órdenes para este período"}
-              </p>
-              {canEdit && (
-                <Link href="/ordenes/nueva">
-                  <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
-                    <Wrench className="h-4 w-4 mr-2" />
-                    Crear Primera Orden
-                  </Button>
-                </Link>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                {/* Desktop View */}
+                <table className="hidden lg:table w-full text-sm">
+                  <thead className="bg-slate-50 sticky top-0 z-10">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-slate-700">
+                        Orden
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-slate-700">
+                        Cliente
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-slate-700">
+                        Vehículo
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-slate-700">
+                        Estado
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-slate-700">
+                        Mecánico
+                      </th>
+                      <th className="text-center py-3 px-4 font-medium text-slate-700">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrdenes.map((orden, i) => (
+                      <motion.tr
+                        key={orden.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.02 }}
+                        className="border-b hover:bg-indigo-50"
+                      >
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-indigo-700">
+                            {orden.numeroOrden}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {new Date(orden.fechaCreacion).toLocaleDateString(
+                              "es-CO"
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>{orden.cliente.nombre}</div>
+                          {orden.cliente.telefono && (
+                            <div className="text-xs text-slate-500">
+                              {orden.cliente.telefono}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>
+                            {orden.vehiculo.marca} {orden.vehiculo.modelo}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {orden.vehiculo.placa}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {getEstadoBadge(orden.estado)}
+                        </td>
+                        <td className="py-3 px-4">{orden.mecanico.name}</td>
+                        <td className="py-3 px-4 text-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              (window.location.href = `/ordenes/${orden.id}`)
+                            }
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
 
-      {/* Modal de Edición */}
-      {selectedOrdenId && canEdit && (
-        <EditarOrdenModal
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedOrdenId(null);
-          }}
-          ordenId={selectedOrdenId}
-          onSuccess={handleEditSuccess}
-        />
-      )}
-    </div>
+                {/* Sin resultados */}
+                {filteredOrdenes.length === 0 && (
+                  <div className="text-center py-12">
+                    <Wrench className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-lg font-medium text-slate-700">
+                      No hay órdenes
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      {searchTerm
+                        ? "Prueba con otros filtros"
+                        : "No hay órdenes en este período"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }

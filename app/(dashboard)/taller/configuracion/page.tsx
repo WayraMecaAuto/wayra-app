@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Settings, Wrench, DollarSign, Save, RefreshCw, Plus, CreditCard as Edit, Trash2, CheckCircle } from 'lucide-react'
+import { Settings, Wrench, DollarSign, Save, RefreshCw, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +22,6 @@ export default function TallerConfiguracionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [editingServicio, setEditingServicio] = useState<Servicio | null>(null)
 
   // Verificar permisos
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
@@ -60,6 +59,7 @@ export default function TallerConfiguracionPage() {
 
       if (response.ok) {
         toast.success('Servicios guardados correctamente')
+        fetchServicios()
       } else {
         toast.error('Error al guardar servicios')
       }
@@ -76,22 +76,46 @@ export default function TallerConfiguracionPage() {
     setServicios(nuevosServicios)
   }
 
-  const agregarServicio = (nuevoServicio: { descripcion: string; precio: number }) => {
-    const clave = `SERVICIO_${nuevoServicio.descripcion.toUpperCase().replace(/\s+/g, '_')}`
-    const servicio: Servicio = {
-      clave,
-      descripcion: nuevoServicio.descripcion,
-      valor: nuevoServicio.precio.toString()
+  const agregarServicio = async (nuevoServicio: { descripcion: string; precio: number }) => {
+    try {
+      const response = await fetch('/api/servicios-taller', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descripcion: nuevoServicio.descripcion,
+          valor: nuevoServicio.precio.toString()
+        })
+      })
+
+      if (response.ok) {
+        toast.success('Servicio agregado')
+        setShowModal(false)
+        fetchServicios()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Error al agregar servicio')
+      }
+    } catch (error) {
+      toast.error('Error al agregar servicio')
     }
-    setServicios([...servicios, servicio])
-    setShowModal(false)
-    toast.success('Servicio agregado')
   }
 
-  const eliminarServicio = (index: number) => {
-    if (confirm('¿Estás seguro de eliminar este servicio?')) {
-      setServicios(servicios.filter((_, i) => i !== index))
-      toast.success('Servicio eliminado')
+  const eliminarServicio = async (clave: string) => {
+    if (!confirm('¿Estás seguro de eliminar este servicio?')) return
+
+    try {
+      const response = await fetch(`/api/servicios-taller?clave=${clave}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        toast.success('Servicio eliminado')
+        fetchServicios()
+      } else {
+        toast.error('Error al eliminar servicio')
+      }
+    } catch (error) {
+      toast.error('Error al eliminar servicio')
     }
   }
 
@@ -108,23 +132,23 @@ export default function TallerConfiguracionPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 sm:p-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-8 text-white shadow-2xl">
-        <div className="flex items-center justify-between">
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <Wrench className="h-10 w-10 text-white" />
+            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              <Wrench className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-2">Configuración del Taller</h1>
-              <p className="text-blue-100 text-lg">Gestiona servicios y precios del taller</p>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">Configuración del Taller</h1>
+              <p className="text-blue-100 text-base sm:text-lg">Gestiona servicios y precios del taller</p>
             </div>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
             <Button
               onClick={() => setShowModal(true)}
-              className="bg-white text-blue-800 hover:bg-blue-50 shadow-lg"
+              className="bg-white text-blue-800 hover:bg-blue-50 shadow-lg w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Nuevo Servicio
@@ -132,7 +156,7 @@ export default function TallerConfiguracionPage() {
             <Button
               onClick={saveAllServices}
               disabled={saving}
-              className="bg-green-600 hover:bg-green-700 shadow-lg"
+              className="bg-green-600 hover:bg-green-700 shadow-lg w-full sm:w-auto"
             >
               {saving ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -148,25 +172,25 @@ export default function TallerConfiguracionPage() {
       {/* Servicios */}
       <Card className="shadow-xl border-0 bg-white">
         <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 border-b">
-          <CardTitle className="text-xl text-gray-800 flex items-center space-x-2">
-            <Settings className="h-6 w-6 text-green-600" />
+          <CardTitle className="text-lg sm:text-xl text-gray-800 flex items-center space-x-2">
+            <Settings className="h-5 sm:h-6 w-5 sm:w-6 text-green-600" />
             <span>Servicios del Taller ({servicios.length})</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {servicios.map((servicio, index) => (
               <div key={servicio.clave} className="p-4 border border-gray-200 rounded-xl hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Wrench className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <Input
                         value={servicio.descripcion}
                         onChange={(e) => updateServicio(index, 'descripcion', e.target.value)}
-                        className="font-medium text-gray-900 border-0 p-0 h-auto focus:ring-0"
+                        className="font-medium text-gray-900 border-0 p-0 h-auto focus:ring-0 text-sm sm:text-base"
                         placeholder="Nombre del servicio"
                       />
                     </div>
@@ -174,20 +198,20 @@ export default function TallerConfiguracionPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => eliminarServicio(index)}
-                    className="text-red-600 hover:bg-red-50"
+                    onClick={() => eliminarServicio(servicio.clave)}
+                    className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
                 
                 <div className="flex items-center space-x-3">
-                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <DollarSign className="h-5 w-5 text-green-600 flex-shrink-0" />
                   <Input
                     type="number"
                     value={servicio.valor}
                     onChange={(e) => updateServicio(index, 'valor', e.target.value)}
-                    className="text-lg font-bold text-green-600"
+                    className="text-base sm:text-lg font-bold text-green-600"
                     placeholder="0"
                   />
                 </div>
@@ -197,9 +221,9 @@ export default function TallerConfiguracionPage() {
 
           {servicios.length === 0 && (
             <div className="text-center py-12">
-              <Wrench className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-500 mb-2">No hay servicios configurados</h3>
-              <p className="text-gray-400 mb-4">Agrega el primer servicio del taller</p>
+              <Wrench className="h-12 sm:h-16 w-12 sm:w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-gray-500 mb-2">No hay servicios configurados</h3>
+              <p className="text-sm sm:text-base text-gray-400 mb-4">Agrega el primer servicio del taller</p>
               <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar Primer Servicio
@@ -246,6 +270,8 @@ function NuevoServicioModal({
     setFormData({ descripcion: '', precio: 0 })
   }
 
+  if (!isOpen) return null
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Servicio">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -267,11 +293,11 @@ function NuevoServicioModal({
           </label>
           <Input
             type="number"
-            step="0.01"
+            step="1000"
             min="0"
             value={formData.precio}
             onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
-            placeholder="0.00"
+            placeholder="0"
             required
           />
         </div>

@@ -32,6 +32,7 @@ import { ClienteForm } from "@/components/forms/ClienteForm";
 import { VehiculoForm } from "@/components/forms/VehiculoForm";
 import { LubricacionModal } from "@/components/forms/LubricacionModal";
 import { ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
+import Dropdown from "@/components/forms/Dropdown";
 import toast from "react-hot-toast";
 
 interface OrdenForm {
@@ -557,46 +558,25 @@ export default function NuevaOrdenPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <div className="relative flex-1">
-                  <select
-                    {...register("clienteId", {
-                      required: "Selecciona un cliente",
-                    })}
-                    className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
-                  >
-                    <option value="">Seleccionar cliente</option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}{" "}
-                        {cliente.telefono && `- ${cliente.telefono}`}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </span>
-                </div>
+              {/* 1. CLIENTE */}
+              <div className="flex gap-2">
+                <Dropdown
+                  options={clientes.map((c) => ({
+                    value: c.id,
+                    label: c.nombre,
+                  }))}
+                  value={selectedClienteId}
+                  onChange={(val) => setValue("clienteId", val)}
+                  placeholder="Seleccionar cliente"
+                  icon={<User className="h-4 w-4 text-gray-500" />}
+                  className="flex-1"
+                />
                 <Button
                   type="button"
-                  variant="outline"
                   onClick={() => setShowClienteModal(true)}
-                  title="Agregar nuevo cliente"
-                  className="hover:scale-105 transition-transform border-gray-200 shadow-sm"
+                  className="h-11 w-11 p-0 bg-green-600 hover:bg-green-700"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5" />
                 </Button>
               </div>
               {errors.clienteId && (
@@ -606,53 +586,29 @@ export default function NuevaOrdenPage() {
               )}
 
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <div className="relative flex-1">
-                  <select
-                    {...register("vehiculoId", {
-                      required: "Selecciona un vehículo",
-                    })}
-                    className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
+                {/* 2. VEHÍCULO */}
+                <div className="flex gap-2">
+                  <Dropdown
+                    options={vehiculos.map((v) => ({
+                      value: v.id,
+                      label: `${v.marca} ${v.modelo} - ${v.placa}`,
+                    }))}
+                    value={watch("vehiculoId")}
+                    onChange={(val) => setValue("vehiculoId", val)}
+                    placeholder="Seleccionar vehículo"
+                    icon={<Car className="h-4 w-4 text-gray-500" />}
+                    className="flex-1"
                     disabled={!selectedClienteId}
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => setShowVehiculoModal(true)}
+                    disabled={!selectedClienteId}
+                    className="h-11 w-11 p-0 bg-green-600 hover:bg-green-700 disabled:opacity-50"
                   >
-                    <option value="">Seleccionar vehículo</option>
-                    {vehiculos.map((vehiculo) => (
-                      <option key={vehiculo.id} value={vehiculo.id}>
-                        {vehiculo.placa} - {vehiculo.marca} {vehiculo.modelo}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </span>
+                    <Plus className="h-5 w-5" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (!selectedClienteId) {
-                      toast.error("Primero selecciona un cliente");
-                      return;
-                    }
-                    setShowVehiculoModal(true);
-                  }}
-                  disabled={!selectedClienteId}
-                  title="Agregar nuevo vehículo"
-                  className="hover:scale-105 transition-transform border-gray-200 shadow-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
               </div>
               {errors.vehiculoId && (
                 <p className="text-sm text-red-600">
@@ -661,34 +617,17 @@ export default function NuevaOrdenPage() {
               )}
 
               <div className="relative">
-                <select
-                  {...register("mecanicoId", {
-                    required: "Selecciona un mecánico",
-                  })}
-                  className="w-full appearance-none pl-4 pr-10 py-2 text-sm sm:text-base border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
-                >
-                  <option value="">Seleccionar mecánico</option>
-                  {mecanicos.map((mecanico) => (
-                    <option key={mecanico.id} value={mecanico.id}>
-                      {mecanico.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </span>
+                {/* 3. MECÁNICO */}
+                <Dropdown
+                  options={mecanicos.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                  }))}
+                  value={watch("mecanicoId")}
+                  onChange={(val) => setValue("mecanicoId", val)}
+                  placeholder="Seleccionar mecánico"
+                  icon={<Wrench className="h-4 w-4 text-gray-500" />}
+                />
                 {errors.mecanicoId && (
                   <p className="text-sm text-red-600">
                     {errors.mecanicoId.message}
