@@ -170,3 +170,15 @@
 .gradient-purple {
   background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
 }
+
+/* ==== QUITAR FLECHAS DE INPUT NUMBER EN TODO EL PROYECTO ==== */
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

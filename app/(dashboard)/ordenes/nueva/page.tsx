@@ -123,6 +123,11 @@ export default function NuevaOrdenPage() {
   const [servicioLubricacionTemp, setServicioLubricacionTemp] =
     useState<Servicio | null>(null);
 
+  const opcionesTipoPrecio = [
+    { value: "VENTA", label: "Precio Venta" },
+    { value: "MINORISTA", label: "Precio Minorista" },
+    { value: "MAYORISTA", label: "Precio Mayorista" },
+  ];
   // Verificar permisos
   const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
     session?.user?.role || ""
@@ -843,9 +848,7 @@ export default function NuevaOrdenPage() {
                         <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
                           Cantidad
                         </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          Tipo Precio
-                        </th>
+
                         <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
                           Precio Unit.
                         </th>
@@ -895,27 +898,6 @@ export default function NuevaOrdenPage() {
                               }
                               className="w-16 h-8 text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                             />
-                          </td>
-                          <td className="py-3 px-3">
-                            <select
-                              value={producto.tipoPrecio}
-                              onChange={(e) => {
-                                const tipoPrecio = e.target.value as
-                                  | "VENTA"
-                                  | "MINORISTA"
-                                  | "MAYORISTA";
-                                actualizarProducto(
-                                  index,
-                                  "tipoPrecio",
-                                  tipoPrecio
-                                );
-                              }}
-                              className="w-28 appearance-none pl-3 pr-8 py-1 text-sm border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
-                            >
-                              <option value="VENTA">Venta</option>
-                              <option value="MINORISTA">Minorista</option>
-                              <option value="MAYORISTA">Mayorista</option>
-                            </select>
                           </td>
                           <td className="py-3 px-3">
                             <div className="flex items-center space-x-2">
@@ -1000,28 +982,6 @@ export default function NuevaOrdenPage() {
                             }
                             className="w-16 h-8 inline-block text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                           />
-                        </div>
-                        <div className="text-sm sm:text-base">
-                          <span className="font-medium">Tipo Precio: </span>
-                          <select
-                            value={producto.tipoPrecio}
-                            onChange={(e) => {
-                              const tipoPrecio = e.target.value as
-                                | "VENTA"
-                                | "MINORISTA"
-                                | "MAYORISTA";
-                              actualizarProducto(
-                                index,
-                                "tipoPrecio",
-                                tipoPrecio
-                              );
-                            }}
-                            className="w-28 appearance-none pl-3 pr-8 py-1 text-sm border border-gray-200 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:shadow-md cursor-pointer"
-                          >
-                            <option value="VENTA">Venta</option>
-                            <option value="MINORISTA">Minorista</option>
-                            <option value="MAYORISTA">Mayorista</option>
-                          </select>
                         </div>
                         <div className="text-sm sm:text-base text-right">
                           <div>

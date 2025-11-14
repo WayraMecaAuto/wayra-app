@@ -60,7 +60,7 @@ const menuItems: MenuItem[] = [
       },
       { 
         title: 'Reportes Wayra', 
-        href: '/wayra/reportes', 
+        href: '/reportes/wayra-productos', 
         icon: BarChart3,
         roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS']
       },

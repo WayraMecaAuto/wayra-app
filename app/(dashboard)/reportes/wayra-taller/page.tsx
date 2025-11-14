@@ -11,26 +11,30 @@ import {
   Download,
   Calendar,
   DollarSign,
-  Award
+  Award,
+  Filter,
+  FileText,
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  Chart as ChartJS, 
-  CategoryScale, 
-  LinearScale, 
-  BarElement, 
-  LineElement,
-  PointElement,
-  Title, 
-  Tooltip, 
-  Legend,
-  ArcElement
-} from 'chart.js'
-import { Bar, Line, Pie } from 'react-chartjs-2'
+import { Bar, Line, Doughnut } from 'react-chartjs-2'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
+import Dropdown from '@/components/forms/Dropdown'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js'
 
 ChartJS.register(
   CategoryScale,
@@ -44,19 +48,29 @@ ChartJS.register(
   Legend
 )
 
-export default function ReportesWayraTallerPage() {
+export default function ReportesWayraTaller() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
-  const [periodo, setPeriodo] = useState<'mensual' | 'trimestral' | 'semestral' | 'anual'>('mensual')
+  const [vistaActual, setVistaActual] = useState('general')
   const [año, setAño] = useState(new Date().getFullYear())
   const [mes, setMes] = useState(new Date().getMonth() + 1)
-  const [vistaActual, setVistaActual] = useState<'dashboard' | 'servicios' | 'mecanicos' | 'contabilidad' | 'comparativa'>('dashboard')
+  const [añoComparacion, setAñoComparacion] = useState(new Date().getFullYear() - 1)
 
   // Estados para datos
   const [serviciosFrecuencia, setServiciosFrecuencia] = useState<any>(null)
   const [mecanicoProductividad, setMecanicoProductividad] = useState<any>(null)
   const [contabilidad, setContabilidad] = useState<any>(null)
   const [comparativa, setComparativa] = useState<any>(null)
+
+  // Reporte personalizado
+  const [mostrarReportePersonalizado, setMostrarReportePersonalizado] = useState(false)
+  const [reportePersonalizado, setReportePersonalizado] = useState({
+    fechaInicio: '',
+    fechaFin: '',
+    incluirServicios: true,
+    incluirMecanicos: true,
+    incluirContabilidad: true
+  })
 
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
   const canViewContabilidad = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
@@ -65,22 +79,28 @@ export default function ReportesWayraTallerPage() {
     if (hasAccess) {
       cargarDatos()
     }
-  }, [hasAccess, periodo, año, mes, vistaActual])
+  }, [hasAccess, vistaActual, año, mes, añoComparacion])
 
   const cargarDatos = async () => {
     setLoading(true)
     try {
-      if (vistaActual === 'servicios') {
+      if (vistaActual === 'general' || vistaActual === 'servicios') {
         const res = await fetch(`/api/reportes/wayra-taller?tipo=servicios-frecuencia`)
         if (res.ok) setServiciosFrecuencia(await res.json())
-      } else if (vistaActual === 'mecanicos') {
+      }
+
+      if (vistaActual === 'general' || vistaActual === 'mecanicos') {
         const res = await fetch(`/api/reportes/wayra-taller?tipo=mecanicos-productividad&año=${año}&mes=${mes}`)
         if (res.ok) setMecanicoProductividad(await res.json())
-      } else if (vistaActual === 'contabilidad' && canViewContabilidad) {
-        const res = await fetch(`/api/reportes/wayra-taller?tipo=contabilidad&periodo=${periodo}&año=${año}&mes=${mes}`)
+      }
+
+      if ((vistaActual === 'general' || vistaActual === 'contabilidad') && canViewContabilidad) {
+        const res = await fetch(`/api/reportes/wayra-taller?tipo=contabilidad&periodo=mensual&año=${año}&mes=${mes}`)
         if (res.ok) setContabilidad(await res.json())
-      } else if (vistaActual === 'comparativa' && canViewContabilidad) {
-        const res = await fetch(`/api/reportes/wayra-taller?tipo=comparativa&año=${año}&año2=${año - 1}`)
+      }
+
+      if (vistaActual === 'comparativa' && canViewContabilidad) {
+        const res = await fetch(`/api/reportes/wayra-taller?tipo=comparativa&año=${año}&año2=${añoComparacion}`)
         if (res.ok) setComparativa(await res.json())
       }
     } catch (error) {
@@ -90,459 +110,998 @@ export default function ReportesWayraTallerPage() {
     }
   }
 
+  const generarReportePersonalizado = async () => {
+    if (!reportePersonalizado.fechaInicio || !reportePersonalizado.fechaFin) {
+      toast.error('Selecciona las fechas')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch(
+        `/api/reportes/wayra-taller/personalizado?` +
+        `fechaInicio=${reportePersonalizado.fechaInicio}&` +
+        `fechaFin=${reportePersonalizado.fechaFin}&` +
+        `incluirServicios=${reportePersonalizado.incluirServicios}&` +
+        `incluirMecanicos=${reportePersonalizado.incluirMecanicos}&` +
+        `incluirContabilidad=${reportePersonalizado.incluirContabilidad}`
+      )
+      
+      if (res.ok) {
+        const data = await res.json()
+        // Generar PDF con los datos personalizados
+        generarPDFPersonalizado(data)
+      }
+    } catch (error) {
+      toast.error('Error al generar reporte personalizado')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generarPDFPersonalizado = (data: any) => {
+    const doc = new jsPDF()
+    let yPos = 20
+
+    doc.setFontSize(18)
+    doc.text('Reporte Personalizado - Wayra Taller', 14, yPos)
+    yPos += 10
+
+    doc.setFontSize(10)
+    doc.text(`Periodo: ${new Date(reportePersonalizado.fechaInicio).toLocaleDateString('es-CO')} - ${new Date(reportePersonalizado.fechaFin).toLocaleDateString('es-CO')}`, 14, yPos)
+    yPos += 8
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString('es-CO')}`, 14, yPos)
+    yPos += 10
+
+    if (reportePersonalizado.incluirServicios && data.servicios && data.servicios.length > 0) {
+      doc.setFontSize(14)
+      doc.text('Servicios Realizados', 14, yPos)
+      yPos += 5
+
+      const serviciosData = data.servicios.map((s: any) => [
+        s.descripcion,
+        s.cantidad.toString(),
+        `${Number(s.total).toLocaleString('es-CO')}`
+      ])
+
+      ;(doc as any).autoTable({
+        head: [['Servicio', 'Cantidad', 'Total']],
+        body: serviciosData,
+        startY: yPos,
+        margin: { left: 14, right: 14 }
+      })
+      yPos = (doc as any).lastAutoTable.finalY + 10
+    }
+
+    if (reportePersonalizado.incluirMecanicos && data.mecanicos && data.mecanicos.length > 0) {
+      if (yPos > 250) {
+        doc.addPage()
+        yPos = 20
+      }
+
+      doc.setFontSize(14)
+      doc.text('Productividad de Mecánicos', 14, yPos)
+      yPos += 5
+
+      const mecanicosData = data.mecanicos.map((m: any) => [
+        m.nombre,
+        m.ordenes.toString(),
+        `${Number(m.ingresos).toLocaleString('es-CO')}`
+      ])
+
+      ;(doc as any).autoTable({
+        head: [['Mecánico', 'Órdenes', 'Ingresos']],
+        body: mecanicosData,
+        startY: yPos,
+        margin: { left: 14, right: 14 }
+      })
+      yPos = (doc as any).lastAutoTable.finalY + 10
+    }
+
+    if (reportePersonalizado.incluirContabilidad && data.contabilidad && canViewContabilidad) {
+      if (yPos > 250) {
+        doc.addPage()
+        yPos = 20
+      }
+
+      doc.setFontSize(14)
+      doc.text('Resumen Contable', 14, yPos)
+      yPos += 8
+
+      doc.setFontSize(10)
+      doc.text(`Ingresos: ${Number(data.contabilidad.ingresos).toLocaleString('es-CO')}`, 14, yPos)
+      yPos += 7
+      doc.text(`Egresos: ${Number(data.contabilidad.egresos).toLocaleString('es-CO')}`, 14, yPos)
+      yPos += 7
+      doc.text(`Utilidad: ${Number(data.contabilidad.utilidad).toLocaleString('es-CO')}`, 14, yPos)
+    }
+
+    doc.save(`reporte-personalizado-${Date.now()}.pdf`)
+    toast.success('PDF generado exitosamente')
+  }
+
   const exportarPDF = () => {
     const doc = new jsPDF()
     doc.text('Reporte Wayra Taller', 14, 15)
     doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
-    
+    doc.text(`Periodo: ${año} - Mes ${mes}`, 14, 29)
+
     if (vistaActual === 'servicios' && serviciosFrecuencia) {
-      doc.text('Servicios Más Realizados', 14, 30)
-      const tableData = serviciosFrecuencia.masRealizados.map((s: any) => [
+      const tableData = serviciosFrecuencia.masRealizados.slice(0, 15).map((s: any) => [
         s.descripcion,
         s.veces_realizado,
         `$${s.ingreso_total.toLocaleString()}`
       ])
       ;(doc as any).autoTable({
-        head: [['Servicio', 'Veces', 'Ingreso Total']],
+        head: [['Servicio', 'Veces', 'Ingreso']],
         body: tableData,
         startY: 35
       })
     }
 
-    doc.save(`reporte-taller-${vistaActual}-${new Date().getTime()}.pdf`)
+    doc.save(`reporte-taller-${Date.now()}.pdf`)
     toast.success('PDF descargado')
   }
 
   if (!hasAccess) redirect('/dashboard')
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
+  const añosOptions = Array.from({ length: 11 }, (_, i) => ({
+    value: 2025 + i,
+    label: String(2025 + i)
+  }))
+
+  const mesesOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: i + 1,
+    label: new Date(2024, i).toLocaleString('es-CO', { month: 'long' })
+  }))
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <BarChart3 className="h-10 w-10 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Reportes Wayra Taller</h1>
-              <p className="text-indigo-100 text-lg">Análisis de servicios y productividad</p>
-            </div>
-          </div>
-          <Button onClick={exportarPDF} className="bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg">
-            <Download className="h-4 w-4 mr-2" />
-            Descargar PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* Navegación */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => setVistaActual('servicios')}
-              variant={vistaActual === 'servicios' ? 'default' : 'outline'}
-              className={vistaActual === 'servicios' ? 'bg-indigo-600' : ''}
-            >
-              <Wrench className="h-4 w-4 mr-2" />
-              Servicios
-            </Button>
-            <Button
-              onClick={() => setVistaActual('mecanicos')}
-              variant={vistaActual === 'mecanicos' ? 'default' : 'outline'}
-              className={vistaActual === 'mecanicos' ? 'bg-indigo-600' : ''}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Mecánicos
-            </Button>
-            {canViewContabilidad && (
-              <>
-                <Button
-                  onClick={() => setVistaActual('contabilidad')}
-                  variant={vistaActual === 'contabilidad' ? 'default' : 'outline'}
-                  className={vistaActual === 'contabilidad' ? 'bg-indigo-600' : ''}
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Contabilidad
-                </Button>
-                <Button
-                  onClick={() => setVistaActual('comparativa')}
-                  variant={vistaActual === 'comparativa' ? 'default' : 'outline'}
-                  className={vistaActual === 'comparativa' ? 'bg-indigo-600' : ''}
-                >
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Comparativa
-                </Button>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Filtros */}
-      {vistaActual !== 'servicios' && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Año</label>
-                <select
-                  value={año}
-                  onChange={(e) => setAño(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 lg:p-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 text-white shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center">
+                <BarChart3 className="h-6 w-6 sm:h-10 sm:w-10" />
               </div>
-              {vistaActual === 'contabilidad' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Periodo</label>
-                    <select
-                      value={periodo}
-                      onChange={(e) => setPeriodo(e.target.value as any)}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    >
-                      <option value="mensual">Mensual</option>
-                      <option value="trimestral">Trimestral</option>
-                      <option value="semestral">Semestral</option>
-                      <option value="anual">Anual</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Mes</label>
-                    <select
-                      value={mes}
-                      onChange={(e) => setMes(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border rounded-lg"
-                    >
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          {new Date(2024, i).toLocaleString('es-CO', { month: 'long' })}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">Reportes Wayra Taller</h1>
+                <p className="text-indigo-100 text-sm sm:text-base lg:text-lg">Análisis y estadísticas</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setMostrarReportePersonalizado(true)} 
+                className="bg-indigo-500 hover:bg-indigo-400 text-sm sm:text-base"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Personalizado
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Navegación */}
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-wrap gap-2">
+              {['general', 'servicios', 'mecanicos', canViewContabilidad && 'contabilidad', canViewContabilidad && 'comparativa']
+                .filter(Boolean)
+                .map((vista) => (
+                  <Button
+                    key={vista}
+                    onClick={() => setVistaActual(vista as string)}
+                    variant={vistaActual === vista ? 'default' : 'outline'}
+                    className={`text-sm ${vistaActual === vista ? 'bg-indigo-600' : ''}`}
+                    size="sm"
+                  >
+                    {vista === 'general' && <BarChart3 className="h-4 w-4 mr-2" />}
+                    {vista === 'servicios' && <Wrench className="h-4 w-4 mr-2" />}
+                    {vista === 'mecanicos' && <Users className="h-4 w-4 mr-2" />}
+                    {vista === 'contabilidad' && <DollarSign className="h-4 w-4 mr-2" />}
+                    {vista === 'comparativa' && <TrendingUp className="h-4 w-4 mr-2" />}
+                    {vista?.charAt(0).toUpperCase() + vista?.slice(1)}
+                  </Button>
+                ))}
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* VISTA: SERVICIOS */}
-      {vistaActual === 'servicios' && serviciosFrecuencia && (
-        <>
+        {/* Filtros */}
+        {vistaActual !== 'general' && (
           <Card>
-            <CardHeader>
-              <CardTitle>Servicios Más Realizados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Bar
-                data={{
-                  labels: serviciosFrecuencia.masRealizados.slice(0, 10).map((s: any) => s.descripcion),
-                  datasets: [{
-                    label: 'Veces Realizado',
-                    data: serviciosFrecuencia.masRealizados.slice(0, 10).map((s: any) => s.veces_realizado),
-                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
-                  }]
-                }}
-                options={{
-                  responsive: true,
-                  plugins: {
-                    legend: { position: 'top' },
-                    title: { display: true, text: 'Top 10 Servicios' }
-                  }
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalle de Servicios</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-3 px-4">Servicio</th>
-                      <th className="text-right py-3 px-4">Veces</th>
-                      <th className="text-right py-3 px-4">Ingreso Total</th>
-                      <th className="text-right py-3 px-4">Precio Promedio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {serviciosFrecuencia.masRealizados.map((s: any, i: number) => (
-                      <tr key={i} className="border-b">
-                        <td className="py-3 px-4">{s.descripcion}</td>
-                        <td className="py-3 px-4 text-right font-bold">{s.veces_realizado}</td>
-                        <td className="py-3 px-4 text-right text-green-600 font-bold">
-                          ${s.ingreso_total.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          ${s.precio_promedio.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <CardContent className="p-3 sm:p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-2">Año</label>
+                  <Dropdown
+                    options={añosOptions}
+                    value={año}
+                    onChange={setAño}
+                    icon={<Calendar className="h-4 w-4" />}
+                  />
+                </div>
+                {vistaActual !== 'comparativa' && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium mb-2">Mes</label>
+                    <Dropdown
+                      options={mesesOptions}
+                      value={mes}
+                      onChange={setMes}
+                      icon={<Calendar className="h-4 w-4" />}
+                    />
+                  </div>
+                )}
+                {vistaActual === 'comparativa' && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium mb-2">Comparar con</label>
+                    <Dropdown
+                      options={añosOptions}
+                      value={añoComparacion}
+                      onChange={setAñoComparacion}
+                      icon={<Calendar className="h-4 w-4" />}
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-        </>
-      )}
+        )}
 
-      {/* VISTA: MECÁNICOS */}
-      {vistaActual === 'mecanicos' && mecanicoProductividad && (
-        <>
-          {mecanicoProductividad.mecanicoDelMes && (
-            <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-300">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Award className="h-6 w-6 text-yellow-600" />
-                  <span>Mecánico del Mes</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-yellow-800">
-                    {mecanicoProductividad.mecanicoDelMes.mecanico}
-                  </h3>
-                  <p className="text-yellow-600 mt-2">
-                    {mecanicoProductividad.mecanicoDelMes.totalOrdenes} órdenes completadas
-                  </p>
-                  <p className="text-yellow-600">
-                    ${mecanicoProductividad.mecanicoDelMes.totalIngresos.toLocaleString()} en ingresos
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
+        {/* Modal Reporte Personalizado */}
+        {mostrarReportePersonalizado && (
+          <Card className="border-indigo-200 shadow-lg">
             <CardHeader>
-              <CardTitle>Productividad por Mecánico</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <FileText className="h-5 w-5" />
+                Crear Reporte Personalizado
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <Bar
-                data={{
-                  labels: mecanicoProductividad.productividad.map((m: any) => m.mecanico),
-                  datasets: [{
-                    label: 'Órdenes Completadas',
-                    data: mecanicoProductividad.productividad.map((m: any) => m.totalOrdenes),
-                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
-                  }]
-                }}
-                options={{
-                  responsive: true,
-                  indexAxis: 'y',
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalle de Mecánicos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-3 px-4">Mecánico</th>
-                      <th className="text-right py-3 px-4">Órdenes</th>
-                      <th className="text-right py-3 px-4">Ingresos</th>
-                      <th className="text-right py-3 px-4">Tiempo Prom.</th>
-                      <th className="text-right py-3 px-4">Ingreso/Orden</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mecanicoProductividad.productividad.map((m: any, i: number) => (
-                      <tr key={i} className="border-b">
-                        <td className="py-3 px-4 font-medium">{m.mecanico}</td>
-                        <td className="py-3 px-4 text-right">{m.totalOrdenes}</td>
-                        <td className="py-3 px-4 text-right text-green-600 font-bold">
-                          ${m.totalIngresos.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-right">{m.tiempoPromedioHoras}h</td>
-                        <td className="py-3 px-4 text-right">
-                          ${parseFloat(m.ingresoPromedioPorOrden).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {/* VISTA: CONTABILIDAD */}
-      {vistaActual === 'contabilidad' && contabilidad && canViewContabilidad && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-gradient-to-br from-green-50 to-green-100">
-              <CardHeader>
-                <CardTitle className="text-green-700">Ingresos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-green-800">
-                  ${contabilidad.resumen.totalIngresos.toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-red-50 to-red-100">
-              <CardHeader>
-                <CardTitle className="text-red-700">Egresos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-red-800">
-                  ${contabilidad.resumen.totalEgresos.toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
-              <CardHeader>
-                <CardTitle className="text-blue-700">Utilidad</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-blue-800">
-                  ${contabilidad.resumen.utilidadNeta.toLocaleString()}
-                </div>
-                <p className="text-sm text-blue-600 mt-1">
-                  Margen: {contabilidad.resumen.margenUtilidad}%
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolución Mensual</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Line
-                data={{
-                  labels: contabilidad.porMes.map((m: any) => m.mes),
-                  datasets: [
-                    {
-                      label: 'Ingresos',
-                      data: contabilidad.porMes.map((m: any) => m.ingresos),
-                      borderColor: 'rgb(34, 197, 94)',
-                      backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    },
-                    {
-                      label: 'Egresos',
-                      data: contabilidad.porMes.map((m: any) => m.egresos),
-                      borderColor: 'rgb(239, 68, 68)',
-                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    }
-                  ]
-                }}
-                options={{
-                  responsive: true,
-                  interaction: { mode: 'index', intersect: false },
-                }}
-              />
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {/* VISTA: COMPARATIVA */}
-      {vistaActual === 'comparativa' && comparativa && canViewContabilidad && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Crecimiento Anual</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-gray-600">Ingresos</p>
-                    <p className={`text-2xl font-bold ${parseFloat(comparativa.crecimiento.ingresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {comparativa.crecimiento.ingresos}%
-                    </p>
+                    <label className="block text-sm font-medium mb-2">Fecha Inicio</label>
+                    <input
+                      type="date"
+                      value={reportePersonalizado.fechaInicio}
+                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, fechaInicio: e.target.value})}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
                   </div>
                   <div>
-                    <p className="text-gray-600">Órdenes</p>
-                    <p className={`text-2xl font-bold ${parseFloat(comparativa.crecimiento.ordenes) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {comparativa.crecimiento.ordenes}%
-                    </p>
+                    <label className="block text-sm font-medium mb-2">Fecha Fin</label>
+                    <input
+                      type="date"
+                      value={reportePersonalizado.fechaFin}
+                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, fechaFin: e.target.value})}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Resumen Comparativo</CardTitle>
-              </CardHeader>
-              <CardContent>
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>{comparativa.año1.año}:</span>
-                    <span className="font-bold">${comparativa.año1.totalIngresos.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{comparativa.año2.año}:</span>
-                    <span className="font-bold">${comparativa.año2.totalIngresos.toLocaleString()}</span>
-                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={reportePersonalizado.incluirServicios}
+                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, incluirServicios: e.target.checked})}
+                      className="rounded"
+                    />
+                    Incluir estadísticas de servicios
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={reportePersonalizado.incluirMecanicos}
+                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, incluirMecanicos: e.target.checked})}
+                      className="rounded"
+                    />
+                    Incluir productividad de mecánicos
+                  </label>
+                  {canViewContabilidad && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={reportePersonalizado.incluirContabilidad}
+                        onChange={(e) => setReportePersonalizado({...reportePersonalizado, incluirContabilidad: e.target.checked})}
+                        className="rounded"
+                      />
+                      Incluir información contable
+                    </label>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparación Mensual</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Line
-                data={{
-                  labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-                  datasets: [
-                    {
-                      label: `${comparativa.año1.año}`,
-                      data: comparativa.año1.porMes.map((m: any) => m.ingresos),
-                      borderColor: 'rgb(99, 102, 241)',
-                      backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    },
-                    {
-                      label: `${comparativa.año2.año}`,
-                      data: comparativa.año2.porMes.map((m: any) => m.ingresos),
-                      borderColor: 'rgb(156, 163, 175)',
-                      backgroundColor: 'rgba(156, 163, 175, 0.1)',
-                    }
-                  ]
-                }}
-                options={{
-                  responsive: true,
-                  interaction: { mode: 'index', intersect: false },
-                }}
-              />
+                <div className="flex gap-2 pt-4">
+                  <Button onClick={generarReportePersonalizado} className="bg-indigo-600 flex-1 text-sm sm:text-base">
+                    <Download className="h-4 w-4 mr-2" />
+                    Generar Reporte
+                  </Button>
+                  <Button onClick={() => setMostrarReportePersonalizado(false)} variant="outline" className="text-sm sm:text-base">
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </>
-      )}
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : (
+          <>
+            {/* VISTA GENERAL */}
+            {vistaActual === 'general' && (
+              <div className="space-y-4 sm:space-y-6">
+                {canViewContabilidad && contabilidad && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <Card className="bg-gradient-to-br from-green-50 to-green-100">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm sm:text-base text-green-700">Ingresos</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-800">
+                          ${contabilidad.resumen.totalIngresos.toLocaleString()}
+                        </div>
+                        <p className="text-xs sm:text-sm text-green-600 mt-1">
+                          {contabilidad.resumen.totalOrdenes} órdenes
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-red-50 to-red-100">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm sm:text-base text-red-700">Egresos</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-800">
+                          ${contabilidad.resumen.totalEgresos.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm sm:text-base text-blue-700">Utilidad</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-800">
+                          ${contabilidad.resumen.utilidadNeta.toLocaleString()}
+                        </div>
+                        <p className="text-xs sm:text-sm text-blue-600 mt-1">
+                          {contabilidad.resumen.margenUtilidad}%
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm sm:text-base text-purple-700">Servicios</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-800">
+                          {serviciosFrecuencia?.masRealizados.reduce((sum: number, s: any) => sum + s.veces_realizado, 0) || 0}
+                        </div>
+                        <p className="text-xs sm:text-sm text-purple-600 mt-1">Total realizados</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  {serviciosFrecuencia && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base sm:text-lg">Top 5 Servicios</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-64 sm:h-80">
+                          <Bar
+                            data={{
+                              labels: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => 
+                                s.descripcion.length > 20 ? s.descripcion.substring(0, 20) + '...' : s.descripcion
+                              ),
+                              datasets: [{
+                                label: 'Veces',
+                                data: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.veces_realizado),
+                                backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                              }]
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              indexAxis: 'y',
+                              plugins: { legend: { display: false } }
+                            }}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {mecanicoProductividad?.mecanicoDelMes && (
+                    <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                          <Award className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
+                          Mecánico del Mes
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-center">
+                          <h3 className="text-xl sm:text-2xl font-bold text-yellow-800">
+                            {mecanicoProductividad.mecanicoDelMes.mecanico}
+                          </h3>
+                          <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
+                            <div>
+                              <p className="text-xs sm:text-sm text-yellow-600">Órdenes</p>
+                              <p className="text-lg sm:text-xl font-bold text-yellow-800">
+                                {mecanicoProductividad.mecanicoDelMes.totalOrdenes}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm text-yellow-600">Ingresos</p>
+                              <p className="text-lg sm:text-xl font-bold text-yellow-800">
+                                ${(mecanicoProductividad.mecanicoDelMes.totalIngresos / 1000).toFixed(0)}k
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm text-yellow-600">Tiempo</p>
+                              <p className="text-lg sm:text-xl font-bold text-yellow-800">
+                                {mecanicoProductividad.mecanicoDelMes.tiempoPromedioHoras}h
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* VISTA SERVICIOS */}
+            {vistaActual === 'servicios' && serviciosFrecuencia && (
+              <div className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Más Realizados</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64 sm:h-80">
+                        <Bar
+                          data={{
+                            labels: serviciosFrecuencia.masRealizados.slice(0, 8).map((s: any) => 
+                              s.descripcion.length > 15 ? s.descripcion.substring(0, 15) + '...' : s.descripcion
+                            ),
+                            datasets: [{
+                              label: 'Cantidad',
+                              data: serviciosFrecuencia.masRealizados.slice(0, 8).map((s: any) => s.veces_realizado),
+                              backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                            }]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } }
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Ingresos por Servicio</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64 sm:h-80">
+                        <Doughnut
+                          data={{
+                            labels: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.descripcion),
+                            datasets: [{
+                              data: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.ingreso_total),
+                              backgroundColor: [
+                                'rgba(99, 102, 241, 0.8)',
+                                'rgba(34, 197, 94, 0.8)',
+                                'rgba(251, 191, 36, 0.8)',
+                                'rgba(239, 68, 68, 0.8)',
+                                'rgba(168, 85, 247, 0.8)'
+                              ]
+                            }]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'bottom',
+                                labels: { boxWidth: 12, font: { size: 10 } }
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Detalle de Servicios</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left py-2 px-2 sm:py-3 sm:px-4">Servicio</th>
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Veces</th>
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4 hidden sm:table-cell">Ingreso</th>
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Promedio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {serviciosFrecuencia.masRealizados.map((s: any, i: number) => (
+                            <tr key={i} className="border-b">
+                              <td className="py-2 px-2 sm:py-3 sm:px-4">{s.descripcion}</td>
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right font-bold">{s.veces_realizado}</td>
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right text-green-600 font-bold hidden sm:table-cell">
+                                ${s.ingreso_total.toLocaleString()}
+                              </td>
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">
+                                ${s.precio_promedio.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* VISTA MECÁNICOS */}
+            {vistaActual === 'mecanicos' && mecanicoProductividad && (
+              <div className="space-y-4 sm:space-y-6">
+                {mecanicoProductividad.mecanicoDelMes && (
+                  <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                        <Award className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
+                        Mecánico del Mes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <h3 className="text-xl sm:text-2xl font-bold text-yellow-800">
+                          {mecanicoProductividad.mecanicoDelMes.mecanico}
+                        </h3>
+                        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
+                          <div>
+                            <p className="text-xs sm:text-sm text-yellow-600">Órdenes</p>
+                            <p className="text-lg sm:text-2xl font-bold text-yellow-800">
+                              {mecanicoProductividad.mecanicoDelMes.totalOrdenes}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs sm:text-sm text-yellow-600">Ingresos</p>
+                            <p className="text-lg sm:text-2xl font-bold text-yellow-800">
+                              ${mecanicoProductividad.mecanicoDelMes.totalIngresos.toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs sm:text-sm text-yellow-600">Tiempo Prom.</p>
+                            <p className="text-lg sm:text-2xl font-bold text-yellow-800">
+                              {mecanicoProductividad.mecanicoDelMes.tiempoPromedioHoras}h
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Productividad</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 sm:h-96">
+                      <Bar
+                        data={{
+                          labels: mecanicoProductividad.productividad.map((m: any) => m.mecanico),
+                          datasets: [{
+                            label: 'Órdenes',
+                            data: mecanicoProductividad.productividad.map((m: any) => m.totalOrdenes),
+                            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          indexAxis: 'y',
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Detalle</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left py-2 px-2 sm:py-3 sm:px-4">Mecánico</th>
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Órdenes</th>
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4 hidden lg:table-cell">Ingresos</th>
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">$/Orden</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mecanicoProductividad.productividad.map((m: any, i: number) => (
+                            <tr key={i} className="border-b">
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 font-medium">{m.mecanico}</td>
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">{m.totalOrdenes}</td>
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right text-green-600 font-bold hidden lg:table-cell">
+                                ${m.totalIngresos.toLocaleString()}
+                              </td>
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">
+                                ${parseFloat(m.ingresoPromedioPorOrden).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* VISTA CONTABILIDAD */}
+            {vistaActual === 'contabilidad' && contabilidad && canViewContabilidad && (
+              <div className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs sm:text-sm text-green-700">Ingresos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-green-800">
+                        ${contabilidad.resumen.totalIngresos.toLocaleString()}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-red-50 to-red-100">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs sm:text-sm text-red-700">Egresos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-red-800">
+                        ${contabilidad.resumen.totalEgresos.toLocaleString()}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs sm:text-sm text-blue-700">Utilidad</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-blue-800">
+                        ${contabilidad.resumen.utilidadNeta.toLocaleString()}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs sm:text-sm text-purple-700">Margen</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-purple-800">
+                        {contabilidad.resumen.margenUtilidad}%
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Evolución Mensual</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 sm:h-96">
+                      <Line
+                        data={{
+                          labels: contabilidad.porMes.map((m: any) => m.mes),
+                          datasets: [
+                            {
+                              label: 'Ingresos',
+                              data: contabilidad.porMes.map((m: any) => m.ingresos),
+                              borderColor: 'rgb(34, 197, 94)',
+                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Egresos',
+                              data: contabilidad.porMes.map((m: any) => m.egresos),
+                              borderColor: 'rgb(239, 68, 68)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Utilidad',
+                              data: contabilidad.porMes.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(59, 130, 246)',
+                              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                              tension: 0.4
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          interaction: { mode: 'index', intersect: false },
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Órdenes por Mes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64">
+                        <Bar
+                          data={{
+                            labels: contabilidad.porMes.map((m: any) => m.mes),
+                            datasets: [{
+                              label: 'Órdenes',
+                              data: contabilidad.porMes.map((m: any) => m.ordenes),
+                              backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                            }]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Resumen</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                          <span className="text-sm text-gray-700">Total Ingresos</span>
+                          <span className="text-sm font-bold text-green-700">
+                            ${contabilidad.resumen.totalIngresos.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                          <span className="text-sm text-gray-700">Total Egresos</span>
+                          <span className="text-sm font-bold text-red-700">
+                            ${contabilidad.resumen.totalEgresos.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                          <span className="text-sm text-gray-700">Utilidad Neta</span>
+                          <span className="text-sm font-bold text-blue-700">
+                            ${contabilidad.resumen.utilidadNeta.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                          <span className="text-sm text-gray-700">Margen</span>
+                          <span className="text-sm font-bold text-purple-700">
+                            {contabilidad.resumen.margenUtilidad}%
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* VISTA COMPARATIVA */}
+            {vistaActual === 'comparativa' && comparativa && canViewContabilidad && (
+              <div className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Crecimiento Ingresos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <p className={`text-3xl sm:text-4xl font-bold ${parseFloat(comparativa.crecimiento.ingresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {parseFloat(comparativa.crecimiento.ingresos) >= 0 ? '+' : ''}{comparativa.crecimiento.ingresos}%
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-2">vs año anterior</p>
+                        <div className="mt-4 space-y-2 text-xs sm:text-sm">
+                          <div className="flex justify-between">
+                            <span>{comparativa.año1.año}:</span>
+                            <span className="font-bold">${comparativa.año1.totalIngresos.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>{comparativa.año2.año}:</span>
+                            <span className="font-bold">${comparativa.año2.totalIngresos.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Crecimiento Órdenes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <p className={`text-3xl sm:text-4xl font-bold ${parseFloat(comparativa.crecimiento.ordenes) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {parseFloat(comparativa.crecimiento.ordenes) >= 0 ? '+' : ''}{comparativa.crecimiento.ordenes}%
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-2">vs año anterior</p>
+                        <div className="mt-4 space-y-2 text-xs sm:text-sm">
+                          <div className="flex justify-between">
+                            <span>{comparativa.año1.año}:</span>
+                            <span className="font-bold">{comparativa.año1.totalOrdenes}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>{comparativa.año2.año}:</span>
+                            <span className="font-bold">{comparativa.año2.totalOrdenes}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Utilidad Comparativa</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                          ${comparativa.año1.utilidadTotal.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-600">{comparativa.año1.año}</p>
+                        <div className="my-3 border-t"></div>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-600">
+                          ${comparativa.año2.utilidadTotal.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-600">{comparativa.año2.año}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Comparación Mensual</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 sm:h-96">
+                      <Line
+                        data={{
+                          labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                          datasets: [
+                            {
+                              label: `${comparativa.año1.año}`,
+                              data: comparativa.año1.porMes.map((m: any) => m.ingresos),
+                              borderColor: 'rgb(99, 102, 241)',
+                              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: `${comparativa.año2.año}`,
+                              data: comparativa.año2.porMes.map((m: any) => m.ingresos),
+                              borderColor: 'rgb(156, 163, 175)',
+                              backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                              tension: 0.4
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          interaction: { mode: 'index', intersect: false },
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Utilidad Mensual</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64">
+                        <Line
+                          data={{
+                            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                            datasets: [
+                              {
+                                label: `${comparativa.año1.año}`,
+                                data: comparativa.año1.porMes.map((m: any) => m.utilidad),
+                                borderColor: 'rgb(34, 197, 94)',
+                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                tension: 0.4
+                              },
+                              {
+                                label: `${comparativa.año2.año}`,
+                                data: comparativa.año2.porMes.map((m: any) => m.utilidad),
+                                borderColor: 'rgb(156, 163, 175)',
+                                backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                                tension: 0.4
+                              }
+                            ]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Órdenes Mensuales</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64">
+                        <Bar
+                          data={{
+                            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                            datasets: [
+                              {
+                                label: `${comparativa.año1.año}`,
+                                data: comparativa.año1.porMes.map((m: any) => m.ordenes),
+                                backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                              },
+                              {
+                                label: `${comparativa.año2.año}`,
+                                data: comparativa.año2.porMes.map((m: any) => m.ordenes),
+                                backgroundColor: 'rgba(156, 163, 175, 0.8)',
+                              }
+                            ]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

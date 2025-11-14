@@ -256,25 +256,6 @@ export default function RepuestosPage() {
                 className="pl-10 h-12 text-base border-0 bg-white shadow-md focus:shadow-lg transition-all duration-300 focus:scale-102"
               />
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={() => setShowScanner(true)}
-                variant="outline"
-                className="w-full sm:w-auto bg-green-50 border-green-300 text-green-700 hover:bg-green-100 transition-all duration-300 hover:scale-105"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Escanear
-              </Button>
-              {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
-                <Button
-                  onClick={() => setShowProductForm(true)}
-                  className="w-full sm:w-auto bg-red-600 hover:bg-red-700 transition-all duration-300 hover:scale-105"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo
-                </Button>
-              )}
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -290,128 +271,130 @@ export default function RepuestosPage() {
         <CardContent className="p-0">
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-y-auto max-h-[60vh] scrollbar-thin scrollbar-thumb-red-300 scrollbar-track-gray-100">
-            <table className="w-full table-fixed">
-              <thead className="bg-gradient-to-r from-gray-50 to-red-50 sticky top-0 z-10">
-                <tr>
-                  <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[25%]">Producto</th>
-                  <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[15%]">Stock</th>
-                  <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[20%]">Precios</th>
-                  <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[10%]">IVA</th>
-                  <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[20%]">Código de Barras</th>
-                  <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[10%]">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((product, index) => (
-                  <tr 
-                    key={product.id} 
-                    className={`border-b border-gray-100 hover:bg-gradient-to-r hover:from-red-25 hover:to-red-50 transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
-                  >
-                    <td className="py-4 px-4 sm:px-6">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 rounded-xl flex items-center justify-center transition-transform duration-300 hover:rotate-12">
-                          <Car className="h-5 w-5 text-red-600" />
+            <div className="max-h-[600px] overflow-y-auto">
+              <table className="w-full table-fixed">
+                <thead className="bg-gradient-to-r from-gray-50 to-red-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[25%]">Producto</th>
+                    <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[15%]">Stock</th>
+                    <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[20%]">Precios</th>
+                    <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[10%]">IVA</th>
+                    <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[20%]">Código de Barras</th>
+                    <th className="text-left py-3 px-4 sm:px-6 font-semibold text-gray-700 w-[10%]">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product, index) => (
+                    <tr 
+                      key={product.id} 
+                      className={`border-b border-gray-100 hover:bg-gradient-to-r hover:from-red-25 hover:to-red-50 transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
+                    >
+                      <td className="py-4 px-4 sm:px-6">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 rounded-xl flex items-center justify-center transition-transform duration-300 hover:rotate-12">
+                            <Car className="h-5 w-5 text-red-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-900 text-base sm:text-lg truncate">{product.nombre}</div>
+                            <div className="text-sm text-gray-500 truncate">Código: {product.codigo}</div>
+                            {product.descripcion && (
+                              <div className="text-xs text-gray-400 mt-1 line-clamp-2">{product.descripcion}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 text-base sm:text-lg truncate">{product.nombre}</div>
-                          <div className="text-sm text-gray-500 truncate">Código: {product.codigo}</div>
-                          {product.descripcion && (
-                            <div className="text-xs text-gray-400 mt-1 line-clamp-2">{product.descripcion}</div>
+                      </td>
+                      <td className="py-4 px-4 sm:px-6">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg sm:text-xl font-bold text-gray-900">{product.stock}</span>
+                          {product.stock <= product.stockMinimo && (
+                            <Badge variant="destructive" className="text-xs animate-pulse">
+                              Stock Bajo
+                            </Badge>
                           )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 sm:px-6">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg sm:text-xl font-bold text-gray-900">{product.stock}</span>
-                        {product.stock <= product.stockMinimo && (
-                          <Badge variant="destructive" className="text-xs animate-pulse">
-                            Stock Bajo
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500">Mín: {product.stockMinimo}</div>
-                    </td>
-                    <td className="py-4 px-4 sm:px-6">
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-600">Venta:</span> 
-                          <span className="font-bold text-green-600">${product.precioVenta.toLocaleString()}</span>
+                        <div className="text-xs text-gray-500">Mín: {product.stockMinimo}</div>
+                      </td>
+                      <td className="py-4 px-4 sm:px-6">
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-600">Venta:</span> 
+                            <span className="font-bold text-green-600">${product.precioVenta.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-600">Minorista:</span> 
+                            <span className="font-bold text-blue-600">${product.precioMinorista.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-600">Mayorista:</span> 
+                            <span className="font-bold text-purple-600">${product.precioMayorista.toLocaleString()}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-600">Minorista:</span> 
-                          <span className="font-bold text-blue-600">${product.precioMinorista.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-600">Mayorista:</span> 
-                          <span className="font-bold text-purple-600">${product.precioMayorista.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 sm:px-6 text-center">
-                      <Badge 
-                        variant={product.aplicaIva ? 'default' : 'secondary'}
-                        className={product.aplicaIva ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}
-                      >
-                        {product.aplicaIva ? 'IVA 19%' : 'Sin IVA'}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-4 sm:px-6">
-                      <div className="flex items-center space-x-2">
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono truncate max-w-[150px]">{product.codigoBarras}</code>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowBarcodeView(product)}
-                          className="h-8 w-8 p-0 flex items-center justify-center hover:bg-red-100 hover:border-red-300 transition-all duration-300 hover:scale-105"
-                          title="Ver código de barras"
+                      </td>
+                      <td className="py-4 px-4 sm:px-6 text-center">
+                        <Badge 
+                          variant={product.aplicaIva ? 'default' : 'secondary'}
+                          className={product.aplicaIva ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}
                         >
-                          <Eye className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 sm:px-6">
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedProduct(product)
-                            setShowMovementForm(true)
-                          }}
-                          className="h-8 w-8 p-0 flex items-center justify-center hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-all duration-300 hover:scale-105"
-                          title="Movimiento de inventario"
-                        >
-                          <ArrowUpDown className="h-4 w-4" />
-                        </Button>
-                        {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingProduct(product)}
-                              className="h-8 w-8 p-0 flex items-center justify-center hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-300 hover:scale-105"
-                              title="Editar producto"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => deleteProduct(product.id)}
-                              className="h-8 w-8 p-0 flex items-center justify-center hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-300 hover:scale-105"
-                              title="Eliminar producto"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          {product.aplicaIva ? 'IVA 19%' : 'Sin IVA'}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4 sm:px-6">
+                        <div className="flex items-center space-x-2">
+                          <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono truncate max-w-[150px]">{product.codigoBarras}</code>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowBarcodeView(product)}
+                            className="h-8 w-8 p-0 flex items-center justify-center hover:bg-red-100 hover:border-red-300 transition-all duration-300 hover:scale-105"
+                            title="Ver código de barras"
+                          >
+                            <Eye className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 sm:px-6">
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedProduct(product)
+                              setShowMovementForm(true)
+                            }}
+                            className="h-8 w-8 p-0 flex items-center justify-center hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-all duration-300 hover:scale-105"
+                            title="Movimiento de inventario"
+                          >
+                            <ArrowUpDown className="h-4 w-4" />
+                          </Button>
+                          {['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingProduct(product)}
+                                className="h-8 w-8 p-0 flex items-center justify-center hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-300 hover:scale-105"
+                                title="Editar producto"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteProduct(product.id)}
+                                className="h-8 w-8 p-0 flex items-center justify-center hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-300 hover:scale-105"
+                                title="Eliminar producto"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Mobile Card View */}

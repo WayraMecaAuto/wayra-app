@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Eye, EyeOff, User, Mail, Lock, Shield, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import Dropdown from '@/components/forms/Dropdown' 
 
 interface CreateUserModalProps {
   isOpen: boolean
@@ -22,12 +23,24 @@ interface CreateUserForm {
   role: string
 }
 
+const roleOptions = [
+  { value: "SUPER_USUARIO", label: "Super Usuario" },
+  { value: "ADMIN_WAYRA_TALLER", label: "Admin Wayra Taller" },
+  { value: "ADMIN_WAYRA_PRODUCTOS", label: "Admin Wayra Productos" },
+  { value: "ADMIN_TORNI_REPUESTOS", label: "Admin TorniRepuestos" },
+  { value: "MECANICO", label: "Mecánico" },
+  { value: "VENDEDOR_WAYRA", label: "Vendedor Wayra" },
+  { value: "VENDEDOR_TORNI", label: "Vendedor TorniRepuestos" },
+]
+
 export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const { register, handleSubmit, formState: { errors }, watch, reset } = useForm<CreateUserForm>()
+  const { register, handleSubmit, formState: { errors }, watch, reset, setValue, getValues } = useForm<CreateUserForm>({
+    defaultValues: { role: "" }
+  })
   const password = watch('password')
 
   const onSubmit = async (data: CreateUserForm) => {
@@ -151,7 +164,7 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
           )}
         </div>
 
-        {/* Rol */}
+        {/* Rol con Dropdown personalizado */}
         <div className="group">
           <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2 transition-colors group-hover:text-blue-600">
             <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-all duration-300">
@@ -159,39 +172,29 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
             </div>
             <span className="text-sm sm:text-base">Rol del Usuario</span>
           </label>
-          <div className="relative">
-            <select
-              {...register('role', { required: 'El rol es requerido' })}
-              className={`w-full h-10 sm:h-11 px-3 sm:px-4 text-sm sm:text-base border-2 rounded-lg focus:outline-none focus:ring-4 transition-all duration-300 appearance-none bg-white cursor-pointer ${
-                errors.role 
-                  ? 'border-red-400 focus:border-red-500 focus:ring-red-100 bg-red-50' 
-                  : 'border-slate-200 focus:border-blue-500 focus:ring-blue-100 hover:border-slate-300'
-              }`}
-            >
-              <option value="">Seleccionar rol</option>
-              <option value="SUPER_USUARIO">🔷 Super Usuario</option>
-              <option value="ADMIN_WAYRA_TALLER">🔧 Admin Wayra Taller</option>
-              <option value="ADMIN_WAYRA_PRODUCTOS">📦 Admin Wayra Productos</option>
-              <option value="ADMIN_TORNI_REPUESTOS">⚙️ Admin TorniRepuestos</option>
-              <option value="MECANICO">🔩 Mecánico</option>
-              <option value="VENDEDOR_WAYRA">💼 Vendedor Wayra</option>
-              <option value="VENDEDOR_TORNI">🛒 Vendedor TorniRepuestos</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <svg className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
+
+          <input
+            type="hidden"
+            {...register('role', { required: 'El rol es requerido' })}
+          />
+
+          <Dropdown
+            options={roleOptions}
+            value={getValues('role') || ""}
+            onChange={(value) => setValue('role', value, { shouldValidate: true })}
+            placeholder="Seleccionar rol"
+            icon={<Shield className="h-4 w-4 text-blue-600 opacity-70" />}
+          />
+
           {errors.role && (
-            <p className="mt-1.5 text-xs sm:text-sm text-red-600 flex items-center gap-2 animate-slide-down">
+            <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-2 animate-slide-down">
               <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse"></span>
               {errors.role.message}
             </p>
           )}
         </div>
 
-        {/* Contraseñas en grid responsive */}
+        {/* Contraseñas */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
           {/* Contraseña */}
           <div className="group">
@@ -311,34 +314,10 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
 
       <style jsx global>{`
         @keyframes slide-down {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        
-        .animate-slide-down {
-          animation: slide-down 0.3s ease-out;
-        }
-
-        select {
-          background-image: none;
-        }
-
-        select option {
-          padding: 10px 12px;
-        }
-
-        /* Scroll suave para móviles */
-        @media (max-width: 640px) {
-          .overflow-y-auto {
-            -webkit-overflow-scrolling: touch;
-          }
-        }
+        .animate-slide-down { animation: slide-down 0.3s ease-out; }
       `}</style>
     </Modal>
   )
