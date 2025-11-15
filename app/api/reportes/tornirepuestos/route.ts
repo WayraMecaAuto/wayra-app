@@ -20,9 +20,19 @@ export async function GET(request: NextRequest) {
     const trimestre = searchParams.get('trimestre') ? parseInt(searchParams.get('trimestre')!) : null
     const semestre = searchParams.get('semestre') ? parseInt(searchParams.get('semestre')!) : null
 
-    // PRODUCTOS MÁS VENDIDOS (TODO EL TIEMPO)
+    // PRODUCTOS MÁS VENDIDOS (TODO EL TIEMPO O POR MES)
     if (tipo === 'productos-vendidos') {
-      const productosVendidos = await prisma.$queryRaw<any[]>`
+      const mesFilter = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
+      const añoFilter = searchParams.get('año') ? parseInt(searchParams.get('año')!) : null
+
+      let whereCondition = ''
+      if (mesFilter && añoFilter) {
+        whereCondition = `AND mc.mes = ${mesFilter} AND mc.anio = ${añoFilter}`
+      }
+
+      console.log('🔍 Filtrando productos TorniRepuestos:', { mesFilter, añoFilter })
+
+      const productosVendidos = await prisma.$queryRawUnsafe<any[]>(`
         SELECT 
           p.id,
           p.nombre,
@@ -37,11 +47,12 @@ export async function GET(request: NextRequest) {
           AND mc.tipo = 'INGRESO'
           AND p.tipo IN ('TORNI_REPUESTO', 'TORNILLERIA')
           AND p."isActive" = true
+          ${whereCondition}
         GROUP BY p.id, p.nombre, p.categoria
         ORDER BY cantidad_vendida DESC
-      `
+      `)
 
-      console.log('✅ TorniRepuestos - Productos vendidos:', productosVendidos.length)
+      console.log('✅ TorniRepuestos - Productos vendidos:', productosVendidos.length, mesFilter ? `(Mes ${mesFilter}/${añoFilter})` : '(Todo el tiempo)')
 
       const productosNoVendidos = await prisma.producto.findMany({
         where: {
@@ -187,10 +198,10 @@ export async function GET(request: NextRequest) {
         const porMes = Array.from({ length: 12 }, (_, i) => {
           const mesNum = i + 1
           const movsMes = movs.filter(m => m.mes === mesNum)
-          const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + m.monto, 0)
-          const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + m.monto, 0)
+          const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
+          const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
           const utilidad = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => {
-            return s + m.detalleIngresos.reduce((sum: number, d: any) => sum + d.utilidad, 0)
+            return s + m.detalleIngresos.reduce((sum: number, d: any) => sum + Number(d.utilidad), 0)
           }, 0)
           
           return { mes: mesNum, ingresos, egresos, utilidad }

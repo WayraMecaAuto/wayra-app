@@ -31,7 +31,7 @@ import {
   Legend,
   ArcElement
 } from 'chart.js'
-import { Bar, Line, Doughnut } from 'react-chartjs-2'
+import { Bar, Line } from 'react-chartjs-2'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
@@ -54,7 +54,12 @@ export default function ReportesTorniRepuestosPage() {
   const [loading, setLoading] = useState(false)
   const [vistaActual, setVistaActual] = useState<'productos' | 'contabilidad' | 'comparativa'>('productos')
   
-  // Filtros
+  // Filtros para productos
+  const [filtroProductos, setFiltroProductos] = useState<'todo' | 'mes'>('todo')
+  const [mesProductos, setMesProductos] = useState(new Date().getMonth() + 1)
+  const [añoProductos, setAñoProductos] = useState(new Date().getFullYear())
+  
+  // Filtros para contabilidad
   const [periodo, setPeriodo] = useState<'mensual' | 'trimestral' | 'semestral' | 'anual'>('mensual')
   const [año, setAño] = useState(new Date().getFullYear())
   const [mes, setMes] = useState(new Date().getMonth() + 1)
@@ -76,19 +81,23 @@ export default function ReportesTorniRepuestosPage() {
     if (hasAccess) {
       cargarDatos()
     }
-  }, [hasAccess, vistaActual, periodo, año, mes, trimestre, semestre, añoComparar])
+  }, [hasAccess, vistaActual, periodo, año, mes, trimestre, semestre, añoComparar, filtroProductos, mesProductos, añoProductos])
 
   const cargarDatos = async () => {
     setLoading(true)
     try {
       if (vistaActual === 'productos') {
-        const res = await fetch(`/api/reportes/torni-repuestos?tipo=productos-vendidos`)
+        let url = `/api/reportes/tornirepuestos?tipo=productos-vendidos`
+        if (filtroProductos === 'mes') {
+          url += `&mes=${mesProductos}&año=${añoProductos}`
+        }
+        const res = await fetch(url)
         if (res.ok) {
           const data = await res.json()
           setProductosVendidos(data)
         }
       } else if (vistaActual === 'contabilidad' && isAdmin) {
-        let url = `/api/reportes/torni-repuestos?tipo=contabilidad&periodo=${periodo}&año=${año}`
+        let url = `/api/reportes/tornirepuestos?tipo=contabilidad&periodo=${periodo}&año=${año}`
         
         if (periodo === 'mensual') {
           url += `&mes=${mes}`
@@ -104,7 +113,7 @@ export default function ReportesTorniRepuestosPage() {
           setContabilidad(data)
         }
       } else if (vistaActual === 'comparativa' && isAdmin) {
-        const res = await fetch(`/api/reportes/torni-repuestos?tipo=comparativa&año=${año}&año2=${añoComparar}`)
+        const res = await fetch(`/api/reportes/tornirepuestos?tipo=comparativa&año=${año}&año2=${añoComparar}`)
         if (res.ok) {
           const data = await res.json()
           setComparativa(data)
@@ -232,6 +241,49 @@ export default function ReportesTorniRepuestosPage() {
       </Card>
 
       {/* Filtros */}
+      {vistaActual === 'productos' && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Periodo</label>
+                <Dropdown
+                  options={[
+                    { value: 'todo', label: 'Todo el tiempo' },
+                    { value: 'mes', label: 'Por mes' }
+                  ]}
+                  value={filtroProductos}
+                  onChange={(val) => setFiltroProductos(val as 'todo' | 'mes')}
+                  icon={<Calendar className="h-4 w-4" />}
+                />
+              </div>
+              {filtroProductos === 'mes' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Año</label>
+                    <Dropdown
+                      options={añosOptions}
+                      value={añoProductos}
+                      onChange={setAñoProductos}
+                      icon={<Calendar className="h-4 w-4" />}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Mes</label>
+                    <Dropdown
+                      options={mesesOptions}
+                      value={mesProductos}
+                      onChange={setMesProductos}
+                      icon={<Calendar className="h-4 w-4" />}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {vistaActual !== 'productos' && (
         <Card>
           <CardContent className="p-4">
@@ -327,7 +379,7 @@ export default function ReportesTorniRepuestosPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-green-600" />
-                      Top 10 Más Vendidos
+                      Top 10 Más Vendidos {filtroProductos === 'mes' && `(${mesesOptions.find(m => m.value === mesProductos)?.label} ${añoProductos})`}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -339,14 +391,14 @@ export default function ReportesTorniRepuestosPage() {
                         datasets: [{
                           label: 'Cantidad Vendida',
                           data: productosVendidos.masVendidos.slice(0, 10).map((p: any) => Number(p.cantidad_vendida)),
-                          backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                          backgroundColor: 'rgba(251, 146, 60, 0.8)',
                         }]
                       }}
                       options={{
                         responsive: true,
                         plugins: {
                           legend: { position: 'top' },
-                          title: { display: true, text: 'Productos Más Vendidos (Todo el Tiempo)' }
+                          title: { display: true, text: 'Productos Más Vendidos' }
                         }
                       }}
                     />
@@ -363,20 +415,24 @@ export default function ReportesTorniRepuestosPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
-                      {productosVendidos.menosVendidos.map((p: any) => (
-                        <div key={p.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-gray-800">{p.nombre}</p>
-                            <p className="text-sm text-gray-600">{p.categoria}</p>
+                      {productosVendidos.menosVendidos.length > 0 ? (
+                        productosVendidos.menosVendidos.map((p: any) => (
+                          <div key={p.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-gray-800">{p.nombre}</p>
+                              <p className="text-sm text-gray-600">{p.categoria}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-600">Stock: {p.stock}</p>
+                              {isAdmin && (
+                                <p className="text-sm font-medium">${p.precioVenta.toLocaleString()}</p>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-600">Stock: {p.stock}</p>
-                            {isAdmin && (
-                              <p className="text-sm font-medium">${p.precioVenta.toLocaleString()}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-500 py-8">Todos los productos tienen ventas registradas</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -405,7 +461,7 @@ export default function ReportesTorniRepuestosPage() {
                       </thead>
                       <tbody>
                         {productosVendidos.masVendidos.map((p: any, i: number) => (
-                          <tr key={i} className="border-b">
+                          <tr key={i} className="border-b hover:bg-gray-50">
                             <td className="py-3 px-4">{p.nombre}</td>
                             <td className="py-3 px-4">
                               <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
@@ -433,7 +489,7 @@ export default function ReportesTorniRepuestosPage() {
             </>
           )}
 
-          {/* VISTA: CONTABILIDAD (Solo Admins) */}
+          {/* VISTA: CONTABILIDAD */}
           {vistaActual === 'contabilidad' && contabilidad && isAdmin && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -471,7 +527,7 @@ export default function ReportesTorniRepuestosPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-blue-800">
-                      ${contabilidad.resumen.utilidadNeta.toLocaleString()}
+                      ${contabilidad.resumen.utilidadBruta.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -497,46 +553,57 @@ export default function ReportesTorniRepuestosPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-96">
-                    <Line
-                      data={{
-                        labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
-                        datasets: [
-                          {
-                            label: 'Ingresos',
-                            data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
-                            borderColor: 'rgb(34, 197, 94)',
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                            tension: 0.4
-                          },
-                          {
-                            label: 'Egresos',
-                            data: contabilidad.porPeriodo.map((m: any) => m.egresos),
-                            borderColor: 'rgb(239, 68, 68)',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            tension: 0.4
-                          },
-                          {
-                            label: 'Utilidad',
-                            data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
-                            borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            tension: 0.4
+                    {contabilidad.porPeriodo && contabilidad.porPeriodo.length > 0 ? (
+                      <Line
+                        data={{
+                          labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
+                          datasets: [
+                            {
+                              label: 'Ingresos',
+                              data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
+                              borderColor: 'rgb(34, 197, 94)',
+                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Egresos',
+                              data: contabilidad.porPeriodo.map((m: any) => m.egresos),
+                              borderColor: 'rgb(239, 68, 68)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Utilidad',
+                              data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(59, 130, 246)',
+                              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                              tension: 0.4
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          interaction: { mode: 'index', intersect: false },
+                          scales: {
+                            y: {
+                              beginAtZero: true
+                            }
                           }
-                        ]
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { mode: 'index', intersect: false },
-                      }}
-                    />
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        No hay datos para mostrar en este periodo
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </>
           )}
 
-          {/* VISTA: COMPARATIVA (Solo Admins) */}
+          {/* VISTA: COMPARATIVA */}
           {vistaActual === 'comparativa' && comparativa && isAdmin && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -622,8 +689,8 @@ export default function ReportesTorniRepuestosPage() {
                           {
                             label: `${comparativa.año1.año}`,
                             data: comparativa.año1.porMes.map((m: any) => m.ingresos),
-                            borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderColor: 'rgb(251, 146, 60)',
+                            backgroundColor: 'rgba(251, 146, 60, 0.1)',
                             tension: 0.4
                           },
                           {
@@ -644,6 +711,77 @@ export default function ReportesTorniRepuestosPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Comparación Mensual de Utilidad</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <Line
+                        data={{
+                          labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                          datasets: [
+                            {
+                              label: `${comparativa.año1.año}`,
+                              data: comparativa.año1.porMes.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(34, 197, 94)',
+                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: `${comparativa.año2.año}`,
+                              data: comparativa.año2.porMes.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(156, 163, 175)',
+                              backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                              tension: 0.4
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Resumen Anual</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-orange-50 rounded-lg">
+                        <p className="text-sm text-gray-600">{comparativa.año1.año} - Ingresos</p>
+                        <p className="text-2xl font-bold text-orange-700">
+                          ${comparativa.año1.totalIngresos.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600">{comparativa.año2.año} - Ingresos</p>
+                        <p className="text-2xl font-bold text-gray-700">
+                          ${comparativa.año2.totalIngresos.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-green-50 rounded-lg">
+                        <p className="text-sm text-gray-600">{comparativa.año1.año} - Utilidad</p>
+                        <p className="text-2xl font-bold text-green-700">
+                          ${comparativa.año1.utilidadTotal.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600">{comparativa.año2.año} - Utilidad</p>
+                        <p className="text-2xl font-bold text-gray-700">
+                          ${comparativa.año2.utilidadTotal.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </>
           )}
         </>

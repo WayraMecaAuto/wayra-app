@@ -359,11 +359,11 @@ export default function ReportesWayraTaller() {
 
                     <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm sm:text-base text-blue-700">Utilidad Bruta</CardTitle>
+                        <CardTitle className="text-sm sm:text-base text-blue-700">Utilidad</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-800">
-                          ${contabilidad.resumen.utilidadBruta.toLocaleString()}
+                          ${contabilidad.resumen.utilidadNeta.toLocaleString()}
                         </div>
                         <p className="text-xs sm:text-sm text-blue-600 mt-1 flex items-center gap-1">
                           <Percent className="h-3 w-3" />
@@ -539,31 +539,22 @@ export default function ReportesWayraTaller() {
                   {canViewContabilidad && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-base sm:text-lg">Ingresos por Servicio (Top 10)</CardTitle>
+                        <CardTitle className="text-base sm:text-lg">Ingresos por Servicio</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="h-64 sm:h-80">
                           <Doughnut
                             data={{
-                              labels: serviciosFrecuencia.masRealizados.slice(0, 10).map((s: any) => 
-                                s.descripcion.length > 25 ? s.descripcion.substring(0, 25) + '...' : s.descripcion
-                              ),
+                              labels: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.descripcion),
                               datasets: [{
-                                data: serviciosFrecuencia.masRealizados.slice(0, 10).map((s: any) => s.ingreso_total),
+                                data: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.ingreso_total),
                                 backgroundColor: [
                                   'rgba(99, 102, 241, 0.8)',
                                   'rgba(34, 197, 94, 0.8)',
                                   'rgba(251, 191, 36, 0.8)',
                                   'rgba(239, 68, 68, 0.8)',
-                                  'rgba(168, 85, 247, 0.8)',
-                                  'rgba(59, 130, 246, 0.8)',
-                                  'rgba(236, 72, 153, 0.8)',
-                                  'rgba(20, 184, 166, 0.8)',
-                                  'rgba(251, 146, 60, 0.8)',
-                                  'rgba(139, 92, 246, 0.8)'
-                                ],
-                                borderWidth: 2,
-                                borderColor: '#fff'
+                                  'rgba(168, 85, 247, 0.8)'
+                                ]
                               }]
                             }}
                             options={{
@@ -571,23 +562,8 @@ export default function ReportesWayraTaller() {
                               maintainAspectRatio: false,
                               plugins: {
                                 legend: {
-                                  position: 'right',
-                                  labels: { 
-                                    boxWidth: 15, 
-                                    font: { size: 11 },
-                                    padding: 10
-                                  }
-                                },
-                                tooltip: {
-                                  callbacks: {
-                                    label: function(context: any) {
-                                      const label = context.label || '';
-                                      const value = context.parsed || 0;
-                                      const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-                                      const percentage = ((value / total) * 100).toFixed(1);
-                                      return `${label}: ${value.toLocaleString()} (${percentage}%)`;
-                                    }
-                                  }
+                                  position: 'bottom',
+                                  labels: { boxWidth: 12, font: { size: 10 } }
                                 }
                               }
                             }}
@@ -822,50 +798,39 @@ export default function ReportesWayraTaller() {
                   </CardHeader>
                   <CardContent>
                     <div className="h-64 sm:h-96">
-                      {contabilidad.porPeriodo && contabilidad.porPeriodo.length > 0 ? (
-                        <Line
-                          data={{
-                            labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
-                            datasets: [
-                              {
-                                label: 'Ingresos',
-                                data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
-                                borderColor: 'rgb(34, 197, 94)',
-                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                                tension: 0.4
-                              },
-                              {
-                                label: 'Egresos',
-                                data: contabilidad.porPeriodo.map((m: any) => m.egresos),
-                                borderColor: 'rgb(239, 68, 68)',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                tension: 0.4
-                              },
-                              {
-                                label: 'Utilidad',
-                                data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
-                                borderColor: 'rgb(59, 130, 246)',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                tension: 0.4
-                              }
-                            ]
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            interaction: { mode: 'index', intersect: false },
-                            scales: {
-                              y: {
-                                beginAtZero: true
-                              }
+                      <Line
+                        data={{
+                          labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
+                          datasets: [
+                            {
+                              label: 'Ingresos',
+                              data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
+                              borderColor: 'rgb(34, 197, 94)',
+                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Egresos',
+                              data: contabilidad.porPeriodo.map((m: any) => m.egresos),
+                              borderColor: 'rgb(239, 68, 68)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Utilidad',
+                              data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(59, 130, 246)',
+                              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                              tension: 0.4
                             }
-                          }}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-500">
-                          No hay datos para mostrar en este periodo
-                        </div>
-                      )}
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          interaction: { mode: 'index', intersect: false },
+                        }}
+                      />
                     </div>
                   </CardContent>
                 </Card>
