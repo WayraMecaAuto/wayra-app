@@ -17,13 +17,23 @@ export async function GET(request: NextRequest) {
     const periodo = searchParams.get('periodo')
     const año = parseInt(searchParams.get('año') || String(new Date().getFullYear()))
     const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
+    const trimestre = searchParams.get('trimestre') ? parseInt(searchParams.get('trimestre')!) : null
+    const semestre = searchParams.get('semestre') ? parseInt(searchParams.get('semestre')!) : null
 
     // Verificar permisos para contabilidad
     const canViewContabilidad = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
 
     // SERVICIOS MÁS/MENOS REALIZADOS
     if (tipo === 'servicios-frecuencia') {
-      const servicios = await prisma.$queryRaw<any[]>`
+      const filtrarPorMes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
+      const filtrarPorAño = searchParams.get('año') ? parseInt(searchParams.get('año')!) : null
+
+      let queryCondition = ''
+      if (filtrarPorMes && filtrarPorAño) {
+        queryCondition = `AND os.mes = ${filtrarPorMes} AND os.anio = ${filtrarPorAño}`
+      }
+
+      const servicios = await prisma.$queryRawUnsafe<any[]>(`
         SELECT 
           so.descripcion,
           COUNT(*) as veces_realizado,
@@ -31,10 +41,10 @@ export async function GET(request: NextRequest) {
           AVG(so.precio) as precio_promedio
         FROM "servicios_orden" so
         INNER JOIN "ordenes_servicio" os ON so."ordenId" = os.id
-        WHERE os.estado = 'COMPLETADO'
+        WHERE os.estado = 'COMPLETADO' ${queryCondition}
         GROUP BY so.descripcion
         ORDER BY veces_realizado DESC
-      `
+      `)
 
       // Normalizar descripciones de lubricación
       const serviciosAgrupados = servicios.reduce((acc: any[], serv: any) => {
@@ -61,7 +71,7 @@ export async function GET(request: NextRequest) {
       serviciosAgrupados.sort((a, b) => b.veces_realizado - a.veces_realizado)
 
       return NextResponse.json({
-        masRealizados: serviciosAgrupados.slice(0, 10),
+        masRealizados: serviciosAgrupados,
         menosRealizados: serviciosAgrupados.slice(-10).reverse()
       })
     }
@@ -73,7 +83,18 @@ export async function GET(request: NextRequest) {
         anio: año
       }
 
-      if (mes) whereClause.mes = mes
+      // Filtrar por periodo
+      if (periodo === 'mensual' && mes) {
+        whereClause.mes = mes
+      } else if (periodo === 'trimestral' && trimestre) {
+        const mesInicio = (trimestre - 1) * 3 + 1
+        const mesFin = trimestre * 3
+        whereClause.mes = { gte: mesInicio, lte: mesFin }
+      } else if (periodo === 'semestral' && semestre) {
+        const mesInicio = semestre === 1 ? 1 : 7
+        const mesFin = semestre === 1 ? 6 : 12
+        whereClause.mes = { gte: mesInicio, lte: mesFin }
+      }
 
       const mecanicos = await prisma.user.findMany({
         where: { role: 'MECANICO', isActive: true },
@@ -113,7 +134,7 @@ export async function GET(request: NextRequest) {
             totalIngresos,
             utilidadTotal,
             tiempoPromedioHoras: tiempoPromedio.toFixed(2),
-            ingresoPromedioPorOrden: totalOrdenes > 0 ? (totalIngresos / totalOrdenes).toFixed(2) : 0
+            ingresoPromedioPorOrden: totalOrdenes > 0 ? (totalIngresos / totalOrdenes).toFixed(2) : '0'
           }
         })
       )
@@ -133,76 +154,104 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Sin permisos para ver contabilidad' }, { status: 403 })
       }
 
-      let whereClause: any = {
-        estado: 'COMPLETADO',
+      // Determinar rango de meses según el periodo
+      let meses: number[] = []
+      
+      if (periodo === 'mensual' && mes) {
+        meses = [mes]
+        whereClause.mes = mes
+      } else if (periodo === 'trimestral' && trimestre) {
+        const mesInicio = (trimestre - 1) * 3 + 1
+        const mesFin = trimestre * 3
+        meses = Array.from({ length: mesFin - mesInicio + 1 }, (_, i) => mesInicio + i)
+        whereClause.mes = { gte: mesInicio, lte: mesFin }
+      } else if (periodo === 'semestral' && semestre) {
+        const mesInicio = semestre === 1 ? 1 : 7
+        const mesFin = semestre === 1 ? 6 : 12
+        meses = Array.from({ length: mesFin - mesInicio + 1 }, (_, i) => mesInicio + i)
+        whereClause.mes = { gte: mesInicio, lte: mesFin }
+      } else {
+        // Anual
+        meses = Array.from({ length: 12 }, (_, i) => i + 1)
+      }
+
+      console.log('📅 Consultando contabilidad Wayra Taller para:', whereClause)
+
+      // OBTENER INGRESOS (de órdenes completadas)
+      const ordenes = await prisma.ordenServicio.findMany({
+        where: whereClause
+      })
+
+      // OBTENER EGRESOS (de movimientos contables)
+      let egresosWhere: any = {
+        tipo: 'EGRESO',
+        entidad: 'WAYRA',
         anio: año
       }
 
-      // Filtrar por periodo
       if (periodo === 'mensual' && mes) {
-        whereClause.mes = mes
-      } else if (periodo === 'trimestral' && mes) {
-        const trimestre = Math.ceil(mes / 3)
+        egresosWhere.mes = mes
+      } else if (periodo === 'trimestral' && trimestre) {
         const mesInicio = (trimestre - 1) * 3 + 1
         const mesFin = trimestre * 3
-        whereClause.mes = { gte: mesInicio, lte: mesFin }
-      } else if (periodo === 'semestral' && mes) {
-        const semestre = mes <= 6 ? 1 : 2
+        egresosWhere.mes = { gte: mesInicio, lte: mesFin }
+      } else if (periodo === 'semestral' && semestre) {
         const mesInicio = semestre === 1 ? 1 : 7
         const mesFin = semestre === 1 ? 6 : 12
-        whereClause.mes = { gte: mesInicio, lte: mesFin }
+        egresosWhere.mes = { gte: mesInicio, lte: mesFin }
       }
 
-      const ordenes = await prisma.ordenServicio.findMany({
-        where: whereClause,
-        include: {
-          servicios: true,
-          repuestosExternos: true
-        }
-      })
-
-      // Obtener egresos del periodo
       const egresos = await prisma.movimientoContable.findMany({
-        where: {
-          tipo: 'EGRESO',
-          entidad: 'WAYRA',
-          anio: año,
-          ...(mes && { mes })
-        }
+        where: egresosWhere
       })
 
-      const totalIngresos = ordenes.reduce((sum, o) => sum + o.total, 0)
-      const totalEgresos = egresos.reduce((sum, e) => sum + e.monto, 0)
-      const utilidadTotal = ordenes.reduce((sum, o) => sum + o.utilidad, 0)
+      console.log('✅ Órdenes encontradas:', ordenes.length, '| Egresos:', egresos.length)
 
-      // Agrupar por mes
-      const porMes = Array.from({ length: 12 }, (_, i) => {
-        const mesNum = i + 1
+      // CALCULAR TOTALES DIRECTAMENTE
+      const totalIngresos = ordenes.reduce((sum, o) => sum + Number(o.total), 0)
+      const totalEgresos = egresos.reduce((sum, e) => sum + Number(e.monto), 0)
+      const utilidadBruta = totalIngresos - totalEgresos
+
+      console.log('💰 Totales contables Taller:', { 
+        ingresos: totalIngresos, 
+        egresos: totalEgresos, 
+        utilidadBruta 
+      })
+
+      // AGRUPAR POR PERIODO
+      const porPeriodo = meses.map(mesNum => {
         const ordenesDelMes = ordenes.filter(o => o.mes === mesNum)
         const egresosDelMes = egresos.filter(e => e.mes === mesNum)
         
-        const ingresosDelMes = ordenesDelMes.reduce((s, o) => s + o.total, 0)
-        const egresosDelMes_total = egresosDelMes.reduce((s, e) => s + e.monto, 0)
-        const utilidadDelMes = ordenesDelMes.reduce((s, o) => s + o.utilidad, 0)
+        const ingresosDelMes = ordenesDelMes.reduce((s, o) => s + Number(o.total), 0)
+        const egresosDelMes_total = egresosDelMes.reduce((s, e) => s + Number(e.monto), 0)
+        const utilidadMes = ingresosDelMes - egresosDelMes_total
 
         return {
-          mes: new Date(2024, mesNum - 1).toLocaleString('es-CO', { month: 'short' }),
-          ingresos: ingresosDelMes,
-          egresos: egresosDelMes_total,
-          utilidad: utilidadDelMes,
+          periodo: new Date(2024, mesNum - 1).toLocaleString('es-CO', { month: 'short' }).replace('.', ''),
+          ingresos: Math.round(ingresosDelMes),
+          egresos: Math.round(egresosDelMes_total),
+          utilidad: Math.round(utilidadMes),
           ordenes: ordenesDelMes.length
         }
       })
 
+      console.log('📊 Por periodo generado:', porPeriodo)
+
       return NextResponse.json({
         resumen: {
-          totalIngresos,
-          totalEgresos,
-          utilidadNeta: utilidadTotal,
-          margenUtilidad: totalIngresos > 0 ? ((utilidadTotal / totalIngresos) * 100).toFixed(2) : 0,
+          totalIngresos: Math.round(totalIngresos),
+          totalEgresos: Math.round(totalEgresos),
+          utilidadNeta: Math.round(utilidadTotal),
+          margenUtilidad: totalIngresos > 0 ? ((utilidadTotal / totalIngresos) * 100).toFixed(2) : '0',
           totalOrdenes: ordenes.length
         },
-        porMes,
+        porPeriodo: porPeriodo.map(p => ({
+          ...p,
+          ingresos: Math.round(p.ingresos),
+          egresos: Math.round(p.egresos),
+          utilidad: Math.round(p.utilidad)
+        })),
         egresos: egresos.slice(0, 50)
       })
     }
@@ -260,11 +309,11 @@ export async function GET(request: NextRequest) {
 
       const crecimientoIngresos = datos2.totalIngresos > 0 
         ? ((datos1.totalIngresos - datos2.totalIngresos) / datos2.totalIngresos * 100).toFixed(2)
-        : 0
+        : '0'
       
       const crecimientoOrdenes = datos2.totalOrdenes > 0
         ? ((datos1.totalOrdenes - datos2.totalOrdenes) / datos2.totalOrdenes * 100).toFixed(2)
-        : 0
+        : '0'
 
       return NextResponse.json({
         año1: { año, ...datos1 },

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { Plus, Search, Edit, Trash2, UserCheck, UserX, Users } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, UserCheck, UserX, Users, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +29,7 @@ export default function UsuariosPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [filterStatus, setFilterStatus] = useState<'todos' | 'activos' | 'inactivos'>('todos')
 
   // Solo SUPER_USUARIO puede acceder
   if (session?.user?.role !== 'SUPER_USUARIO') {
@@ -56,6 +57,8 @@ export default function UsuariosPage() {
   }
 
   const toggleUserStatus = async (userId: string, isActive: boolean) => {
+    const action = isActive ? 'activar' : 'desactivar'
+    
     try {
       const response = await fetch(`/api/usuarios/${userId}`, {
         method: 'PATCH',
@@ -64,7 +67,7 @@ export default function UsuariosPage() {
       })
       
       if (response.ok) {
-        toast.success(`Usuario ${isActive ? 'activado' : 'desactivado'} correctamente`)
+        toast.success(`Usuario ${action === 'activar' ? 'activado' : 'desactivado'} correctamente`)
         fetchUsers()
       } else {
         const error = await response.json()
@@ -76,7 +79,7 @@ export default function UsuariosPage() {
   }
 
   const deleteUser = async (userId: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
+    if (!confirm('¿Estás seguro de que quieres ELIMINAR PERMANENTEMENTE este usuario? Esta acción no se puede deshacer. Si solo quieres desactivarlo, usa el botón de desactivar.')) {
       return
     }
 
@@ -86,7 +89,7 @@ export default function UsuariosPage() {
       })
       
       if (response.ok) {
-        toast.success('Usuario eliminado correctamente')
+        toast.success('Usuario eliminado permanentemente')
         fetchUsers()
       } else {
         const error = await response.json()
@@ -123,10 +126,20 @@ export default function UsuariosPage() {
     }
   }
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filtrar usuarios por búsqueda y estado
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesStatus = filterStatus === 'todos' || 
+      (filterStatus === 'activos' && user.isActive) ||
+      (filterStatus === 'inactivos' && !user.isActive)
+    
+    return matchesSearch && matchesStatus
+  })
+
+  const activeUsers = users.filter(u => u.isActive).length
+  const inactiveUsers = users.filter(u => !u.isActive).length
 
   if (loading) {
     return (
@@ -187,9 +200,7 @@ export default function UsuariosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-600 font-medium">Usuarios Activos</p>
-                  <p className="text-3xl font-bold text-green-600 mt-1">
-                    {users.filter(u => u.isActive).length}
-                  </p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">{activeUsers}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-full">
                   <UserCheck className="h-6 w-6 text-green-600" />
@@ -203,9 +214,7 @@ export default function UsuariosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-600 font-medium">Usuarios Inactivos</p>
-                  <p className="text-3xl font-bold text-red-600 mt-1">
-                    {users.filter(u => !u.isActive).length}
-                  </p>
+                  <p className="text-3xl font-bold text-red-600 mt-1">{inactiveUsers}</p>
                 </div>
                 <div className="p-3 bg-red-100 rounded-full">
                   <UserX className="h-6 w-6 text-red-600" />
@@ -215,9 +224,9 @@ export default function UsuariosPage() {
           </Card>
         </div>
 
-        {/* Search */}
+        {/* Search and Filter */}
         <Card className="bg-white border-0 shadow-lg animate-fade-in">
-          <CardContent className="p-4">
+          <CardContent className="p-4 space-y-4">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
               <Input
@@ -226,6 +235,31 @@ export default function UsuariosPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-12 h-14 text-base border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300"
               />
+            </div>
+            
+            {/* Filter Buttons */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setFilterStatus('todos')}
+                variant={filterStatus === 'todos' ? 'default' : 'outline'}
+                className={`${filterStatus === 'todos' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+              >
+                Todos ({users.length})
+              </Button>
+              <Button
+                onClick={() => setFilterStatus('activos')}
+                variant={filterStatus === 'activos' ? 'default' : 'outline'}
+                className={`${filterStatus === 'activos' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+              >
+                Activos ({activeUsers})
+              </Button>
+              <Button
+                onClick={() => setFilterStatus('inactivos')}
+                variant={filterStatus === 'inactivos' ? 'default' : 'outline'}
+                className={`${filterStatus === 'inactivos' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+              >
+                Inactivos ({inactiveUsers})
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -244,17 +278,25 @@ export default function UsuariosPage() {
               {filteredUsers.map((user, index) => (
                 <div 
                   key={user.id} 
-                  className="p-4 border-b border-slate-100 hover:bg-blue-50 transition-all duration-300 animate-slide-in-right"
+                  className={`p-4 border-b border-slate-100 transition-all duration-300 animate-slide-in-right ${
+                    !user.isActive ? 'bg-gray-50 opacity-75' : 'hover:bg-blue-50'
+                  }`}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex items-center space-x-3 mb-3">
                     <div className="relative group">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-300 ${
+                        user.isActive 
+                          ? 'bg-gradient-to-br from-blue-500 to-blue-600 group-hover:scale-110' 
+                          : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                      }`}>
                         <span className="text-white font-bold text-lg">
                           {user.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <div className="absolute inset-0 bg-blue-400 rounded-full blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+                      <div className={`absolute inset-0 rounded-full blur-lg opacity-0 transition-opacity duration-300 ${
+                        user.isActive ? 'group-hover:opacity-50 bg-blue-400' : ''
+                      }`}></div>
                     </div>
                     <div className="flex-1">
                       <div className="font-semibold text-slate-800">{user.name}</div>
@@ -291,17 +333,23 @@ export default function UsuariosPage() {
                       <Edit className="h-4 w-4 mr-1" />
                       Editar
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => toggleUserStatus(user.id, !user.isActive)}
-                      className={`flex-1 bg-white border-2 transition-all duration-300 ${
-                        user.isActive
-                          ? 'border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white'
-                          : 'border-green-500 text-green-600 hover:bg-green-500 hover:text-white'
-                      }`}
-                    >
-                      {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                    </Button>
+                    {user.isActive ? (
+                      <Button
+                        size="sm"
+                        onClick={() => toggleUserStatus(user.id, false)}
+                        className="flex-1 bg-white border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white transition-all duration-300"
+                      >
+                        <UserX className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => toggleUserStatus(user.id, true)}
+                        className="flex-1 bg-white border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white transition-all duration-300"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -323,18 +371,26 @@ export default function UsuariosPage() {
                   {filteredUsers.map((user, index) => (
                     <tr 
                       key={user.id} 
-                      className="border-b border-slate-100 hover:bg-blue-50 transition-all duration-300 animate-slide-in-right group"
+                      className={`border-b border-slate-100 transition-all duration-300 animate-slide-in-right group ${
+                        !user.isActive ? 'bg-gray-50 opacity-75' : 'hover:bg-blue-50'
+                      }`}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <td className="py-4 px-6">
                         <div className="flex items-center space-x-3">
                           <div className="relative">
-                            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300">
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all duration-300 ${
+                              user.isActive 
+                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 group-hover:shadow-lg group-hover:scale-110' 
+                                : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                            }`}>
                               <span className="text-white font-bold">
                                 {user.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
-                            <div className="absolute inset-0 bg-blue-400 rounded-full blur-md opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                            <div className={`absolute inset-0 rounded-full blur-md opacity-0 transition-opacity duration-300 ${
+                              user.isActive ? 'group-hover:opacity-40 bg-blue-400' : ''
+                            }`}></div>
                           </div>
                           <div>
                             <div className="font-semibold text-slate-800">{user.name}</div>
@@ -383,23 +439,30 @@ export default function UsuariosPage() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => toggleUserStatus(user.id, !user.isActive)}
-                            className={`bg-white border-2 hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md ${
-                              user.isActive 
-                                ? 'border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white' 
-                                : 'border-green-500 text-green-600 hover:bg-green-500 hover:text-white'
-                            }`}
-                            title={user.isActive ? 'Desactivar usuario' : 'Activar usuario'}
-                          >
-                            {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                          </Button>
+                          {user.isActive ? (
+                            <Button
+                              size="sm"
+                              onClick={() => toggleUserStatus(user.id, false)}
+                              className="bg-white border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md"
+                              title="Desactivar usuario"
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => toggleUserStatus(user.id, true)}
+                              className="bg-white border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md"
+                              title="Reactivar usuario"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             onClick={() => deleteUser(user.id)}
                             className="bg-white border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                            title="Eliminar usuario"
+                            title="Eliminar usuario permanentemente"
                             disabled={session?.user?.id === user.id}
                           >
                             <Trash2 className="h-4 w-4" />

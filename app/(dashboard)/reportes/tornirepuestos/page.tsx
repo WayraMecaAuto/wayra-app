@@ -49,7 +49,7 @@ ChartJS.register(
   Legend
 )
 
-export default function ReportesWayraProductosPage() {
+export default function ReportesTorniRepuestosPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [vistaActual, setVistaActual] = useState<'productos' | 'contabilidad' | 'comparativa'>('productos')
@@ -69,8 +69,8 @@ export default function ReportesWayraProductosPage() {
   const [contabilidad, setContabilidad] = useState<any>(null)
   const [comparativa, setComparativa] = useState<any>(null)
 
-  const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA'].includes(session?.user?.role || '')
-  const isAdmin = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
+  const hasAccess = ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'].includes(session?.user?.role || '')
+  const isAdmin = ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '')
 
   useEffect(() => {
     if (hasAccess) {
@@ -82,13 +82,13 @@ export default function ReportesWayraProductosPage() {
     setLoading(true)
     try {
       if (vistaActual === 'productos') {
-        const res = await fetch(`/api/reportes/wayra-productos?tipo=productos-vendidos`)
+        const res = await fetch(`/api/reportes/torni-repuestos?tipo=productos-vendidos`)
         if (res.ok) {
           const data = await res.json()
           setProductosVendidos(data)
         }
       } else if (vistaActual === 'contabilidad' && isAdmin) {
-        let url = `/api/reportes/wayra-productos?tipo=contabilidad&periodo=${periodo}&año=${año}`
+        let url = `/api/reportes/torni-repuestos?tipo=contabilidad&periodo=${periodo}&año=${año}`
         
         if (periodo === 'mensual') {
           url += `&mes=${mes}`
@@ -104,7 +104,7 @@ export default function ReportesWayraProductosPage() {
           setContabilidad(data)
         }
       } else if (vistaActual === 'comparativa' && isAdmin) {
-        const res = await fetch(`/api/reportes/wayra-productos?tipo=comparativa&año=${año}&año2=${añoComparar}`)
+        const res = await fetch(`/api/reportes/torni-repuestos?tipo=comparativa&año=${año}&año2=${añoComparar}`)
         if (res.ok) {
           const data = await res.json()
           setComparativa(data)
@@ -120,7 +120,7 @@ export default function ReportesWayraProductosPage() {
 
   const exportarPDF = () => {
     const doc = new jsPDF()
-    doc.text('Reporte Wayra Productos', 14, 15)
+    doc.text('Reporte TorniRepuestos', 14, 15)
     doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
     
     if (vistaActual === 'productos' && productosVendidos) {
@@ -139,7 +139,7 @@ export default function ReportesWayraProductosPage() {
       })
     }
 
-    doc.save(`reporte-wayra-productos-${vistaActual}-${Date.now()}.pdf`)
+    doc.save(`reporte-torni-repuestos-${vistaActual}-${Date.now()}.pdf`)
     toast.success('PDF descargado')
   }
 
@@ -177,18 +177,18 @@ export default function ReportesWayraProductosPage() {
   return (
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
+      <div className="bg-gradient-to-r from-orange-600 via-orange-700 to-orange-800 rounded-2xl p-6 sm:p-8 text-white shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
               <BarChart3 className="h-10 w-10 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-2">Reportes Wayra Productos</h1>
-              <p className="text-blue-100 text-lg">Análisis de ventas y contabilidad</p>
+              <h1 className="text-3xl font-bold mb-2">Reportes TorniRepuestos</h1>
+              <p className="text-orange-100 text-lg">Análisis de ventas y contabilidad</p>
             </div>
           </div>
-          <Button onClick={exportarPDF} className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg">
+          <Button onClick={exportarPDF} className="bg-white text-orange-600 hover:bg-orange-50 shadow-lg">
             <Download className="h-4 w-4 mr-2" />
             Descargar PDF
           </Button>
@@ -202,7 +202,7 @@ export default function ReportesWayraProductosPage() {
             <Button
               onClick={() => setVistaActual('productos')}
               variant={vistaActual === 'productos' ? 'default' : 'outline'}
-              className={vistaActual === 'productos' ? 'bg-blue-600' : ''}
+              className={vistaActual === 'productos' ? 'bg-orange-600' : ''}
             >
               <Package className="h-4 w-4 mr-2" />
               Productos
@@ -212,7 +212,7 @@ export default function ReportesWayraProductosPage() {
                 <Button
                   onClick={() => setVistaActual('contabilidad')}
                   variant={vistaActual === 'contabilidad' ? 'default' : 'outline'}
-                  className={vistaActual === 'contabilidad' ? 'bg-blue-600' : ''}
+                  className={vistaActual === 'contabilidad' ? 'bg-orange-600' : ''}
                 >
                   <DollarSign className="h-4 w-4 mr-2" />
                   Contabilidad
@@ -220,7 +220,7 @@ export default function ReportesWayraProductosPage() {
                 <Button
                   onClick={() => setVistaActual('comparativa')}
                   variant={vistaActual === 'comparativa' ? 'default' : 'outline'}
-                  className={vistaActual === 'comparativa' ? 'bg-blue-600' : ''}
+                  className={vistaActual === 'comparativa' ? 'bg-orange-600' : ''}
                 >
                   <TrendingUp className="h-4 w-4 mr-2" />
                   Comparativa
@@ -314,7 +314,7 @@ export default function ReportesWayraProductosPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
         </div>
       ) : (
         <>
@@ -367,7 +367,7 @@ export default function ReportesWayraProductosPage() {
                         <div key={p.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
                           <div>
                             <p className="font-medium text-gray-800">{p.nombre}</p>
-                            <p className="text-sm text-gray-600">{p.tipo}</p>
+                            <p className="text-sm text-gray-600">{p.categoria}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-600">Stock: {p.stock}</p>
@@ -393,7 +393,7 @@ export default function ReportesWayraProductosPage() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="text-left py-3 px-4">Producto</th>
-                          <th className="text-left py-3 px-4">Tipo</th>
+                          <th className="text-left py-3 px-4">Categoría</th>
                           <th className="text-right py-3 px-4">Cantidad</th>
                           {isAdmin && (
                             <>
@@ -408,8 +408,8 @@ export default function ReportesWayraProductosPage() {
                           <tr key={i} className="border-b">
                             <td className="py-3 px-4">{p.nombre}</td>
                             <td className="py-3 px-4">
-                              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
-                                {p.tipo}
+                              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
+                                {p.categoria}
                               </span>
                             </td>
                             <td className="py-3 px-4 text-right font-bold">{Number(p.cantidad_vendida)}</td>
@@ -467,11 +467,11 @@ export default function ReportesWayraProductosPage() {
 
                 <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
                   <CardHeader>
-                    <CardTitle className="text-blue-700">Utilidad Bruta</CardTitle>
+                    <CardTitle className="text-blue-700">Utilidad Neta</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-blue-800">
-                      ${contabilidad.resumen.utilidadBruta.toLocaleString()}
+                      ${contabilidad.resumen.utilidadNeta.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -497,50 +497,39 @@ export default function ReportesWayraProductosPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-96">
-                    {contabilidad.porPeriodo && contabilidad.porPeriodo.length > 0 ? (
-                      <Line
-                        data={{
-                          labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
-                          datasets: [
-                            {
-                              label: 'Ingresos',
-                              data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
-                              borderColor: 'rgb(34, 197, 94)',
-                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                              tension: 0.4
-                            },
-                            {
-                              label: 'Egresos',
-                              data: contabilidad.porPeriodo.map((m: any) => m.egresos),
-                              borderColor: 'rgb(239, 68, 68)',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              tension: 0.4
-                            },
-                            {
-                              label: 'Utilidad',
-                              data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
-                              borderColor: 'rgb(59, 130, 246)',
-                              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                              tension: 0.4
-                            }
-                          ]
-                        }}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          interaction: { mode: 'index', intersect: false },
-                          scales: {
-                            y: {
-                              beginAtZero: true
-                            }
+                    <Line
+                      data={{
+                        labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
+                        datasets: [
+                          {
+                            label: 'Ingresos',
+                            data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.4
+                          },
+                          {
+                            label: 'Egresos',
+                            data: contabilidad.porPeriodo.map((m: any) => m.egresos),
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4
+                          },
+                          {
+                            label: 'Utilidad',
+                            data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4
                           }
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        No hay datos para mostrar en este periodo
-                      </div>
-                    )}
+                        ]
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                      }}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -625,54 +614,21 @@ export default function ReportesWayraProductosPage() {
                   <CardTitle>Comparación Mensual de Ingresos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Line
-                    data={{
-                      labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-                      datasets: [
-                        {
-                          label: `${comparativa.año1.año}`,
-                          data: comparativa.año1.porMes.map((m: any) => m.ingresos),
-                          borderColor: 'rgb(59, 130, 246)',
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                          tension: 0.4
-                        },
-                        {
-                          label: `${comparativa.año2.año}`,
-                          data: comparativa.año2.porMes.map((m: any) => m.ingresos),
-                          borderColor: 'rgb(156, 163, 175)',
-                          backgroundColor: 'rgba(156, 163, 175, 0.1)',
-                          tension: 0.4
-                        }
-                      ]
-                    }}
-                    options={{
-                      responsive: true,
-                      interaction: { mode: 'index', intersect: false },
-                    }}
-                  />
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Comparación Mensual de Utilidad</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  <div className="h-96">
                     <Line
                       data={{
                         labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
                         datasets: [
                           {
                             label: `${comparativa.año1.año}`,
-                            data: comparativa.año1.porMes.map((m: any) => m.utilidad),
-                            borderColor: 'rgb(34, 197, 94)',
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            data: comparativa.año1.porMes.map((m: any) => m.ingresos),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             tension: 0.4
                           },
                           {
                             label: `${comparativa.año2.año}`,
-                            data: comparativa.año2.porMes.map((m: any) => m.utilidad),
+                            data: comparativa.año2.porMes.map((m: any) => m.ingresos),
                             borderColor: 'rgb(156, 163, 175)',
                             backgroundColor: 'rgba(156, 163, 175, 0.1)',
                             tension: 0.4
@@ -682,45 +638,12 @@ export default function ReportesWayraProductosPage() {
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
                       }}
                     />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Resumen Anual</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="p-4 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-gray-600">{comparativa.año1.año} - Ingresos</p>
-                        <p className="text-2xl font-bold text-blue-700">
-                          ${comparativa.año1.totalIngresos.toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600">{comparativa.año2.año} - Ingresos</p>
-                        <p className="text-2xl font-bold text-gray-700">
-                          ${comparativa.año2.totalIngresos.toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-green-50 rounded-lg">
-                        <p className="text-sm text-gray-600">{comparativa.año1.año} - Utilidad</p>
-                        <p className="text-2xl font-bold text-green-700">
-                          ${comparativa.año1.utilidadTotal.toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600">{comparativa.año2.año} - Utilidad</p>
-                        <p className="text-2xl font-bold text-gray-700">
-                          ${comparativa.año2.utilidadTotal.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           )}
         </>

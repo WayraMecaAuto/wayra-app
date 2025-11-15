@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useSession, signOut } from 'next-auth/react'
-import { Menu, Bell, User, LogOut, Settings, Shield, Clock, X, CheckCircle, AlertTriangle, Info, Check, AreaChart as MarkAsUnread, ChevronDown } from 'lucide-react'
+import { Menu, Bell, LogOut, Clock, X, CheckCircle, AlertTriangle, Info, Check, MarkAsRead, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -44,7 +44,6 @@ function NotificationsModal({
   getNotificationIcon: (type: string) => JSX.Element
   getNotificationColor: (type: string, priority: string, read: boolean) => string
 }) {
-  // Efecto para manejar scroll del body cuando el modal está abierto
   useEffect(() => {
     if (showModal) {
       document.body.style.overflow = 'hidden'
@@ -57,7 +56,6 @@ function NotificationsModal({
     }
   }, [showModal])
 
-  // Efecto para cerrar modal con tecla Escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -78,14 +76,12 @@ function NotificationsModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
         aria-hidden="true"
       />
       
-      {/* Modal Container */}
       <div className="relative z-10 w-full h-full sm:h-auto flex items-center justify-center">
         <div 
           className="bg-white w-full h-full sm:w-auto sm:h-auto sm:rounded-2xl shadow-2xl sm:max-w-4xl lg:max-w-6xl xl:max-w-7xl sm:max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 flex flex-col"
@@ -94,7 +90,6 @@ function NotificationsModal({
           aria-modal="true"
           aria-labelledby="modal-title"
         >
-          {/* Header */}
           <div className="flex items-center justify-between p-3 sm:p-6 lg:p-8 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 sm:rounded-t-2xl flex-shrink-0">
             <div className="flex-1 min-w-0">
               <h3 id="modal-title" className="font-bold text-gray-900 text-base sm:text-xl lg:text-2xl truncate">
@@ -112,7 +107,7 @@ function NotificationsModal({
                   onClick={markAllAsRead}
                   className="hover:bg-blue-50 touch-manipulation text-xs sm:text-sm whitespace-nowrap flex-shrink-0 px-2 sm:px-3"
                 >
-                  <MarkAsUnread className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden xs:inline sm:inline">Marcar todas</span>
                   <span className="xs:hidden sm:hidden">✓</span>
                 </Button>
@@ -129,10 +124,7 @@ function NotificationsModal({
             </div>
           </div>
           
-          {/* Content */}
-          <div 
-            className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 min-h-0"
-          >
+          <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 min-h-0">
             {notifications.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
                 {notifications.map((notification) => (
@@ -194,7 +186,6 @@ function NotificationsModal({
             )}
           </div>
           
-          {/* Footer */}
           <div className="p-3 sm:p-6 lg:p-8 border-t border-gray-100 bg-gray-50 sm:rounded-b-2xl flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="text-xs sm:text-base text-gray-600">
@@ -228,40 +219,18 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAllNotifications, setShowAllNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchNotifications()
-    // Cargar notificaciones leídas del localStorage
-    const savedReadNotifications = localStorage.getItem('readNotifications')
-    if (savedReadNotifications) {
-      setReadNotifications(new Set(JSON.parse(savedReadNotifications)))
-    }
-    
-    // Actualizar notificaciones cada 30 segundos
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  // Guardar notificaciones leídas en localStorage cuando cambien
-  useEffect(() => {
-    if (readNotifications.size > 0) {
-      localStorage.setItem('readNotifications', JSON.stringify(Array.from(readNotifications)))
-    }
-  }, [readNotifications])
-
   const fetchNotifications = async () => {
     try {
-      // Enviar las notificaciones leídas al servidor para que las marque correctamente
-      const readNotificationsArray = Array.from(readNotifications)
-      const queryParams = new URLSearchParams({
-        readNotifications: JSON.stringify(readNotificationsArray)
-      })
-      
-      const response = await fetch(`/api/notifications?${queryParams}`)
+      const response = await fetch('/api/notifications')
       if (response.ok) {
         const data = await response.json()
-        // Las notificaciones ya vienen con el estado correcto desde el servidor
         setNotifications(data)
       }
     } catch (error) {
@@ -278,10 +247,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
       })
       
       if (response.ok) {
-        // Actualizar estado local
-        const newReadNotifications = new Set([...readNotifications, ...notificationIds])
-        setReadNotifications(newReadNotifications)
-        
+        // Actualizar inmediatamente el estado local
         setNotifications(prev => 
           prev.map(notif => 
             notificationIds.includes(notif.id) 
@@ -289,6 +255,8 @@ export function Navbar({ onMenuClick }: NavbarProps) {
               : notif
           )
         )
+        // Refrescar desde el servidor
+        await fetchNotifications()
       }
     } catch (error) {
       console.error('Error marking notifications as read:', error)
@@ -298,29 +266,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   const markAllAsRead = async () => {
     const unreadIds = notifications.filter(n => !n.read).map(n => n.id)
     if (unreadIds.length > 0) {
-      try {
-        const response = await fetch('/api/notifications', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notificationIds: unreadIds, action: 'mark_read' })
-        })
-        
-        if (response.ok) {
-          // Actualizar estado local
-          const newReadNotifications = new Set([...readNotifications, ...unreadIds])
-          setReadNotifications(newReadNotifications)
-          
-          setNotifications(prev => 
-            prev.map(notif => 
-              unreadIds.includes(notif.id) 
-                ? { ...notif, read: true }
-                : notif
-            )
-          )
-        }
-      } catch (error) {
-        console.error('Error marking all notifications as read:', error)
-      }
+      await markAsRead(unreadIds)
     }
   }
 
@@ -384,30 +330,8 @@ export function Navbar({ onMenuClick }: NavbarProps) {
               <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
 
-            {/* Logos - Responsive */}
             <div className="flex items-center space-x-2 sm:space-x-6">
-              <div className="flex items-center space-x-2 sm:space-x-4 px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl sm:rounded-2xl border border-blue-200/50 shadow-md">
-                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-white rounded-lg sm:rounded-xl shadow-lg flex items-center justify-center">
-                  <Image
-                    src="/images/WayraLogo.png"
-                    alt="Wayra Logo"
-                    width={32}
-                    height={32}
-                    className="object-contain sm:w-10 sm:h-10"
-                  />
-                </div>
-                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-white rounded-lg sm:rounded-xl shadow-lg flex items-center justify-center">
-                  <Image
-                    src="/images/TorniRepuestos.png"
-                    alt="TorniRepuestos Logo"
-                    width={32}
-                    height={32}
-                    className="object-contain sm:w-10 sm:h-10"
-                  />
-                </div>
-              </div>
 
-              {/* Status del taller - Solo visible en desktop */}
               <div className="hidden lg:flex items-center space-x-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200/50 shadow-md">
                 <Clock className="h-5 w-5 text-gray-600" />
                 <span className="text-sm font-semibold text-gray-700">
@@ -429,7 +353,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
 
           {/* Right side */}
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Notifications - Optimizado para móvil */}
+            {/* Notifications */}
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -446,9 +370,8 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                 )}
               </button>
 
-              {/* Notifications Menu desplegable - Responsive */}
               {showNotifications && (
-                <div className="absolute -right-full mt-2 sm:mt-3 w-80 sm:w-96 bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200/50 z-50 animate-scale-in max-h-[80vh] overflow-hidden">
+                <div className="absolute right-0 mt-2 sm:mt-3 w-80 sm:w-96 bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200/50 z-50 animate-scale-in max-h-[80vh] overflow-hidden">
                   <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl sm:rounded-t-2xl">
                     <div className="flex items-center justify-between">
                       <div>
@@ -529,7 +452,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
               )}
             </div>
 
-            {/* Usuario Menu - Optimizado para móvil */}
+            {/* Usuario Menu - SIMPLIFICADO */}
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
@@ -562,7 +485,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                 <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block" />
               </button>
 
-              {/* Usuario menu desplegable - Responsive */}
+              {/* Usuario menu desplegable - SOLO CERRAR SESIÓN */}
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 sm:mt-3 w-56 sm:w-64 bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200/50 z-50 animate-scale-in">
                   <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl sm:rounded-t-2xl">
@@ -583,32 +506,14 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                     </div>
                   </div>
                   
+                  {/* SOLO BOTÓN DE CERRAR SESIÓN */}
                   <div className="py-2">
-                    <button className="w-full flex items-center space-x-3 px-4 sm:px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors touch-manipulation">
-                      <User className="h-4 w-4 flex-shrink-0" />
-                      <span>Mi Perfil</span>
-                    </button>
-                    
-                    {['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'ADMIN_WAYRA_PRODUCTOS', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '') && (
-                      <button className="w-full flex items-center space-x-3 px-4 sm:px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors touch-manipulation">
-                        <Shield className="h-4 w-4 flex-shrink-0" />
-                        <span>Administración</span>
-                      </button>
-                    )}
-                    
-                    <button className="w-full flex items-center space-x-3 px-4 sm:px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors touch-manipulation">
-                      <Settings className="h-4 w-4 flex-shrink-0" />
-                      <span>Configuración</span>
-                    </button>
-                  </div>
-                  
-                  <div className="border-t border-gray-100 py-2">
                     <button
                       onClick={() => signOut({ callbackUrl: '/login' })}
                       className="w-full flex items-center space-x-3 px-4 sm:px-6 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors touch-manipulation"
                     >
                       <LogOut className="h-4 w-4 flex-shrink-0" />
-                      <span>Cerrar Sesión</span>
+                      <span className="font-medium">Cerrar Sesión</span>
                     </button>
                   </div>
                 </div>
@@ -617,7 +522,6 @@ export function Navbar({ onMenuClick }: NavbarProps) {
           </div>
         </div>
 
-        {/* Click outside to close dropdowns */}
         {(showUserMenu || showNotifications) && (
           <div 
             className="fixed inset-0 z-30" 
@@ -629,7 +533,6 @@ export function Navbar({ onMenuClick }: NavbarProps) {
         )}
       </header>
 
-      {/* Modal de todas las notificaciones usando Portal */}
       <NotificationsModal
         showModal={showAllNotifications}
         onClose={handleCloseAllNotifications}

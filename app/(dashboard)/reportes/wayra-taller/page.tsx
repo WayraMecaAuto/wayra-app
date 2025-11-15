@@ -12,9 +12,9 @@ import {
   Calendar,
   DollarSign,
   Award,
-  Filter,
-  FileText,
-  Plus
+  ArrowUpRight,
+  ArrowDownRight,
+  Percent
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,8 +52,16 @@ export default function ReportesWayraTaller() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [vistaActual, setVistaActual] = useState('general')
+  const [filtroServicios, setFiltroServicios] = useState<'todo' | 'mes'>('todo')
+  const [mesServicios, setMesServicios] = useState(new Date().getMonth() + 1)
+  const [añoServicios, setAñoServicios] = useState(new Date().getFullYear())
+  
+  // Filtros
+  const [periodo, setPeriodo] = useState<'mensual' | 'trimestral' | 'semestral' | 'anual'>('mensual')
   const [año, setAño] = useState(new Date().getFullYear())
   const [mes, setMes] = useState(new Date().getMonth() + 1)
+  const [trimestre, setTrimestre] = useState(Math.ceil((new Date().getMonth() + 1) / 3))
+  const [semestre, setSemestre] = useState(new Date().getMonth() < 6 ? 1 : 2)
   const [añoComparacion, setAñoComparacion] = useState(new Date().getFullYear() - 1)
 
   // Estados para datos
@@ -62,16 +70,6 @@ export default function ReportesWayraTaller() {
   const [contabilidad, setContabilidad] = useState<any>(null)
   const [comparativa, setComparativa] = useState<any>(null)
 
-  // Reporte personalizado
-  const [mostrarReportePersonalizado, setMostrarReportePersonalizado] = useState(false)
-  const [reportePersonalizado, setReportePersonalizado] = useState({
-    fechaInicio: '',
-    fechaFin: '',
-    incluirServicios: true,
-    incluirMecanicos: true,
-    incluirContabilidad: true
-  })
-
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
   const canViewContabilidad = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
 
@@ -79,23 +77,47 @@ export default function ReportesWayraTaller() {
     if (hasAccess) {
       cargarDatos()
     }
-  }, [hasAccess, vistaActual, año, mes, añoComparacion])
+  }, [hasAccess, vistaActual, periodo, año, mes, trimestre, semestre, añoComparacion, filtroServicios, mesServicios, añoServicios])
 
   const cargarDatos = async () => {
     setLoading(true)
     try {
       if (vistaActual === 'general' || vistaActual === 'servicios') {
-        const res = await fetch(`/api/reportes/wayra-taller?tipo=servicios-frecuencia`)
+        let url = `/api/reportes/wayra-taller?tipo=servicios-frecuencia`
+        if (filtroServicios === 'mes') {
+          url += `&mes=${mesServicios}&año=${añoServicios}`
+        }
+        const res = await fetch(url)
         if (res.ok) setServiciosFrecuencia(await res.json())
       }
 
       if (vistaActual === 'general' || vistaActual === 'mecanicos') {
-        const res = await fetch(`/api/reportes/wayra-taller?tipo=mecanicos-productividad&año=${año}&mes=${mes}`)
+        let url = `/api/reportes/wayra-taller?tipo=mecanicos-productividad&año=${año}&periodo=${periodo}`
+        
+        if (periodo === 'mensual') {
+          url += `&mes=${mes}`
+        } else if (periodo === 'trimestral') {
+          url += `&trimestre=${trimestre}`
+        } else if (periodo === 'semestral') {
+          url += `&semestre=${semestre}`
+        }
+        
+        const res = await fetch(url)
         if (res.ok) setMecanicoProductividad(await res.json())
       }
 
       if ((vistaActual === 'general' || vistaActual === 'contabilidad') && canViewContabilidad) {
-        const res = await fetch(`/api/reportes/wayra-taller?tipo=contabilidad&periodo=mensual&año=${año}&mes=${mes}`)
+        let url = `/api/reportes/wayra-taller?tipo=contabilidad&periodo=${periodo}&año=${año}`
+        
+        if (periodo === 'mensual') {
+          url += `&mes=${mes}`
+        } else if (periodo === 'trimestral') {
+          url += `&trimestre=${trimestre}`
+        } else if (periodo === 'semestral') {
+          url += `&semestre=${semestre}`
+        }
+        
+        const res = await fetch(url)
         if (res.ok) setContabilidad(await res.json())
       }
 
@@ -110,130 +132,20 @@ export default function ReportesWayraTaller() {
     }
   }
 
-  const generarReportePersonalizado = async () => {
-    if (!reportePersonalizado.fechaInicio || !reportePersonalizado.fechaFin) {
-      toast.error('Selecciona las fechas')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await fetch(
-        `/api/reportes/wayra-taller/personalizado?` +
-        `fechaInicio=${reportePersonalizado.fechaInicio}&` +
-        `fechaFin=${reportePersonalizado.fechaFin}&` +
-        `incluirServicios=${reportePersonalizado.incluirServicios}&` +
-        `incluirMecanicos=${reportePersonalizado.incluirMecanicos}&` +
-        `incluirContabilidad=${reportePersonalizado.incluirContabilidad}`
-      )
-      
-      if (res.ok) {
-        const data = await res.json()
-        // Generar PDF con los datos personalizados
-        generarPDFPersonalizado(data)
-      }
-    } catch (error) {
-      toast.error('Error al generar reporte personalizado')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const generarPDFPersonalizado = (data: any) => {
-    const doc = new jsPDF()
-    let yPos = 20
-
-    doc.setFontSize(18)
-    doc.text('Reporte Personalizado - Wayra Taller', 14, yPos)
-    yPos += 10
-
-    doc.setFontSize(10)
-    doc.text(`Periodo: ${new Date(reportePersonalizado.fechaInicio).toLocaleDateString('es-CO')} - ${new Date(reportePersonalizado.fechaFin).toLocaleDateString('es-CO')}`, 14, yPos)
-    yPos += 8
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString('es-CO')}`, 14, yPos)
-    yPos += 10
-
-    if (reportePersonalizado.incluirServicios && data.servicios && data.servicios.length > 0) {
-      doc.setFontSize(14)
-      doc.text('Servicios Realizados', 14, yPos)
-      yPos += 5
-
-      const serviciosData = data.servicios.map((s: any) => [
-        s.descripcion,
-        s.cantidad.toString(),
-        `${Number(s.total).toLocaleString('es-CO')}`
-      ])
-
-      ;(doc as any).autoTable({
-        head: [['Servicio', 'Cantidad', 'Total']],
-        body: serviciosData,
-        startY: yPos,
-        margin: { left: 14, right: 14 }
-      })
-      yPos = (doc as any).lastAutoTable.finalY + 10
-    }
-
-    if (reportePersonalizado.incluirMecanicos && data.mecanicos && data.mecanicos.length > 0) {
-      if (yPos > 250) {
-        doc.addPage()
-        yPos = 20
-      }
-
-      doc.setFontSize(14)
-      doc.text('Productividad de Mecánicos', 14, yPos)
-      yPos += 5
-
-      const mecanicosData = data.mecanicos.map((m: any) => [
-        m.nombre,
-        m.ordenes.toString(),
-        `${Number(m.ingresos).toLocaleString('es-CO')}`
-      ])
-
-      ;(doc as any).autoTable({
-        head: [['Mecánico', 'Órdenes', 'Ingresos']],
-        body: mecanicosData,
-        startY: yPos,
-        margin: { left: 14, right: 14 }
-      })
-      yPos = (doc as any).lastAutoTable.finalY + 10
-    }
-
-    if (reportePersonalizado.incluirContabilidad && data.contabilidad && canViewContabilidad) {
-      if (yPos > 250) {
-        doc.addPage()
-        yPos = 20
-      }
-
-      doc.setFontSize(14)
-      doc.text('Resumen Contable', 14, yPos)
-      yPos += 8
-
-      doc.setFontSize(10)
-      doc.text(`Ingresos: ${Number(data.contabilidad.ingresos).toLocaleString('es-CO')}`, 14, yPos)
-      yPos += 7
-      doc.text(`Egresos: ${Number(data.contabilidad.egresos).toLocaleString('es-CO')}`, 14, yPos)
-      yPos += 7
-      doc.text(`Utilidad: ${Number(data.contabilidad.utilidad).toLocaleString('es-CO')}`, 14, yPos)
-    }
-
-    doc.save(`reporte-personalizado-${Date.now()}.pdf`)
-    toast.success('PDF generado exitosamente')
-  }
-
   const exportarPDF = () => {
     const doc = new jsPDF()
     doc.text('Reporte Wayra Taller', 14, 15)
     doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
-    doc.text(`Periodo: ${año} - Mes ${mes}`, 14, 29)
+    doc.text(`Periodo: ${año}`, 14, 29)
 
     if (vistaActual === 'servicios' && serviciosFrecuencia) {
       const tableData = serviciosFrecuencia.masRealizados.slice(0, 15).map((s: any) => [
         s.descripcion,
         s.veces_realizado,
-        `$${s.ingreso_total.toLocaleString()}`
+        canViewContabilidad ? `$${s.ingreso_total.toLocaleString()}` : '-'
       ])
       ;(doc as any).autoTable({
-        head: [['Servicio', 'Veces', 'Ingreso']],
+        head: [['Servicio', 'Veces', ...(canViewContabilidad ? ['Ingreso'] : [])]],
         body: tableData,
         startY: 35
       })
@@ -255,6 +167,25 @@ export default function ReportesWayraTaller() {
     label: new Date(2024, i).toLocaleString('es-CO', { month: 'long' })
   }))
 
+  const trimestreOptions = [
+    { value: 1, label: 'Trimestre 1 (Ene-Mar)' },
+    { value: 2, label: 'Trimestre 2 (Abr-Jun)' },
+    { value: 3, label: 'Trimestre 3 (Jul-Sep)' },
+    { value: 4, label: 'Trimestre 4 (Oct-Dic)' }
+  ]
+
+  const semestreOptions = [
+    { value: 1, label: 'Semestre 1 (Ene-Jun)' },
+    { value: 2, label: 'Semestre 2 (Jul-Dic)' }
+  ]
+
+  const periodoOptions = [
+    { value: 'mensual', label: 'Mensual' },
+    { value: 'trimestral', label: 'Trimestral' },
+    { value: 'semestral', label: 'Semestral' },
+    { value: 'anual', label: 'Anual' }
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -270,15 +201,10 @@ export default function ReportesWayraTaller() {
                 <p className="text-indigo-100 text-sm sm:text-base lg:text-lg">Análisis y estadísticas</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => setMostrarReportePersonalizado(true)} 
-                className="bg-indigo-500 hover:bg-indigo-400 text-sm sm:text-base"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Personalizado
-              </Button>
-            </div>
+            <Button onClick={exportarPDF} className="bg-white text-indigo-600 hover:bg-indigo-50">
+              <Download className="h-4 w-4 mr-2" />
+              PDF
+            </Button>
           </div>
         </div>
 
@@ -309,10 +235,10 @@ export default function ReportesWayraTaller() {
         </Card>
 
         {/* Filtros */}
-        {vistaActual !== 'general' && (
+        {vistaActual !== 'general' && vistaActual !== 'servicios' && (
           <Card>
             <CardContent className="p-3 sm:p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium mb-2">Año</label>
                   <Dropdown
@@ -322,17 +248,57 @@ export default function ReportesWayraTaller() {
                     icon={<Calendar className="h-4 w-4" />}
                   />
                 </div>
-                {vistaActual !== 'comparativa' && (
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium mb-2">Mes</label>
-                    <Dropdown
-                      options={mesesOptions}
-                      value={mes}
-                      onChange={setMes}
-                      icon={<Calendar className="h-4 w-4" />}
-                    />
-                  </div>
+
+                {(vistaActual === 'mecanicos' || vistaActual === 'contabilidad') && (
+                  <>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium mb-2">Periodo</label>
+                      <Dropdown
+                        options={periodoOptions}
+                        value={periodo}
+                        onChange={setPeriodo}
+                        icon={<Calendar className="h-4 w-4" />}
+                      />
+                    </div>
+
+                    {periodo === 'mensual' && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium mb-2">Mes</label>
+                        <Dropdown
+                          options={mesesOptions}
+                          value={mes}
+                          onChange={setMes}
+                          icon={<Calendar className="h-4 w-4" />}
+                        />
+                      </div>
+                    )}
+
+                    {periodo === 'trimestral' && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium mb-2">Trimestre</label>
+                        <Dropdown
+                          options={trimestreOptions}
+                          value={trimestre}
+                          onChange={setTrimestre}
+                          icon={<Calendar className="h-4 w-4" />}
+                        />
+                      </div>
+                    )}
+
+                    {periodo === 'semestral' && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium mb-2">Semestre</label>
+                        <Dropdown
+                          options={semestreOptions}
+                          value={semestre}
+                          onChange={setSemestre}
+                          icon={<Calendar className="h-4 w-4" />}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
+
                 {vistaActual === 'comparativa' && (
                   <div>
                     <label className="block text-xs sm:text-sm font-medium mb-2">Comparar con</label>
@@ -344,84 +310,6 @@ export default function ReportesWayraTaller() {
                     />
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Modal Reporte Personalizado */}
-        {mostrarReportePersonalizado && (
-          <Card className="border-indigo-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <FileText className="h-5 w-5" />
-                Crear Reporte Personalizado
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Fecha Inicio</label>
-                    <input
-                      type="date"
-                      value={reportePersonalizado.fechaInicio}
-                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, fechaInicio: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Fecha Fin</label>
-                    <input
-                      type="date"
-                      value={reportePersonalizado.fechaFin}
-                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, fechaFin: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={reportePersonalizado.incluirServicios}
-                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, incluirServicios: e.target.checked})}
-                      className="rounded"
-                    />
-                    Incluir estadísticas de servicios
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={reportePersonalizado.incluirMecanicos}
-                      onChange={(e) => setReportePersonalizado({...reportePersonalizado, incluirMecanicos: e.target.checked})}
-                      className="rounded"
-                    />
-                    Incluir productividad de mecánicos
-                  </label>
-                  {canViewContabilidad && (
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={reportePersonalizado.incluirContabilidad}
-                        onChange={(e) => setReportePersonalizado({...reportePersonalizado, incluirContabilidad: e.target.checked})}
-                        className="rounded"
-                      />
-                      Incluir información contable
-                    </label>
-                  )}
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={generarReportePersonalizado} className="bg-indigo-600 flex-1 text-sm sm:text-base">
-                    <Download className="h-4 w-4 mr-2" />
-                    Generar Reporte
-                  </Button>
-                  <Button onClick={() => setMostrarReportePersonalizado(false)} variant="outline" className="text-sm sm:text-base">
-                    Cancelar
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -440,7 +328,10 @@ export default function ReportesWayraTaller() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <Card className="bg-gradient-to-br from-green-50 to-green-100">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm sm:text-base text-green-700">Ingresos</CardTitle>
+                        <CardTitle className="text-sm sm:text-base text-green-700 flex items-center gap-2">
+                          <ArrowUpRight className="h-4 w-4" />
+                          Ingresos
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-800">
@@ -454,7 +345,10 @@ export default function ReportesWayraTaller() {
 
                     <Card className="bg-gradient-to-br from-red-50 to-red-100">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm sm:text-base text-red-700">Egresos</CardTitle>
+                        <CardTitle className="text-sm sm:text-base text-red-700 flex items-center gap-2">
+                          <ArrowDownRight className="h-4 w-4" />
+                          Egresos
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-800">
@@ -465,13 +359,14 @@ export default function ReportesWayraTaller() {
 
                     <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm sm:text-base text-blue-700">Utilidad</CardTitle>
+                        <CardTitle className="text-sm sm:text-base text-blue-700">Utilidad Bruta</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-800">
-                          ${contabilidad.resumen.utilidadNeta.toLocaleString()}
+                          ${contabilidad.resumen.utilidadBruta.toLocaleString()}
                         </div>
-                        <p className="text-xs sm:text-sm text-blue-600 mt-1">
+                        <p className="text-xs sm:text-sm text-blue-600 mt-1 flex items-center gap-1">
+                          <Percent className="h-3 w-3" />
                           {contabilidad.resumen.margenUtilidad}%
                         </p>
                       </CardContent>
@@ -479,7 +374,10 @@ export default function ReportesWayraTaller() {
 
                     <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm sm:text-base text-purple-700">Servicios</CardTitle>
+                        <CardTitle className="text-sm sm:text-base text-purple-700 flex items-center gap-2">
+                          <Wrench className="h-4 w-4" />
+                          Servicios
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-800">
@@ -542,12 +440,14 @@ export default function ReportesWayraTaller() {
                                 {mecanicoProductividad.mecanicoDelMes.totalOrdenes}
                               </p>
                             </div>
-                            <div>
-                              <p className="text-xs sm:text-sm text-yellow-600">Ingresos</p>
-                              <p className="text-lg sm:text-xl font-bold text-yellow-800">
-                                ${(mecanicoProductividad.mecanicoDelMes.totalIngresos / 1000).toFixed(0)}k
-                              </p>
-                            </div>
+                            {canViewContabilidad && (
+                              <div>
+                                <p className="text-xs sm:text-sm text-yellow-600">Ingresos</p>
+                                <p className="text-lg sm:text-xl font-bold text-yellow-800">
+                                  ${(mecanicoProductividad.mecanicoDelMes.totalIngresos / 1000).toFixed(0)}k
+                                </p>
+                              </div>
+                            )}
                             <div>
                               <p className="text-xs sm:text-sm text-yellow-600">Tiempo</p>
                               <p className="text-lg sm:text-xl font-bold text-yellow-800">
@@ -566,6 +466,48 @@ export default function ReportesWayraTaller() {
             {/* VISTA SERVICIOS */}
             {vistaActual === 'servicios' && serviciosFrecuencia && (
               <div className="space-y-4 sm:space-y-6">
+                {/* Filtros de Servicios */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Periodo</label>
+                        <Dropdown
+                          options={[
+                            { value: 'todo', label: 'Todo el tiempo' },
+                            { value: 'mes', label: 'Por mes' }
+                          ]}
+                          value={filtroServicios}
+                          onChange={(val) => setFiltroServicios(val as 'todo' | 'mes')}
+                          icon={<Calendar className="h-4 w-4" />}
+                        />
+                      </div>
+                      {filtroServicios === 'mes' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Año</label>
+                            <Dropdown
+                              options={añosOptions}
+                              value={añoServicios}
+                              onChange={setAñoServicios}
+                              icon={<Calendar className="h-4 w-4" />}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Mes</label>
+                            <Dropdown
+                              options={mesesOptions}
+                              value={mesServicios}
+                              onChange={setMesServicios}
+                              icon={<Calendar className="h-4 w-4" />}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   <Card>
                     <CardHeader>
@@ -594,40 +536,66 @@ export default function ReportesWayraTaller() {
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base sm:text-lg">Ingresos por Servicio</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-64 sm:h-80">
-                        <Doughnut
-                          data={{
-                            labels: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.descripcion),
-                            datasets: [{
-                              data: serviciosFrecuencia.masRealizados.slice(0, 5).map((s: any) => s.ingreso_total),
-                              backgroundColor: [
-                                'rgba(99, 102, 241, 0.8)',
-                                'rgba(34, 197, 94, 0.8)',
-                                'rgba(251, 191, 36, 0.8)',
-                                'rgba(239, 68, 68, 0.8)',
-                                'rgba(168, 85, 247, 0.8)'
-                              ]
-                            }]
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                              legend: {
-                                position: 'bottom',
-                                labels: { boxWidth: 12, font: { size: 10 } }
+                  {canViewContabilidad && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base sm:text-lg">Ingresos por Servicio (Top 10)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-64 sm:h-80">
+                          <Doughnut
+                            data={{
+                              labels: serviciosFrecuencia.masRealizados.slice(0, 10).map((s: any) => 
+                                s.descripcion.length > 25 ? s.descripcion.substring(0, 25) + '...' : s.descripcion
+                              ),
+                              datasets: [{
+                                data: serviciosFrecuencia.masRealizados.slice(0, 10).map((s: any) => s.ingreso_total),
+                                backgroundColor: [
+                                  'rgba(99, 102, 241, 0.8)',
+                                  'rgba(34, 197, 94, 0.8)',
+                                  'rgba(251, 191, 36, 0.8)',
+                                  'rgba(239, 68, 68, 0.8)',
+                                  'rgba(168, 85, 247, 0.8)',
+                                  'rgba(59, 130, 246, 0.8)',
+                                  'rgba(236, 72, 153, 0.8)',
+                                  'rgba(20, 184, 166, 0.8)',
+                                  'rgba(251, 146, 60, 0.8)',
+                                  'rgba(139, 92, 246, 0.8)'
+                                ],
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                              }]
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  position: 'right',
+                                  labels: { 
+                                    boxWidth: 15, 
+                                    font: { size: 11 },
+                                    padding: 10
+                                  }
+                                },
+                                tooltip: {
+                                  callbacks: {
+                                    label: function(context: any) {
+                                      const label = context.label || '';
+                                      const value = context.parsed || 0;
+                                      const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                                      const percentage = ((value / total) * 100).toFixed(1);
+                                      return `${label}: ${value.toLocaleString()} (${percentage}%)`;
+                                    }
+                                  }
+                                }
                               }
-                            }
-                          }}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
+                            }}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
 
                 <Card>
@@ -641,8 +609,12 @@ export default function ReportesWayraTaller() {
                           <tr>
                             <th className="text-left py-2 px-2 sm:py-3 sm:px-4">Servicio</th>
                             <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Veces</th>
-                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4 hidden sm:table-cell">Ingreso</th>
-                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Promedio</th>
+                            {canViewContabilidad && (
+                              <>
+                                <th className="text-right py-2 px-2 sm:py-3 sm:px-4 hidden sm:table-cell">Ingreso</th>
+                                <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Promedio</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -650,12 +622,16 @@ export default function ReportesWayraTaller() {
                             <tr key={i} className="border-b">
                               <td className="py-2 px-2 sm:py-3 sm:px-4">{s.descripcion}</td>
                               <td className="py-2 px-2 sm:py-3 sm:px-4 text-right font-bold">{s.veces_realizado}</td>
-                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right text-green-600 font-bold hidden sm:table-cell">
-                                ${s.ingreso_total.toLocaleString()}
-                              </td>
-                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">
-                                ${s.precio_promedio.toLocaleString()}
-                              </td>
+                              {canViewContabilidad && (
+                                <>
+                                  <td className="py-2 px-2 sm:py-3 sm:px-4 text-right text-green-600 font-bold hidden sm:table-cell">
+                                    ${s.ingreso_total.toLocaleString()}
+                                  </td>
+                                  <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">
+                                    ${s.precio_promedio.toLocaleString()}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -674,7 +650,7 @@ export default function ReportesWayraTaller() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                         <Award className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
-                        Mecánico del Mes
+                        Mecánico del Periodo
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -689,12 +665,14 @@ export default function ReportesWayraTaller() {
                               {mecanicoProductividad.mecanicoDelMes.totalOrdenes}
                             </p>
                           </div>
-                          <div>
-                            <p className="text-xs sm:text-sm text-yellow-600">Ingresos</p>
-                            <p className="text-lg sm:text-2xl font-bold text-yellow-800">
-                              ${mecanicoProductividad.mecanicoDelMes.totalIngresos.toLocaleString()}
-                            </p>
-                          </div>
+                          {canViewContabilidad && (
+                            <div>
+                              <p className="text-xs sm:text-sm text-yellow-600">Ingresos</p>
+                              <p className="text-lg sm:text-2xl font-bold text-yellow-800">
+                                ${mecanicoProductividad.mecanicoDelMes.totalIngresos.toLocaleString()}
+                              </p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-xs sm:text-sm text-yellow-600">Tiempo Prom.</p>
                             <p className="text-lg sm:text-2xl font-bold text-yellow-800">
@@ -743,8 +721,13 @@ export default function ReportesWayraTaller() {
                           <tr>
                             <th className="text-left py-2 px-2 sm:py-3 sm:px-4">Mecánico</th>
                             <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Órdenes</th>
-                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4 hidden lg:table-cell">Ingresos</th>
-                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">$/Orden</th>
+                            {canViewContabilidad && (
+                              <>
+                                <th className="text-right py-2 px-2 sm:py-3 sm:px-4 hidden lg:table-cell">Ingresos</th>
+                                <th className="text-right py-2 px-2 sm:py-3 sm:px-4">$/Orden</th>
+                              </>
+                            )}
+                            <th className="text-right py-2 px-2 sm:py-3 sm:px-4">Tiempo Prom.</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -752,12 +735,17 @@ export default function ReportesWayraTaller() {
                             <tr key={i} className="border-b">
                               <td className="py-2 px-2 sm:py-3 sm:px-4 font-medium">{m.mecanico}</td>
                               <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">{m.totalOrdenes}</td>
-                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right text-green-600 font-bold hidden lg:table-cell">
-                                ${m.totalIngresos.toLocaleString()}
-                              </td>
-                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">
-                                ${parseFloat(m.ingresoPromedioPorOrden).toLocaleString()}
-                              </td>
+                              {canViewContabilidad && (
+                                <>
+                                  <td className="py-2 px-2 sm:py-3 sm:px-4 text-right text-green-600 font-bold hidden lg:table-cell">
+                                    ${m.totalIngresos.toLocaleString()}
+                                  </td>
+                                  <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">
+                                    ${parseFloat(m.ingresoPromedioPorOrden).toLocaleString()}
+                                  </td>
+                                </>
+                              )}
+                              <td className="py-2 px-2 sm:py-3 sm:px-4 text-right">{m.tiempoPromedioHoras}h</td>
                             </tr>
                           ))}
                         </tbody>
@@ -774,7 +762,10 @@ export default function ReportesWayraTaller() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   <Card className="bg-gradient-to-br from-green-50 to-green-100">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-xs sm:text-sm text-green-700">Ingresos</CardTitle>
+                      <CardTitle className="text-xs sm:text-sm text-green-700 flex items-center gap-2">
+                        <ArrowUpRight className="h-4 w-4" />
+                        Ingresos
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-green-800">
@@ -785,7 +776,10 @@ export default function ReportesWayraTaller() {
 
                   <Card className="bg-gradient-to-br from-red-50 to-red-100">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-xs sm:text-sm text-red-700">Egresos</CardTitle>
+                      <CardTitle className="text-xs sm:text-sm text-red-700 flex items-center gap-2">
+                        <ArrowDownRight className="h-4 w-4" />
+                        Egresos
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-red-800">
@@ -807,7 +801,10 @@ export default function ReportesWayraTaller() {
 
                   <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-xs sm:text-sm text-purple-700">Margen</CardTitle>
+                      <CardTitle className="text-xs sm:text-sm text-purple-700 flex items-center gap-2">
+                        <Percent className="h-4 w-4" />
+                        Margen
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-purple-800">
@@ -819,43 +816,56 @@ export default function ReportesWayraTaller() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Evolución Mensual</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">
+                      Evolución {periodo === 'mensual' ? 'Mensual' : periodo === 'trimestral' ? 'Trimestral' : periodo === 'semestral' ? 'Semestral' : 'Anual'}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="h-64 sm:h-96">
-                      <Line
-                        data={{
-                          labels: contabilidad.porMes.map((m: any) => m.mes),
-                          datasets: [
-                            {
-                              label: 'Ingresos',
-                              data: contabilidad.porMes.map((m: any) => m.ingresos),
-                              borderColor: 'rgb(34, 197, 94)',
-                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                              tension: 0.4
-                            },
-                            {
-                              label: 'Egresos',
-                              data: contabilidad.porMes.map((m: any) => m.egresos),
-                              borderColor: 'rgb(239, 68, 68)',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              tension: 0.4
-                            },
-                            {
-                              label: 'Utilidad',
-                              data: contabilidad.porMes.map((m: any) => m.utilidad),
-                              borderColor: 'rgb(59, 130, 246)',
-                              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                              tension: 0.4
+                      {contabilidad.porPeriodo && contabilidad.porPeriodo.length > 0 ? (
+                        <Line
+                          data={{
+                            labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
+                            datasets: [
+                              {
+                                label: 'Ingresos',
+                                data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
+                                borderColor: 'rgb(34, 197, 94)',
+                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                tension: 0.4
+                              },
+                              {
+                                label: 'Egresos',
+                                data: contabilidad.porPeriodo.map((m: any) => m.egresos),
+                                borderColor: 'rgb(239, 68, 68)',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                tension: 0.4
+                              },
+                              {
+                                label: 'Utilidad',
+                                data: contabilidad.porPeriodo.map((m: any) => m.utilidad),
+                                borderColor: 'rgb(59, 130, 246)',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                tension: 0.4
+                              }
+                            ]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            scales: {
+                              y: {
+                                beginAtZero: true
+                              }
                             }
-                          ]
-                        }}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          interaction: { mode: 'index', intersect: false },
-                        }}
-                      />
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          No hay datos para mostrar en este periodo
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -863,16 +873,16 @@ export default function ReportesWayraTaller() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base sm:text-lg">Órdenes por Mes</CardTitle>
+                      <CardTitle className="text-base sm:text-lg">Órdenes por Periodo</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="h-64">
                         <Bar
                           data={{
-                            labels: contabilidad.porMes.map((m: any) => m.mes),
+                            labels: contabilidad.porPeriodo.map((m: any) => m.periodo),
                             datasets: [{
                               label: 'Órdenes',
-                              data: contabilidad.porMes.map((m: any) => m.ordenes),
+                              data: contabilidad.porPeriodo.map((m: any) => m.ordenes),
                               backgroundColor: 'rgba(99, 102, 241, 0.8)',
                             }]
                           }}
@@ -913,6 +923,12 @@ export default function ReportesWayraTaller() {
                           <span className="text-sm text-gray-700">Margen</span>
                           <span className="text-sm font-bold text-purple-700">
                             {contabilidad.resumen.margenUtilidad}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                          <span className="text-sm text-gray-700">Órdenes</span>
+                          <span className="text-sm font-bold text-gray-700">
+                            {contabilidad.resumen.totalOrdenes}
                           </span>
                         </div>
                       </div>
@@ -996,7 +1012,7 @@ export default function ReportesWayraTaller() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Comparación Mensual</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">Comparación Mensual de Ingresos</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="h-64 sm:h-96">

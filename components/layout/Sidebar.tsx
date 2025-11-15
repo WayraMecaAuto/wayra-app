@@ -90,7 +90,7 @@ const menuItems: MenuItem[] = [
       },
       { 
         title: 'Reportes TorniRepuestos', 
-        href: '/tornirepuestos/reportes', 
+        href: '/reportes/tornirepuestos', 
         icon: TrendingUp,
         roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS']
       },
@@ -123,12 +123,6 @@ const menuItems: MenuItem[] = [
       }
     ]
   },
-  {
-    title: 'Configuración Sistema',
-    href: '/configuracion',
-    icon: Building,
-    roles: ['SUPER_USUARIO']
-  }
 ]
 
 function MenuItem({ item, level = 0, isCollapsed, onItemClick }: { 

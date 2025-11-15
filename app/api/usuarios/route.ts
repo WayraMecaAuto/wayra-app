@@ -14,7 +14,6 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
-      where: { isActive: true }, // Solo usuarios activos
       select: {
         id: true,
         name: true,
@@ -24,7 +23,10 @@ export async function GET() {
         createdAt: true,
         lastLogin: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [
+        { isActive: 'desc' }, // Activos primero
+        { createdAt: 'desc' }
+      ]
     })
 
     return NextResponse.json(users)

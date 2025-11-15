@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA'].includes(session?.user?.role || '')
+    const hasAccess = ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'].includes(session?.user?.role || '')
     if (!session || !hasAccess) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -19,49 +19,33 @@ export async function GET(request: NextRequest) {
     const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
     const trimestre = searchParams.get('trimestre') ? parseInt(searchParams.get('trimestre')!) : null
     const semestre = searchParams.get('semestre') ? parseInt(searchParams.get('semestre')!) : null
-    const mesProductos = searchParams.get('mesProductos') ? parseInt(searchParams.get('mesProductos')!) : null
-    const añoProductos = searchParams.get('añoProductos') ? parseInt(searchParams.get('añoProductos')!) : null
 
-    console.log('📊 Wayra Productos:', { tipo, periodo, año, mes, trimestre, semestre, mesProductos, añoProductos })
-
-    // PRODUCTOS MÁS VENDIDOS
+    // PRODUCTOS MÁS VENDIDOS (TODO EL TIEMPO)
     if (tipo === 'productos-vendidos') {
-      let whereMovimientos: any = {
-        entidad: 'WAYRA_PRODUCTOS',
-        tipo: 'INGRESO'
-      }
-
-      // Filtrar por mes/año si se proporciona
-      if (mesProductos && añoProductos) {
-        whereMovimientos.mes = mesProductos
-        whereMovimientos.anio = añoProductos
-      }
-
-      const productosVendidos = await prisma.$queryRawUnsafe<any[]>(`
+      const productosVendidos = await prisma.$queryRaw<any[]>`
         SELECT 
           p.id,
           p.nombre,
-          p.tipo,
+          p.categoria,
           CAST(SUM(dic.cantidad) AS INTEGER) as cantidad_vendida,
           CAST(SUM(dic."subtotalVenta") AS DECIMAL(10,2)) as total_vendido,
           CAST(SUM(dic.utilidad) AS DECIMAL(10,2)) as utilidad_total
         FROM "detalles_ingreso_contable" dic
         INNER JOIN "productos" p ON dic."productoId" = p.id
         INNER JOIN "movimientos_contables" mc ON dic."movimientoContableId" = mc.id
-        WHERE mc.entidad = 'WAYRA_PRODUCTOS'
+        WHERE mc.entidad = 'TORNIREPUESTOS'
           AND mc.tipo = 'INGRESO'
-          AND p.tipo IN ('WAYRA_ENI', 'WAYRA_CALAN')
+          AND p.tipo IN ('TORNI_REPUESTO', 'TORNILLERIA')
           AND p."isActive" = true
-          ${mesProductos && añoProductos ? `AND mc.mes = ${mesProductos} AND mc.anio = ${añoProductos}` : ''}
-        GROUP BY p.id, p.nombre, p.tipo
+        GROUP BY p.id, p.nombre, p.categoria
         ORDER BY cantidad_vendida DESC
-      `)
+      `
 
-      console.log('✅ Productos vendidos:', productosVendidos.length, mesProductos ? `(Mes ${mesProductos}/${añoProductos})` : '(Todo el tiempo)')
+      console.log('✅ TorniRepuestos - Productos vendidos:', productosVendidos.length)
 
       const productosNoVendidos = await prisma.producto.findMany({
         where: {
-          tipo: { in: ['WAYRA_ENI', 'WAYRA_CALAN'] },
+          tipo: { in: ['TORNI_REPUESTO', 'TORNILLERIA'] },
           isActive: true,
           detallesContables: {
             none: {}
@@ -70,7 +54,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           nombre: true,
-          tipo: true,
+          categoria: true,
           stock: true,
           precioVenta: true
         },
@@ -78,91 +62,88 @@ export async function GET(request: NextRequest) {
         take: 20
       })
 
+      console.log('✅ TorniRepuestos - Productos sin ventas:', productosNoVendidos.length)
+
       return NextResponse.json({
         masVendidos: productosVendidos,
         menosVendidos: productosNoVendidos
       })
     }
 
-    // REPORTES CONTABLES
+    // REPORTES CONTABLES POR PERIODO
     if (tipo === 'contabilidad') {
-      const isAdmin = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
+      const isAdmin = ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '')
       if (!isAdmin) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }
 
-      // Obtener datos EXACTAMENTE como en la página de contabilidad wayra-productos
-      const whereIngresos: any = {
-        entidad: 'WAYRA_PRODUCTOS',
-        tipo: 'INGRESO',
+      let whereClause: any = {
+        entidad: 'TORNIREPUESTOS',
         anio: año
       }
 
-      const whereEgresos: any = {
-        entidad: 'WAYRA_PRODUCTOS',
-        tipo: 'EGRESO',
-        anio: año
-      }
-
-      // Filtrar por periodo
+      // Determinar rango de meses según el periodo
+      let meses: number[] = []
+      
       if (periodo === 'mensual' && mes) {
-        whereIngresos.mes = mes
-        whereEgresos.mes = mes
+        meses = [mes]
+        whereClause.mes = mes
       } else if (periodo === 'trimestral' && trimestre) {
         const mesInicio = (trimestre - 1) * 3 + 1
         const mesFin = trimestre * 3
-        whereIngresos.mes = { gte: mesInicio, lte: mesFin }
-        whereEgresos.mes = { gte: mesInicio, lte: mesFin }
+        meses = Array.from({ length: mesFin - mesInicio + 1 }, (_, i) => mesInicio + i)
+        whereClause.mes = { gte: mesInicio, lte: mesFin }
       } else if (periodo === 'semestral' && semestre) {
         const mesInicio = semestre === 1 ? 1 : 7
         const mesFin = semestre === 1 ? 6 : 12
-        whereIngresos.mes = { gte: mesInicio, lte: mesFin }
-        whereEgresos.mes = { gte: mesInicio, lte: mesFin }
-      }
-
-      const ingresos = await prisma.movimientoContable.findMany({
-        where: whereIngresos,
-        include: {
-          detalleIngresos: true
-        }
-      })
-
-      const egresos = await prisma.movimientoContable.findMany({
-        where: whereEgresos
-      })
-
-      const totalIngresos = ingresos.reduce((sum, i) => sum + Number(i.monto), 0)
-      const totalEgresos = egresos.reduce((sum, e) => sum + Number(e.monto), 0)
-      const utilidadBruta = totalIngresos - totalEgresos
-
-      // Determinar meses a mostrar
-      let meses: number[] = []
-      if (periodo === 'mensual' && mes) {
-        meses = [mes]
-      } else if (periodo === 'trimestral' && trimestre) {
-        const mesInicio = (trimestre - 1) * 3 + 1
-        meses = [mesInicio, mesInicio + 1, mesInicio + 2]
-      } else if (periodo === 'semestral' && semestre) {
-        const mesInicio = semestre === 1 ? 1 : 7
-        meses = Array.from({ length: 6 }, (_, i) => mesInicio + i)
+        meses = Array.from({ length: mesFin - mesInicio + 1 }, (_, i) => mesInicio + i)
+        whereClause.mes = { gte: mesInicio, lte: mesFin }
       } else {
+        // Anual
         meses = Array.from({ length: 12 }, (_, i) => i + 1)
       }
 
+      console.log('📅 Consultando contabilidad TorniRepuestos para:', whereClause)
+
+      // OBTENER TODOS LOS MOVIMIENTOS CONTABLES
+      const movimientos = await prisma.movimientoContable.findMany({
+        where: whereClause,
+        orderBy: { fecha: 'desc' }
+      })
+
+      console.log('✅ Movimientos contables TorniRepuestos:', movimientos.length)
+
+      // SEPARAR INGRESOS Y EGRESOS
+      const ingresos = movimientos.filter(m => m.tipo === 'INGRESO')
+      const egresos = movimientos.filter(m => m.tipo === 'EGRESO')
+
+      // CALCULAR TOTALES DIRECTAMENTE DE LOS MOVIMIENTOS
+      const totalIngresos = ingresos.reduce((sum, m) => sum + Number(m.monto), 0)
+      const totalEgresos = egresos.reduce((sum, m) => sum + Number(m.monto), 0)
+      const utilidadBruta = totalIngresos - totalEgresos
+
+      console.log('💰 Totales contables TorniRepuestos:', { 
+        ingresos: totalIngresos, 
+        egresos: totalEgresos, 
+        utilidadBruta 
+      })
+
+      // AGRUPAR POR PERIODO
       const porPeriodo = meses.map(mesNum => {
-        const ingMes = ingresos.filter(i => i.mes === mesNum).reduce((s, i) => s + Number(i.monto), 0)
-        const egrMes = egresos.filter(e => e.mes === mesNum).reduce((s, e) => s + Number(e.monto), 0)
+        const movsMes = movimientos.filter(m => m.mes === mesNum)
+        const ingresosMes = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
+        const egresosMes = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
+        const utilidadMes = ingresosMes - egresosMes
         
         return {
           periodo: new Date(2024, mesNum - 1).toLocaleString('es-CO', { month: 'short' }).replace('.', ''),
-          ingresos: Math.round(ingMes),
-          egresos: Math.round(egrMes),
-          utilidad: Math.round(ingMes - egrMes)
+          ingresos: Math.round(ingresosMes),
+          egresos: Math.round(egresosMes),
+          utilidad: Math.round(utilidadMes)
         }
       })
 
-      console.log('💰 Contabilidad Wayra Productos:', { totalIngresos, totalEgresos, utilidadBruta })
-      console.log('📊 Datos por periodo:', porPeriodo)
+      console.log('📊 Por periodo TorniRepuestos generado:', porPeriodo)
 
       return NextResponse.json({
         resumen: {
@@ -179,9 +160,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // COMPARATIVA
+    // COMPARATIVA AÑO VS AÑO
     if (tipo === 'comparativa') {
-      const isAdmin = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
+      const isAdmin = ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '')
       if (!isAdmin) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }
@@ -189,21 +170,30 @@ export async function GET(request: NextRequest) {
       const año2 = parseInt(searchParams.get('año2') || String(año - 1))
 
       const movimientos1 = await prisma.movimientoContable.findMany({
-        where: { entidad: 'WAYRA_PRODUCTOS', anio: año }
+        where: { entidad: 'TORNIREPUESTOS', anio: año },
+        include: {
+          detalleIngresos: true
+        }
       })
 
       const movimientos2 = await prisma.movimientoContable.findMany({
-        where: { entidad: 'WAYRA_PRODUCTOS', anio: año2 }
+        where: { entidad: 'TORNIREPUESTOS', anio: año2 },
+        include: {
+          detalleIngresos: true
+        }
       })
 
       const procesarDatos = (movs: any[]) => {
         const porMes = Array.from({ length: 12 }, (_, i) => {
           const mesNum = i + 1
           const movsMes = movs.filter(m => m.mes === mesNum)
-          const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
-          const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
+          const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + m.monto, 0)
+          const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + m.monto, 0)
+          const utilidad = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => {
+            return s + m.detalleIngresos.reduce((sum: number, d: any) => sum + d.utilidad, 0)
+          }, 0)
           
-          return { mes: mesNum, ingresos: Math.round(ingresos), egresos: Math.round(egresos), utilidad: Math.round(ingresos - egresos) }
+          return { mes: mesNum, ingresos, egresos, utilidad }
         })
 
         return {
@@ -217,6 +207,7 @@ export async function GET(request: NextRequest) {
       const datos1 = procesarDatos(movimientos1)
       const datos2 = procesarDatos(movimientos2)
 
+      // Calcular crecimiento
       const crecimientoIngresos = datos2.totalIngresos > 0 
         ? ((datos1.totalIngresos - datos2.totalIngresos) / datos2.totalIngresos * 100).toFixed(2)
         : '0'
@@ -238,7 +229,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Tipo de reporte no válido' }, { status: 400 })
 
   } catch (error) {
-    console.error('❌ Error Wayra Productos:', error)
+    console.error('Error en reportes TorniRepuestos:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

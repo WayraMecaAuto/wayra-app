@@ -24,6 +24,7 @@ export async function PATCH(
       body.password = await bcrypt.hash(body.password, 12)
     }
 
+    // ✅ CAMBIO: Permitir actualizar cualquier campo, incluido isActive
     const user = await prisma.user.update({
       where: { id },
       data: body,
@@ -64,6 +65,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'No puedes eliminar tu propio usuario' }, { status: 400 })
     }
 
+    // ✅ MEJORA: Eliminación permanente (solo para casos extremos)
+    // El Super Usuario puede decidir si desactivar o eliminar
     await prisma.user.delete({
       where: { id }
     })
