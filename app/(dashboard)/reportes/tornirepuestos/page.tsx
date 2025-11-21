@@ -33,8 +33,6 @@ import {
 } from 'chart.js'
 import { Bar, Line } from 'react-chartjs-2'
 import toast from 'react-hot-toast'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
 import Dropdown from '@/components/forms/Dropdown'
 
 ChartJS.register(
@@ -127,31 +125,6 @@ export default function ReportesTorniRepuestosPage() {
     }
   }
 
-  const exportarPDF = () => {
-    const doc = new jsPDF()
-    doc.text('Reporte TorniRepuestos', 14, 15)
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
-    
-    if (vistaActual === 'productos' && productosVendidos) {
-      doc.text('Productos Más Vendidos', 14, 30)
-      const tableData = productosVendidos.masVendidos.slice(0, 20).map((p: any) => [
-        p.nombre,
-        p.cantidad_vendida,
-        isAdmin ? `$${Number(p.total_vendido).toLocaleString()}` : '-',
-        isAdmin ? `$${Number(p.utilidad_total).toLocaleString()}` : '-'
-      ])
-      
-      ;(doc as any).autoTable({
-        head: [['Producto', 'Cantidad', ...(isAdmin ? ['Ventas', 'Utilidad'] : [])]],
-        body: tableData,
-        startY: 35
-      })
-    }
-
-    doc.save(`reporte-torni-repuestos-${vistaActual}-${Date.now()}.pdf`)
-    toast.success('PDF descargado')
-  }
-
   if (!hasAccess) redirect('/dashboard')
 
   const añosOptions = Array.from({ length: 11 }, (_, i) => ({
@@ -197,10 +170,6 @@ export default function ReportesTorniRepuestosPage() {
               <p className="text-orange-100 text-lg">Análisis de ventas y contabilidad</p>
             </div>
           </div>
-          <Button onClick={exportarPDF} className="bg-white text-orange-600 hover:bg-orange-50 shadow-lg">
-            <Download className="h-4 w-4 mr-2" />
-            Descargar PDF
-          </Button>
         </div>
       </div>
 
@@ -507,6 +476,20 @@ export default function ReportesTorniRepuestosPage() {
                   </CardContent>
                 </Card>
 
+                <Card className="bg-gradient-to-br from-amber-50 to-amber-100">
+                  <CardHeader>
+                    <CardTitle className="text-amber-700 flex items-center gap-2">
+                      <TrendingDown className="h-5 w-5" />
+                      Costos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-amber-800">
+                      ${contabilidad.resumen.totalCostos.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card className="bg-gradient-to-br from-red-50 to-red-100">
                   <CardHeader>
                     <CardTitle className="text-red-700 flex items-center gap-2">
@@ -523,33 +506,23 @@ export default function ReportesTorniRepuestosPage() {
 
                 <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
                   <CardHeader>
-                    <CardTitle className="text-blue-700">Utilidad Neta</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-blue-800">
-                      ${contabilidad.resumen.utilidadBruta.toLocaleString()}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
-                  <CardHeader>
-                    <CardTitle className="text-purple-700 flex items-center gap-2">
+                    <CardTitle className="text-blue-700 flex items-center gap-2">
                       <Percent className="h-5 w-5" />
-                      Margen
+                      Utilidad
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-purple-800">
-                      {contabilidad.resumen.margenUtilidad}%
+                    <div className="text-3xl font-bold text-blue-800">
+                      ${contabilidad.resumen.totalUtilidad.toLocaleString()}
                     </div>
+                    <p className="text-sm text-blue-600 mt-1">{contabilidad.resumen.margenUtilidad}% margen</p>
                   </CardContent>
                 </Card>
               </div>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Evolución {periodo === 'mensual' ? 'Mensual' : periodo === 'trimestral' ? 'Trimestral' : periodo === 'semestral' ? 'Semestral' : 'Anual'}</CardTitle>
+                  <CardTitle>Evolución {periodo === 'mensual' ? 'Diaria' : periodo === 'anual' ? 'Mensual' : 'del Periodo'}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-96">
@@ -563,6 +536,13 @@ export default function ReportesTorniRepuestosPage() {
                               data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
                               borderColor: 'rgb(34, 197, 94)',
                               backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Costos',
+                              data: contabilidad.porPeriodo.map((m: any) => m.costos),
+                              borderColor: 'rgb(251, 191, 36)',
+                              backgroundColor: 'rgba(251, 191, 36, 0.1)',
                               tension: 0.4
                             },
                             {

@@ -49,9 +49,21 @@ export default function TornilleriaPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
+  // Verificar permisos
+  const hasAccess = [
+    "SUPER_USUARIO",
+    "ADMIN_TORNI_REPUESTOS",
+    "VENDEDOR_TORNI",
+  ].includes(session?.user?.role || "");
+  const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_PRODUCTOS"].includes(
+    session?.user?.role || ""
+  );
+
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (hasAccess) {
+      fetchProducts();
+    }
+  }, [hasAccess]);
 
   const fetchProducts = async () => {
     try {
@@ -105,6 +117,23 @@ export default function TornilleriaPage() {
     totalValue: products.reduce((sum, p) => sum + p.stock * p.precioVenta, 0),
     allWithIva: products.length, // Todos tienen IVA obligatorio
   };
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-red-50 to-red-100">
+        <div className="text-center animate-fade-in">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+            <AlertTriangle className="h-10 w-10 text-red-500" />
+          </div>
+          <div className="text-red-600 text-2xl font-bold mb-3">
+            Acceso Denegado
+          </div>
+          <p className="text-gray-600 max-w-md">
+            No tienes permisos para acceder a esta sección
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const trimestre = searchParams.get('trimestre') ? parseInt(searchParams.get('trimestre')!) : null
     const semestre = searchParams.get('semestre') ? parseInt(searchParams.get('semestre')!) : null
 
-    // PRODUCTOS MÁS VENDIDOS (TODO EL TIEMPO O POR MES)
+    // PRODUCTOS MÁS VENDIDOS (CON FILTRO DE MES/AÑO O TODO EL TIEMPO)
     if (tipo === 'productos-vendidos') {
       const mesFilter = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
       const añoFilter = searchParams.get('año') ? parseInt(searchParams.get('año')!) : null
@@ -88,85 +88,170 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }
 
-      let whereClause: any = {
-        entidad: 'TORNIREPUESTOS',
-        anio: año
-      }
-
       // Determinar rango de meses según el periodo
-      let meses: number[] = []
+      let mesesRango: number[] = []
       
       if (periodo === 'mensual' && mes) {
-        meses = [mes]
-        whereClause.mes = mes
+        mesesRango = [mes]
       } else if (periodo === 'trimestral' && trimestre) {
         const mesInicio = (trimestre - 1) * 3 + 1
-        const mesFin = trimestre * 3
-        meses = Array.from({ length: mesFin - mesInicio + 1 }, (_, i) => mesInicio + i)
-        whereClause.mes = { gte: mesInicio, lte: mesFin }
+        mesesRango = [mesInicio, mesInicio + 1, mesInicio + 2]
       } else if (periodo === 'semestral' && semestre) {
         const mesInicio = semestre === 1 ? 1 : 7
-        const mesFin = semestre === 1 ? 6 : 12
-        meses = Array.from({ length: mesFin - mesInicio + 1 }, (_, i) => mesInicio + i)
-        whereClause.mes = { gte: mesInicio, lte: mesFin }
+        mesesRango = Array.from({ length: 6 }, (_, i) => mesInicio + i)
       } else {
-        // Anual
-        meses = Array.from({ length: 12 }, (_, i) => i + 1)
+        // Anual - todos los meses
+        mesesRango = Array.from({ length: 12 }, (_, i) => i + 1)
       }
 
-      console.log('📅 Consultando contabilidad TorniRepuestos para:', whereClause)
+      console.log('📅 Consultando contabilidad TorniRepuestos:', { periodo, año, meses: mesesRango })
 
-      // OBTENER TODOS LOS MOVIMIENTOS CONTABLES
-      const movimientos = await prisma.movimientoContable.findMany({
-        where: whereClause,
-        orderBy: { fecha: 'desc' }
-      })
+      // OBTENER DATOS DE CONTABILIDAD PARA CADA MES DEL RANGO
+      const todosIngresos: any[] = []
+      const todosEgresos: any[] = []
 
-      console.log('✅ Movimientos contables TorniRepuestos:', movimientos.length)
+      for (const mesNum of mesesRango) {
+        const ingresosMovimientos = await prisma.movimientoContable.findMany({
+          where: {
+            tipo: 'INGRESO',
+            concepto: { in: ['VENTA_PRODUCTO', 'VENTA_DESDE_ORDEN'] },
+            entidad: 'TORNIREPUESTOS',
+            mes: mesNum,
+            anio: año
+          },
+          include: {
+            detalleIngresos: {
+              include: {
+                producto: {
+                  select: {
+                    nombre: true,
+                    codigo: true,
+                    categoria: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: { fecha: 'desc' }
+        })
 
-      // SEPARAR INGRESOS Y EGRESOS
-      const ingresos = movimientos.filter(m => m.tipo === 'INGRESO')
-      const egresos = movimientos.filter(m => m.tipo === 'EGRESO')
+        const ingresosMes = ingresosMovimientos.flatMap(mov =>
+          mov.detalleIngresos.map(detalle => ({
+            id: detalle.id,
+            fecha: mov.fecha,
+            cantidad: detalle.cantidad,
+            descripcion: detalle.producto.nombre,
+            categoria: detalle.producto.categoria,
+            precioCompra: detalle.precioCompra,
+            precioVenta: detalle.precioVenta,
+            utilidad: detalle.utilidad,
+            productoId: detalle.productoId,
+            motivo: mov.descripcion,
+            mes: mesNum
+          }))
+        )
 
-      // CALCULAR TOTALES DIRECTAMENTE DE LOS MOVIMIENTOS
-      const totalIngresos = ingresos.reduce((sum, m) => sum + Number(m.monto), 0)
-      const totalEgresos = egresos.reduce((sum, m) => sum + Number(m.monto), 0)
-      const utilidadBruta = totalIngresos - totalEgresos
+        const egresosMes = await prisma.movimientoContable.findMany({
+          where: {
+            tipo: 'EGRESO',
+            entidad: 'TORNIREPUESTOS',
+            mes: mesNum,
+            anio: año
+          },
+          include: {
+            usuario: {
+              select: { name: true }
+            }
+          },
+          orderBy: { fecha: 'desc' }
+        })
 
-      console.log('💰 Totales contables TorniRepuestos:', { 
+        const egresosFormatoMes = egresosMes.map(e => ({
+          id: e.id,
+          fecha: e.fecha,
+          descripcion: e.descripcion,
+          concepto: e.concepto,
+          usuario: e.usuario.name,
+          valor: e.monto,
+          mes: mesNum
+        }))
+
+        todosIngresos.push(...ingresosMes)
+        todosEgresos.push(...egresosFormatoMes)
+      }
+
+      console.log('✅ TorniRepuestos - Ingresos:', todosIngresos.length, 'Egresos:', todosEgresos.length)
+
+      // CALCULAR TOTALES (EXACTAMENTE COMO EN LA API DE CONTABILIDAD)
+      const totalIngresos = todosIngresos.reduce((sum, i) => sum + i.precioVenta * i.cantidad, 0)
+      const totalCostos = todosIngresos.reduce((sum, i) => sum + i.precioCompra * i.cantidad, 0)
+      const totalEgresos = todosEgresos.reduce((sum, e) => sum + e.valor, 0)
+      const totalUtilidad = totalIngresos - totalCostos - totalEgresos
+
+      console.log('💰 Totales TorniRepuestos:', { 
         ingresos: totalIngresos, 
+        costos: totalCostos,
         egresos: totalEgresos, 
-        utilidadBruta 
+        utilidad: totalUtilidad 
       })
 
-      // AGRUPAR POR PERIODO
-      const porPeriodo = meses.map(mesNum => {
-        const movsMes = movimientos.filter(m => m.mes === mesNum)
-        const ingresosMes = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
-        const egresosMes = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
-        const utilidadMes = ingresosMes - egresosMes
-        
-        return {
-          periodo: new Date(2024, mesNum - 1).toLocaleString('es-CO', { month: 'short' }).replace('.', ''),
-          ingresos: Math.round(ingresosMes),
-          egresos: Math.round(egresosMes),
-          utilidad: Math.round(utilidadMes)
-        }
-      })
+      // GENERAR DATOS POR PERIODO
+      let porPeriodo: any[] = []
 
-      console.log('📊 Por periodo TorniRepuestos generado:', porPeriodo)
+      if (periodo === 'mensual' && mes) {
+        // Agrupar por día
+        const diasEnMes = new Date(año, mes, 0).getDate()
+        porPeriodo = Array.from({ length: diasEnMes }, (_, i) => {
+          const dia = i + 1
+          const ingresosDia = todosIngresos.filter(ing => new Date(ing.fecha).getDate() === dia)
+          const egresosDia = todosEgresos.filter(egr => new Date(egr.fecha).getDate() === dia)
+
+          const ingresosVal = ingresosDia.reduce((s, i) => s + i.precioVenta * i.cantidad, 0)
+          const costosVal = ingresosDia.reduce((s, i) => s + i.precioCompra * i.cantidad, 0)
+          const egresosVal = egresosDia.reduce((s, e) => s + e.valor, 0)
+
+          return {
+            periodo: `Día ${dia}`,
+            ingresos: Math.round(ingresosVal),
+            costos: Math.round(costosVal),
+            egresos: Math.round(egresosVal),
+            utilidad: Math.round(ingresosVal - costosVal - egresosVal)
+          }
+        })
+      } else {
+        // Agrupar por mes (trimestral, semestral, anual)
+        porPeriodo = mesesRango.map(mesNum => {
+          const ingresosMes = todosIngresos.filter(i => i.mes === mesNum)
+          const egresosMes = todosEgresos.filter(e => e.mes === mesNum)
+
+          const ingresosVal = ingresosMes.reduce((s, i) => s + i.precioVenta * i.cantidad, 0)
+          const costosVal = ingresosMes.reduce((s, i) => s + i.precioCompra * i.cantidad, 0)
+          const egresosVal = egresosMes.reduce((s, e) => s + e.valor, 0)
+
+          return {
+            periodo: new Date(año, mesNum - 1).toLocaleString('es-CO', { month: 'short' }).replace('.', ''),
+            ingresos: Math.round(ingresosVal),
+            costos: Math.round(costosVal),
+            egresos: Math.round(egresosVal),
+            utilidad: Math.round(ingresosVal - costosVal - egresosVal)
+          }
+        })
+      }
+
+      console.log('📊 Por periodo TorniRepuestos:', porPeriodo.length, 'puntos')
 
       return NextResponse.json({
         resumen: {
           totalIngresos: Math.round(totalIngresos),
+          totalCostos: Math.round(totalCostos),
           totalEgresos: Math.round(totalEgresos),
-          utilidadBruta: Math.round(utilidadBruta),
-          margenUtilidad: totalIngresos > 0 ? ((utilidadBruta / totalIngresos) * 100).toFixed(2) : '0'
+          totalUtilidad: Math.round(totalUtilidad),
+          margenUtilidad: totalIngresos > 0 ? ((totalUtilidad / totalIngresos) * 100).toFixed(2) : '0'
         },
         porPeriodo,
         movimientos: {
-          ingresos: ingresos.slice(0, 50),
-          egresos: egresos.slice(0, 50)
+          ingresos: todosIngresos.slice(0, 50),
+          egresos: todosEgresos.slice(0, 50)
         }
       })
     }
@@ -182,33 +267,32 @@ export async function GET(request: NextRequest) {
 
       const movimientos1 = await prisma.movimientoContable.findMany({
         where: { entidad: 'TORNIREPUESTOS', anio: año },
-        include: {
-          detalleIngresos: true
-        }
+        include: { detalleIngresos: true }
       })
 
       const movimientos2 = await prisma.movimientoContable.findMany({
         where: { entidad: 'TORNIREPUESTOS', anio: año2 },
-        include: {
-          detalleIngresos: true
-        }
+        include: { detalleIngresos: true }
       })
 
       const procesarDatos = (movs: any[]) => {
         const porMes = Array.from({ length: 12 }, (_, i) => {
           const mesNum = i + 1
-          const movsMes = movs.filter(m => m.mes === mesNum)
-          const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
-          const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
-          const utilidad = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => {
-            return s + m.detalleIngresos.reduce((sum: number, d: any) => sum + Number(d.utilidad), 0)
-          }, 0)
+          const movsDelMes = movs.filter(m => m.mes === mesNum)
           
-          return { mes: mesNum, ingresos, egresos, utilidad }
+          const ingresos = movsDelMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
+          const costos = movsDelMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => {
+            return s + m.detalleIngresos.reduce((sum: number, d: any) => sum + Number(d.subtotalCompra), 0)
+          }, 0)
+          const egresos = movsDelMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
+          const utilidad = ingresos - costos - egresos
+          
+          return { mes: mesNum, ingresos, costos, egresos, utilidad }
         })
 
         return {
           totalIngresos: porMes.reduce((s, m) => s + m.ingresos, 0),
+          totalCostos: porMes.reduce((s, m) => s + m.costos, 0),
           totalEgresos: porMes.reduce((s, m) => s + m.egresos, 0),
           utilidadTotal: porMes.reduce((s, m) => s + m.utilidad, 0),
           porMes
@@ -218,7 +302,6 @@ export async function GET(request: NextRequest) {
       const datos1 = procesarDatos(movimientos1)
       const datos2 = procesarDatos(movimientos2)
 
-      // Calcular crecimiento
       const crecimientoIngresos = datos2.totalIngresos > 0 
         ? ((datos1.totalIngresos - datos2.totalIngresos) / datos2.totalIngresos * 100).toFixed(2)
         : '0'

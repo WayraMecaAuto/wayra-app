@@ -31,10 +31,8 @@ import {
   Legend,
   ArcElement
 } from 'chart.js'
-import { Bar, Line, Doughnut } from 'react-chartjs-2'
+import { Bar, Line } from 'react-chartjs-2'
 import toast from 'react-hot-toast'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
 import Dropdown from '@/components/forms/Dropdown'
 
 ChartJS.register(
@@ -54,7 +52,12 @@ export default function ReportesWayraProductosPage() {
   const [loading, setLoading] = useState(false)
   const [vistaActual, setVistaActual] = useState<'productos' | 'contabilidad' | 'comparativa'>('productos')
   
-  // Filtros
+  // Filtros para productos
+  const [filtroProductos, setFiltroProductos] = useState<'todo' | 'mes'>('todo')
+  const [mesProductos, setMesProductos] = useState(new Date().getMonth() + 1)
+  const [añoProductos, setAñoProductos] = useState(new Date().getFullYear())
+  
+  // Filtros para contabilidad
   const [periodo, setPeriodo] = useState<'mensual' | 'trimestral' | 'semestral' | 'anual'>('mensual')
   const [año, setAño] = useState(new Date().getFullYear())
   const [mes, setMes] = useState(new Date().getMonth() + 1)
@@ -76,18 +79,26 @@ export default function ReportesWayraProductosPage() {
     if (hasAccess) {
       cargarDatos()
     }
-  }, [hasAccess, vistaActual, periodo, año, mes, trimestre, semestre, añoComparar])
+  }, [hasAccess, vistaActual, periodo, año, mes, trimestre, semestre, añoComparar, filtroProductos, mesProductos, añoProductos])
 
   const cargarDatos = async () => {
     setLoading(true)
     try {
       if (vistaActual === 'productos') {
-        const res = await fetch(`/api/reportes/wayra-productos?tipo=productos-vendidos`)
+        // 🔥 CORREGIDO: Usar la ruta correcta para Wayra Productos
+        let url = `/api/reportes/wayra-productos?tipo=productos-vendidos`
+        if (filtroProductos === 'mes') {
+          url += `&mes=${mesProductos}&año=${añoProductos}`
+        }
+        console.log('📊 Cargando productos Wayra:', url)
+        const res = await fetch(url)
         if (res.ok) {
           const data = await res.json()
+          console.log('✅ Datos productos recibidos:', data)
           setProductosVendidos(data)
         }
       } else if (vistaActual === 'contabilidad' && isAdmin) {
+        // 🔥 CORREGIDO: Usar la ruta correcta para Wayra Productos
         let url = `/api/reportes/wayra-productos?tipo=contabilidad&periodo=${periodo}&año=${año}`
         
         if (periodo === 'mensual') {
@@ -98,15 +109,21 @@ export default function ReportesWayraProductosPage() {
           url += `&semestre=${semestre}`
         }
         
+        console.log('📊 Cargando contabilidad Wayra:', url)
         const res = await fetch(url)
         if (res.ok) {
           const data = await res.json()
+          console.log('✅ Contabilidad Wayra recibida:', data)
           setContabilidad(data)
         }
       } else if (vistaActual === 'comparativa' && isAdmin) {
-        const res = await fetch(`/api/reportes/wayra-productos?tipo=comparativa&año=${año}&año2=${añoComparar}`)
+        // 🔥 CORREGIDO: Usar la ruta correcta para Wayra Productos
+        const url = `/api/reportes/wayra-productos?tipo=comparativa&año=${año}&año2=${añoComparar}`
+        console.log('📊 Cargando comparativa Wayra:', url)
+        const res = await fetch(url)
         if (res.ok) {
           const data = await res.json()
+          console.log('✅ Comparativa Wayra recibida:', data)
           setComparativa(data)
         }
       }
@@ -116,31 +133,6 @@ export default function ReportesWayraProductosPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const exportarPDF = () => {
-    const doc = new jsPDF()
-    doc.text('Reporte Wayra Productos', 14, 15)
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
-    
-    if (vistaActual === 'productos' && productosVendidos) {
-      doc.text('Productos Más Vendidos', 14, 30)
-      const tableData = productosVendidos.masVendidos.slice(0, 20).map((p: any) => [
-        p.nombre,
-        p.cantidad_vendida,
-        isAdmin ? `$${Number(p.total_vendido).toLocaleString()}` : '-',
-        isAdmin ? `$${Number(p.utilidad_total).toLocaleString()}` : '-'
-      ])
-      
-      ;(doc as any).autoTable({
-        head: [['Producto', 'Cantidad', ...(isAdmin ? ['Ventas', 'Utilidad'] : [])]],
-        body: tableData,
-        startY: 35
-      })
-    }
-
-    doc.save(`reporte-wayra-productos-${vistaActual}-${Date.now()}.pdf`)
-    toast.success('PDF descargado')
   }
 
   if (!hasAccess) redirect('/dashboard')
@@ -188,10 +180,6 @@ export default function ReportesWayraProductosPage() {
               <p className="text-blue-100 text-lg">Análisis de ventas y contabilidad</p>
             </div>
           </div>
-          <Button onClick={exportarPDF} className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg">
-            <Download className="h-4 w-4 mr-2" />
-            Descargar PDF
-          </Button>
         </div>
       </div>
 
@@ -232,6 +220,49 @@ export default function ReportesWayraProductosPage() {
       </Card>
 
       {/* Filtros */}
+      {vistaActual === 'productos' && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Periodo</label>
+                <Dropdown
+                  options={[
+                    { value: 'todo', label: 'Todo el tiempo' },
+                    { value: 'mes', label: 'Por mes' }
+                  ]}
+                  value={filtroProductos}
+                  onChange={(val) => setFiltroProductos(val as 'todo' | 'mes')}
+                  icon={<Calendar className="h-4 w-4" />}
+                />
+              </div>
+              {filtroProductos === 'mes' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Año</label>
+                    <Dropdown
+                      options={añosOptions}
+                      value={añoProductos}
+                      onChange={setAñoProductos}
+                      icon={<Calendar className="h-4 w-4" />}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Mes</label>
+                    <Dropdown
+                      options={mesesOptions}
+                      value={mesProductos}
+                      onChange={setMesProductos}
+                      icon={<Calendar className="h-4 w-4" />}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {vistaActual !== 'productos' && (
         <Card>
           <CardContent className="p-4">
@@ -314,7 +345,7 @@ export default function ReportesWayraProductosPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       ) : (
         <>
@@ -327,7 +358,7 @@ export default function ReportesWayraProductosPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-green-600" />
-                      Top 10 Más Vendidos
+                      Top 10 Más Vendidos {filtroProductos === 'mes' && `(${mesesOptions.find(m => m.value === mesProductos)?.label} ${añoProductos})`}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -339,14 +370,14 @@ export default function ReportesWayraProductosPage() {
                         datasets: [{
                           label: 'Cantidad Vendida',
                           data: productosVendidos.masVendidos.slice(0, 10).map((p: any) => Number(p.cantidad_vendida)),
-                          backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                          backgroundColor: 'rgba(59, 130, 246, 0.8)',
                         }]
                       }}
                       options={{
                         responsive: true,
                         plugins: {
                           legend: { position: 'top' },
-                          title: { display: true, text: 'Productos Más Vendidos (Todo el Tiempo)' }
+                          title: { display: true, text: 'Productos Más Vendidos' }
                         }
                       }}
                     />
@@ -357,26 +388,30 @@ export default function ReportesWayraProductosPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5 text-orange-600" />
+                      <AlertCircle className="h-5 w-5 text-blue-600" />
                       Sin Ventas Registradas
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
-                      {productosVendidos.menosVendidos.map((p: any) => (
-                        <div key={p.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-gray-800">{p.nombre}</p>
-                            <p className="text-sm text-gray-600">{p.tipo}</p>
+                      {productosVendidos.menosVendidos.length > 0 ? (
+                        productosVendidos.menosVendidos.map((p: any) => (
+                          <div key={p.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-gray-800">{p.nombre}</p>
+                              <p className="text-sm text-gray-600">{p.tipo}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-600">Stock: {p.stock}</p>
+                              {isAdmin && (
+                                <p className="text-sm font-medium">${p.precioVenta.toLocaleString()}</p>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-600">Stock: {p.stock}</p>
-                            {isAdmin && (
-                              <p className="text-sm font-medium">${p.precioVenta.toLocaleString()}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-500 py-8">Todos los productos tienen ventas registradas</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -405,7 +440,7 @@ export default function ReportesWayraProductosPage() {
                       </thead>
                       <tbody>
                         {productosVendidos.masVendidos.map((p: any, i: number) => (
-                          <tr key={i} className="border-b">
+                          <tr key={i} className="border-b hover:bg-gray-50">
                             <td className="py-3 px-4">{p.nombre}</td>
                             <td className="py-3 px-4">
                               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
@@ -433,7 +468,7 @@ export default function ReportesWayraProductosPage() {
             </>
           )}
 
-          {/* VISTA: CONTABILIDAD (Solo Admins) */}
+          {/* VISTA: CONTABILIDAD */}
           {vistaActual === 'contabilidad' && contabilidad && isAdmin && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -447,6 +482,20 @@ export default function ReportesWayraProductosPage() {
                   <CardContent>
                     <div className="text-3xl font-bold text-green-800">
                       ${contabilidad.resumen.totalIngresos.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-amber-50 to-amber-100">
+                  <CardHeader>
+                    <CardTitle className="text-amber-700 flex items-center gap-2">
+                      <TrendingDown className="h-5 w-5" />
+                      Costos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-amber-800">
+                      ${contabilidad.resumen.totalCostos.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -467,33 +516,23 @@ export default function ReportesWayraProductosPage() {
 
                 <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
                   <CardHeader>
-                    <CardTitle className="text-blue-700">Utilidad Bruta</CardTitle>
+                    <CardTitle className="text-blue-700 flex items-center gap-2">
+                      <Percent className="h-5 w-5" />
+                      Utilidad
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-blue-800">
                       ${contabilidad.resumen.utilidadBruta.toLocaleString()}
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
-                  <CardHeader>
-                    <CardTitle className="text-purple-700 flex items-center gap-2">
-                      <Percent className="h-5 w-5" />
-                      Margen
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-purple-800">
-                      {contabilidad.resumen.margenUtilidad}%
-                    </div>
+                    <p className="text-sm text-blue-600 mt-1">{contabilidad.resumen.margenUtilidad}% margen</p>
                   </CardContent>
                 </Card>
               </div>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Evolución {periodo === 'mensual' ? 'Mensual' : periodo === 'trimestral' ? 'Trimestral' : periodo === 'semestral' ? 'Semestral' : 'Anual'}</CardTitle>
+                  <CardTitle>Evolución {periodo === 'mensual' ? 'Diaria' : periodo === 'anual' ? 'Mensual' : 'del Periodo'}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-96">
@@ -507,6 +546,13 @@ export default function ReportesWayraProductosPage() {
                               data: contabilidad.porPeriodo.map((m: any) => m.ingresos),
                               borderColor: 'rgb(34, 197, 94)',
                               backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Costos',
+                              data: contabilidad.porPeriodo.map((m: any) => m.costos),
+                              borderColor: 'rgb(251, 191, 36)',
+                              backgroundColor: 'rgba(251, 191, 36, 0.1)',
                               tension: 0.4
                             },
                             {
@@ -547,7 +593,7 @@ export default function ReportesWayraProductosPage() {
             </>
           )}
 
-          {/* VISTA: COMPARATIVA (Solo Admins) */}
+          {/* VISTA: COMPARATIVA */}
           {vistaActual === 'comparativa' && comparativa && isAdmin && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -625,54 +671,21 @@ export default function ReportesWayraProductosPage() {
                   <CardTitle>Comparación Mensual de Ingresos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Line
-                    data={{
-                      labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-                      datasets: [
-                        {
-                          label: `${comparativa.año1.año}`,
-                          data: comparativa.año1.porMes.map((m: any) => m.ingresos),
-                          borderColor: 'rgb(59, 130, 246)',
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                          tension: 0.4
-                        },
-                        {
-                          label: `${comparativa.año2.año}`,
-                          data: comparativa.año2.porMes.map((m: any) => m.ingresos),
-                          borderColor: 'rgb(156, 163, 175)',
-                          backgroundColor: 'rgba(156, 163, 175, 0.1)',
-                          tension: 0.4
-                        }
-                      ]
-                    }}
-                    options={{
-                      responsive: true,
-                      interaction: { mode: 'index', intersect: false },
-                    }}
-                  />
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Comparación Mensual de Utilidad</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  <div className="h-96">
                     <Line
                       data={{
                         labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
                         datasets: [
                           {
                             label: `${comparativa.año1.año}`,
-                            data: comparativa.año1.porMes.map((m: any) => m.utilidad),
-                            borderColor: 'rgb(34, 197, 94)',
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            data: comparativa.año1.porMes.map((m: any) => m.ingresos),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             tension: 0.4
                           },
                           {
                             label: `${comparativa.año2.año}`,
-                            data: comparativa.año2.porMes.map((m: any) => m.utilidad),
+                            data: comparativa.año2.porMes.map((m: any) => m.ingresos),
                             borderColor: 'rgb(156, 163, 175)',
                             backgroundColor: 'rgba(156, 163, 175, 0.1)',
                             tension: 0.4
@@ -682,8 +695,46 @@ export default function ReportesWayraProductosPage() {
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
                       }}
                     />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Comparación Mensual de Utilidad</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <Line
+                        data={{
+                          labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                          datasets: [
+                            {
+                              label: `${comparativa.año1.año}`,
+                              data: comparativa.año1.porMes.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(34, 197, 94)',
+                              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                              tension: 0.4
+                            },
+                            {
+                              label: `${comparativa.año2.año}`,
+                              data: comparativa.año2.porMes.map((m: any) => m.utilidad),
+                              borderColor: 'rgb(156, 163, 175)',
+                              backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                              tension: 0.4
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                        }}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 

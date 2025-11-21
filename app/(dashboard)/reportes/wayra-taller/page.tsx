@@ -20,8 +20,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bar, Line, Doughnut } from 'react-chartjs-2'
 import toast from 'react-hot-toast'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
 import Dropdown from '@/components/forms/Dropdown'
 import {
   Chart as ChartJS,
@@ -132,29 +130,6 @@ export default function ReportesWayraTaller() {
     }
   }
 
-  const exportarPDF = () => {
-    const doc = new jsPDF()
-    doc.text('Reporte Wayra Taller', 14, 15)
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
-    doc.text(`Periodo: ${año}`, 14, 29)
-
-    if (vistaActual === 'servicios' && serviciosFrecuencia) {
-      const tableData = serviciosFrecuencia.masRealizados.slice(0, 15).map((s: any) => [
-        s.descripcion,
-        s.veces_realizado,
-        canViewContabilidad ? `$${s.ingreso_total.toLocaleString()}` : '-'
-      ])
-      ;(doc as any).autoTable({
-        head: [['Servicio', 'Veces', ...(canViewContabilidad ? ['Ingreso'] : [])]],
-        body: tableData,
-        startY: 35
-      })
-    }
-
-    doc.save(`reporte-taller-${Date.now()}.pdf`)
-    toast.success('PDF descargado')
-  }
-
   if (!hasAccess) redirect('/dashboard')
 
   const añosOptions = Array.from({ length: 11 }, (_, i) => ({
@@ -201,10 +176,6 @@ export default function ReportesWayraTaller() {
                 <p className="text-indigo-100 text-sm sm:text-base lg:text-lg">Análisis y estadísticas</p>
               </div>
             </div>
-            <Button onClick={exportarPDF} className="bg-white text-indigo-600 hover:bg-indigo-50">
-              <Download className="h-4 w-4 mr-2" />
-              PDF
-            </Button>
           </div>
         </div>
 

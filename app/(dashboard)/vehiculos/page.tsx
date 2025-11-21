@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
+import Dropdown from '@/components/forms/Dropdown'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 
@@ -59,11 +60,13 @@ export default function VehiculosPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingVehiculo, setEditingVehiculo] = useState<Vehiculo | null>(null)
+  const [selectedClienteId, setSelectedClienteId] = useState('')
+  const [selectedCombustible, setSelectedCombustible] = useState('')
 
   // Verificar permisos
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
 
-  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<VehiculoForm>()
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<VehiculoForm>()
 
   useEffect(() => {
     if (hasAccess) {
@@ -74,6 +77,8 @@ export default function VehiculosPage() {
 
   useEffect(() => {
     if (editingVehiculo) {
+      setSelectedClienteId(editingVehiculo.clienteId)
+      setSelectedCombustible(editingVehiculo.combustible || '')
       setValue('clienteId', editingVehiculo.clienteId)
       setValue('placa', editingVehiculo.placa)
       setValue('marca', editingVehiculo.marca)
@@ -124,7 +129,11 @@ export default function VehiculosPage() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          ...data,
+          clienteId: selectedClienteId,
+          combustible: selectedCombustible
+        })
       })
 
       if (response.ok) {
@@ -143,6 +152,8 @@ export default function VehiculosPage() {
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingVehiculo(null)
+    setSelectedClienteId('')
+    setSelectedCombustible('')
     reset()
   }
 
@@ -185,6 +196,15 @@ export default function VehiculosPage() {
       </div>
     )
   }
+
+  const opcionesCombustible = [
+    { value: '', label: 'Selecciona' },
+    { value: 'Gasolina', label: 'Gasolina' },
+    { value: 'Diesel', label: 'Diesel' },
+    { value: 'Eléctrico', label: 'Eléctrico' },
+    { value: 'Híbrido', label: 'Híbrido' },
+    { value: 'Gas', label: 'Gas' }
+  ]
 
   return (
     <div className="space-y-6 p-4 sm:p-6 md:p-8 lg:p-10 animate-fade-in">
@@ -432,18 +452,17 @@ export default function VehiculosPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cliente *
             </label>
-            <select
-              {...register('clienteId', { required: 'El cliente es requerido' })}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300 focus:scale-102 ${errors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
+            <Dropdown
+              options={clientes.map(c => ({ value: c.id, label: c.nombre }))}
+              value={selectedClienteId}
+              onChange={(val) => {
+                setSelectedClienteId(val)
+                setValue('clienteId', val)
+              }}
+              placeholder="Selecciona un cliente"
+              icon={<User className="h-4 w-4 text-gray-500" />}
               disabled={!!editingVehiculo}
-            >
-              <option value="">Selecciona un cliente</option>
-              {clientes.map(cliente => (
-                <option key={cliente.id} value={cliente.id}>
-                  {cliente.nombre}
-                </option>
-              ))}
-            </select>
+            />
             {errors.clienteId && (
               <p className="mt-1 text-sm text-red-600">{errors.clienteId.message}</p>
             )}
@@ -523,17 +542,16 @@ export default function VehiculosPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Combustible
               </label>
-              <select
-                {...register('combustible')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300 focus:scale-102"
-              >
-                <option value="">Selecciona</option>
-                <option value="Gasolina">Gasolina</option>
-                <option value="Diesel">Diesel</option>
-                <option value="Eléctrico">Eléctrico</option>
-                <option value="Híbrido">Híbrido</option>
-                <option value="Gas">Gas</option>
-              </select>
+              <Dropdown
+                options={opcionesCombustible}
+                value={selectedCombustible}
+                onChange={(val) => {
+                  setSelectedCombustible(val)
+                  setValue('combustible', val)
+                }}
+                placeholder="Selecciona"
+                icon={<FileText className="h-4 w-4 text-gray-500" />}
+              />
             </div>
           </div>
 
@@ -548,19 +566,18 @@ export default function VehiculosPage() {
                 className="transition-all duration-300 focus:scale-102"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Kilometraje
-            </label>
-            <Input
-              {...register('kilometraje')}
-              type="number"
-              placeholder="150000"
-              min="0"
-              className="transition-all duration-300 focus:scale-102"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Kilometraje
+              </label>
+              <Input
+                {...register('kilometraje')}
+                type="number"
+                placeholder="150000"
+                min="0"
+                className="transition-all duration-300 focus:scale-102"
+              />
+            </div>
           </div>
 
           <div>

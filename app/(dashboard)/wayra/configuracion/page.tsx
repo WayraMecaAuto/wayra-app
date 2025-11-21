@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
+import { motion } from 'framer-motion'
 
 interface Configuracion {
   clave: string
@@ -25,7 +26,6 @@ export default function WayraConfiguracionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Verificar permisos
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
 
   useEffect(() => {
@@ -109,206 +109,259 @@ export default function WayraConfiguracionPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"
+        />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-2xl p-8 text-white shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <Image
-                src="/images/WayraLogo.png"
-                alt="Wayra Logo"
-                width={40}
-                height={40}
-                className="object-contain"
-              />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+        {/* Header Hero */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 p-8 shadow-2xl text-white"
+        >
+          <div className="absolute inset-0 bg-black/10" />
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-xl border border-white/30">
+                <Image
+                  src="/images/WayraLogo.png"
+                  alt="Wayra Logo"
+                  width={48}
+                  height={48}
+                  className="object-contain drop-shadow-lg"
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Configuración Wayra</h1>
+                <p className="text-blue-100 text-sm sm:text-base mt-1">Gestión avanzada de márgenes, tasas e IVA</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Configuración Wayra</h1>
-              <p className="text-blue-100 text-lg">Gestiona márgenes, IVA y configuraciones</p>
-            </div>
+
+            <Button
+              onClick={saveAllConfigurations}
+              disabled={saving}
+              size="lg"
+              className="bg-white text-blue-700 hover:bg-blue-50 font-semibold shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-5 w-5 mr-2" />
+                  Guardar Todo
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={saveAllConfigurations}
-            disabled={saving}
-            className="bg-white text-blue-800 hover:bg-blue-50 shadow-lg"
+        </motion.div>
+
+        {/* Grid de tarjetas */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8">
+          {/* ENI Card */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
-            {saving ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            {saving ? 'Guardando...' : 'Guardar Todo'}
-          </Button>
+            <Card className="overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white/80 backdrop-blur">
+              <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Package className="h-6 w-6" />
+                  </div>
+                  <span>Wayra ENI (Nacional)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <Percent className="h-4 w-4 text-blue-600" />
+                    Margen de Ganancia (%)
+                  </label>
+                  <Input
+                    type="number"
+                    value={getConfigValue('WAYRA_MARGEN_ENI')}
+                    onChange={(e) => setConfigValue('WAYRA_MARGEN_ENI', e.target.value)}
+                    placeholder="35"
+                    className="text-lg font-bold border-2 focus:border-blue-500 transition-all"
+                  />
+                  <p className="text-xs text-gray-500">Sobre precio de compra</p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertCircle className="h-4 w-4 text-blue-700" />
+                    <span className="font-medium text-blue-800 text-sm">IVA para ENI</span>
+                  </div>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    IVA opcional del 19%. No obligatorio para productos nacionales.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Calculator className="h-4 w-4 text-blue-600" />
+                      Minorista (%)
+                    </label>
+                    <Input
+                      type="number"
+                      value={getConfigValue('WAYRA_DESCUENTO_MINORISTA')}
+                      onChange={(e) => setConfigValue('WAYRA_DESCUENTO_MINORISTA', e.target.value)}
+                      placeholder="3"
+                      className="font-bold border-2 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Calculator className="h-4 w-4 text-blue-600" />
+                      Mayorista (%)
+                    </label>
+                    <Input
+                      type="number"
+                      value={getConfigValue('WAYRA_DESCUENTO_MAYORISTA')}
+                      onChange={(e) => setConfigValue('WAYRA_DESCUENTO_MAYORISTA', e.target.value)}
+                      placeholder="10"
+                      className="font-bold border-2 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* CALAN Card */}
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <Card className="overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white/80 backdrop-blur">
+              <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Globe className="h-6 w-6" />
+                  </div>
+                  <span>Wayra CALAN (Importado)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                    Tasa USD → COP
+                  </label>
+                  <Input
+                    type="number"
+                    value={getConfigValue('TASA_USD_COP')}
+                    onChange={(e) => setConfigValue('TASA_USD_COP', e.target.value)}
+                    placeholder="4000"
+                    className="text-lg font-bold border-2 focus:border-orange-500 transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Percent className="h-4 w-4 text-orange-600" />
+                      Margen (%)
+                    </label>
+                    <Input
+                      type="number"
+                      value={getConfigValue('WAYRA_MARGEN_CALAN')}
+                      onChange={(e) => setConfigValue('WAYRA_MARGEN_CALAN', e.target.value)}
+                      placeholder="35"
+                      className="font-bold border-2 focus:border-orange-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Percent className="h-4 w-4 text-orange-600" />
+                      IVA CALAN (%)
+                    </label>
+                    <Input
+                      type="number"
+                      value={getConfigValue('IVA_CALAN')}
+                      onChange={(e) => setConfigValue('IVA_CALAN', e.target.value)}
+                      placeholder="15"
+                      className="font-bold border-2 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-4 w-4 text-orange-700" />
+                    <span className="font-medium text-orange-800 text-sm">Características CALAN</span>
+                  </div>
+                  <p className="text-xs text-orange-700 leading-relaxed">
+                    IVA obligatorio del 15% + conversión automática USD a COP.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Configuraciones ENI */}
-        <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-blue-50">
-          <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="h-5 w-5" />
-              <span>Wayra ENI (Nacional)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Percent className="h-4 w-4 inline mr-1" />
-                Margen de Ganancia (%)
-              </label>
-              <Input
-                type="number"
-                value={getConfigValue('WAYRA_MARGEN_ENI')}
-                onChange={(e) => setConfigValue('WAYRA_MARGEN_ENI', e.target.value)}
-                placeholder="35"
-                className="text-lg font-semibold"
-              />
-              <p className="text-xs text-gray-500 mt-1">Margen aplicado sobre precio de compra</p>
-            </div>
+        {/* Resumen del sistema */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur">
+            <CardHeader className="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <Settings className="h-6 w-6" />
+                Resumen del Sistema Wayra
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200"
+                >
+                  <div className="text-4xl font-bold text-blue-700 mb-2">ENI</div>
+                  <p className="text-sm font-medium text-gray-700">Productos Nacionales</p>
+                  <p className="text-xs text-gray-600 mt-1">IVA opcional</p>
+                </motion.div>
 
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <div className="flex items-center space-x-2 mb-2">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-700">IVA para ENI</span>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl border border-orange-200"
+                >
+                  <div className="text-4xl font-bold text-orange-700 mb-2">CALAN</div>
+                  <p className="text-sm font-medium text-gray-700">Productos Importados</p>
+                  <p className="text-xs text-gray-600 mt-1">IVA 15% obligatorio</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl border border-green-200"
+                >
+                  <div className="text-4xl font-bold text-green-700 mb-2">35%</div>
+                  <p className="text-sm font-medium text-gray-700">Margen Estándar</p>
+                  <p className="text-xs text-gray-600 mt-1">Aplica a ambos tipos</p>
+                </motion.div>
               </div>
-              <p className="text-sm text-blue-600">
-                Los productos ENI no tienen IVA obligatorio. El IVA se aplica opcionalmente al 19%.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calculator className="h-4 w-4 inline mr-1" />
-                Descuento Minorista (%)
-              </label>
-              <Input
-                type="number"
-                value={getConfigValue('WAYRA_DESCUENTO_MINORISTA')}
-                onChange={(e) => setConfigValue('WAYRA_DESCUENTO_MINORISTA', e.target.value)}
-                placeholder="3"
-                className="text-lg font-semibold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calculator className="h-4 w-4 inline mr-1" />
-                Descuento Mayorista (%)
-              </label>
-              <Input
-                type="number"
-                value={getConfigValue('WAYRA_DESCUENTO_MAYORISTA')}
-                onChange={(e) => setConfigValue('WAYRA_DESCUENTO_MAYORISTA', e.target.value)}
-                placeholder="10"
-                className="text-lg font-semibold"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Configuraciones CALAN */}
-        <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-orange-50">
-          <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center space-x-2">
-              <Globe className="h-5 w-5" />
-              <span>Wayra CALAN (Importado)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <DollarSign className="h-4 w-4 inline mr-1" />
-                Tasa USD a COP
-              </label>
-              <Input
-                type="number"
-                value={getConfigValue('TASA_USD_COP')}
-                onChange={(e) => setConfigValue('TASA_USD_COP', e.target.value)}
-                placeholder="4000"
-                className="text-lg font-semibold"
-              />
-              <p className="text-xs text-gray-500 mt-1">Tasa de conversión para productos importados</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Percent className="h-4 w-4 inline mr-1" />
-                Margen de Ganancia (%)
-              </label>
-              <Input
-                type="number"
-                value={getConfigValue('WAYRA_MARGEN_CALAN')}
-                onChange={(e) => setConfigValue('WAYRA_MARGEN_CALAN', e.target.value)}
-                placeholder="35"
-                className="text-lg font-semibold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Percent className="h-4 w-4 inline mr-1" />
-                IVA CALAN (%)
-              </label>
-              <Input
-                type="number"
-                value={getConfigValue('IVA_CALAN')}
-                onChange={(e) => setConfigValue('IVA_CALAN', e.target.value)}
-                placeholder="15"
-                className="text-lg font-semibold"
-              />
-              <p className="text-xs text-gray-500 mt-1">IVA obligatorio para productos CALAN</p>
-            </div>
-
-            <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-              <div className="flex items-center space-x-2 mb-2">
-                <CheckCircle className="h-4 w-4 text-orange-600" />
-                <span className="text-sm font-medium text-orange-700">Configuración CALAN</span>
-              </div>
-              <p className="text-sm text-orange-600">
-                Los productos CALAN tienen IVA del 15% obligatorio y conversión automática USD → COP.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
-
-      {/* Información del Sistema */}
-      <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-gray-50">
-        <CardHeader className="bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-t-lg">
-          <CardTitle className="flex items-center space-x-2">
-            <Settings className="h-5 w-5" />
-            <span>Información del Sistema Wayra</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 bg-white rounded-xl border border-blue-100 shadow-md">
-              <div className="text-3xl font-bold text-blue-600 mb-2">ENI</div>
-              <div className="text-sm text-gray-600">Productos Nacionales</div>
-              <div className="text-xs text-gray-500 mt-1">Sin IVA obligatorio</div>
-            </div>
-            <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-md">
-              <div className="text-3xl font-bold text-orange-600 mb-2">CALAN</div>
-              <div className="text-sm text-gray-600">Productos Importados</div>
-              <div className="text-xs text-gray-500 mt-1">IVA 15% obligatorio</div>
-            </div>
-            <div className="text-center p-4 bg-white rounded-xl border border-green-100 shadow-md">
-              <div className="text-3xl font-bold text-green-600 mb-2">35%</div>
-              <div className="text-sm text-gray-600">Margen Estándar</div>
-              <div className="text-xs text-gray-500 mt-1">Ambos productos</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

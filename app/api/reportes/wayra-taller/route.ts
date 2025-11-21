@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 🔥 REPORTES CONTABLES CORREGIDOS (COMBINAR MOVIMIENTOS + ÓRDENES COMPLETADAS)
+    // REPORTES CONTABLES
     if (tipo === "contabilidad") {
       if (!canViewContabilidad) {
         return NextResponse.json(
@@ -186,106 +186,127 @@ export async function GET(request: NextRequest) {
       }
 
       // Determinar rango de meses según el periodo
-      let meses: number[] = [];
-      let whereCondition: any = { anio: año };
-
+      let mesesRango: number[] = [];
+      
       if (periodo === "mensual" && mes) {
-        meses = [mes];
-        whereCondition.mes = mes;
+        mesesRango = [mes];
       } else if (periodo === "trimestral" && trimestre) {
         const mesInicio = (trimestre - 1) * 3 + 1;
-        const mesFin = trimestre * 3;
-        meses = Array.from(
-          { length: mesFin - mesInicio + 1 },
-          (_, i) => mesInicio + i
-        );
-        whereCondition.mes = { gte: mesInicio, lte: mesFin };
+        mesesRango = [mesInicio, mesInicio + 1, mesInicio + 2];
       } else if (periodo === "semestral" && semestre) {
         const mesInicio = semestre === 1 ? 1 : 7;
-        const mesFin = semestre === 1 ? 6 : 12;
-        meses = Array.from(
-          { length: mesFin - mesInicio + 1 },
-          (_, i) => mesInicio + i
-        );
-        whereCondition.mes = { gte: mesInicio, lte: mesFin };
+        mesesRango = Array.from({ length: 6 }, (_, i) => mesInicio + i);
       } else {
-        meses = Array.from({ length: 12 }, (_, i) => i + 1);
+        // Anual - todos los meses
+        mesesRango = Array.from({ length: 12 }, (_, i) => i + 1);
       }
 
-      console.log("📅 Consultando contabilidad Wayra Taller para:", whereCondition);
+      console.log("📅 Consultando contabilidad Wayra Taller:", { periodo, año, meses: mesesRango });
 
-      // 🔥 OBTENER INGRESOS DESDE MOVIMIENTOS CONTABLES
-      const ingresosMovimientos = await prisma.movimientoContable.findMany({
-        where: {
-          ...whereCondition,
-          entidad: "WAYRA",
-          tipo: "INGRESO"
-        }
-      });
+      // OBTENER DATOS DE CADA MES
+      const todosIngresos: any[] = [];
+      const todosEgresos: any[] = [];
 
-      // 🔥 TAMBIÉN OBTENER INGRESOS DE ÓRDENES COMPLETADAS (POR SI NO TIENEN MOVIMIENTOS)
-      const ordenesCompletadas = await prisma.ordenServicio.findMany({
-        where: {
-          ...whereCondition,
-          estado: "COMPLETADO"
-        },
-        include: {
-          servicios: true,
-          repuestosExternos: true
-        }
-      });
+      for (const mesNum of mesesRango) {
+        // Obtener órdenes completadas del mes
+        const ordenesCompletadas = await prisma.ordenServicio.findMany({
+          where: {
+            estado: "COMPLETADO",
+            mes: mesNum,
+            anio: año,
+          },
+          include: {
+            servicios: true,
+            repuestosExternos: true,
+            cliente: {
+              select: { nombre: true },
+            },
+            vehiculo: {
+              select: { placa: true, marca: true, modelo: true },
+            },
+          },
+          orderBy: { fechaFin: "desc" },
+        });
 
-      // 🔥 OBTENER EGRESOS
-      const egresosMovimientos = await prisma.movimientoContable.findMany({
-        where: {
-          ...whereCondition,
-          entidad: "WAYRA",
-          tipo: "EGRESO"
-        }
-      });
+        ordenesCompletadas.forEach((orden) => {
+          // SERVICIOS
+          orden.servicios.forEach((servicio) => {
+            todosIngresos.push({
+              id: servicio.id,
+              fecha: orden.fechaFin || orden.fechaCreacion,
+              descripcion: `${servicio.descripcion} - Orden ${orden.numeroOrden}`,
+              monto: servicio.precio,
+              tipo: "SERVICIO",
+              ordenId: orden.id,
+              mes: mesNum
+            });
+          });
 
-      console.log("✅ Ingresos (movimientos):", ingresosMovimientos.length);
-      console.log("✅ Órdenes completadas:", ordenesCompletadas.length);
-      console.log("✅ Egresos:", egresosMovimientos.length);
+          // REPUESTOS EXTERNOS
+          orden.repuestosExternos.forEach((repuesto) => {
+            todosIngresos.push({
+              id: repuesto.id,
+              fecha: orden.fechaFin || orden.fechaCreacion,
+              descripcion: `${repuesto.nombre} - Orden ${orden.numeroOrden}`,
+              monto: repuesto.subtotal,
+              tipo: "REPUESTO_EXTERNO",
+              ordenId: orden.id,
+              mes: mesNum
+            });
+          });
 
-      // 🔥 CALCULAR INGRESOS COMBINANDO MOVIMIENTOS + ÓRDENES
-      const porPeriodo = meses.map((mesNum) => {
-        // Ingresos desde movimientos contables
-        let ingresosDelMes = ingresosMovimientos
-          .filter((m) => m.mes === mesNum)
-          .reduce((s, m) => s + Number(m.monto), 0);
+          // MANO DE OBRA
+          if (orden.manoDeObra && orden.manoDeObra > 0) {
+            todosIngresos.push({
+              id: `mo-${orden.id}`,
+              fecha: orden.fechaFin || orden.fechaCreacion,
+              descripcion: `Mano de obra - Orden ${orden.numeroOrden}`,
+              monto: orden.manoDeObra,
+              tipo: "MANO_OBRA",
+              ordenId: orden.id,
+              mes: mesNum
+            });
+          }
+        });
 
-        // Si NO hay movimientos, usar ingresos de órdenes completadas
-        if (ingresosDelMes === 0) {
-          const ordenesDelMes = ordenesCompletadas.filter((o) => o.mes === mesNum);
-          ingresosDelMes = ordenesDelMes.reduce((sum, o) => {
-            // Servicios + Mano de Obra + Repuestos Externos
-            const totalServicios = o.servicios.reduce((s, serv) => s + serv.precio, 0);
-            const totalRepuestos = o.repuestosExternos.reduce((s, r) => s + r.subtotal, 0);
-            return sum + totalServicios + (o.manoDeObra || 0) + totalRepuestos;
-          }, 0);
-        }
+        // Obtener egresos del mes
+        const egresosMes = await prisma.movimientoContable.findMany({
+          where: {
+            tipo: "EGRESO",
+            entidad: "WAYRA",
+            mes: mesNum,
+            anio: año,
+          },
+          include: {
+            usuario: {
+              select: {
+                name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { fecha: "desc" },
+        });
 
-        const egresosDelMes = egresosMovimientos
-          .filter((m) => m.mes === mesNum)
-          .reduce((s, m) => s + Number(m.monto), 0);
+        const egresosFormatoMes = egresosMes.map((e) => ({
+          id: e.id,
+          fecha: e.fecha,
+          descripcion: e.descripcion,
+          concepto: e.concepto,
+          usuario: e.usuario.name,
+          rol: e.usuario.role,
+          valor: e.monto,
+          mes: mesNum
+        }));
 
-        const utilidadMes = ingresosDelMes - egresosDelMes;
+        todosEgresos.push(...egresosFormatoMes);
+      }
 
-        return {
-          periodo: new Date(2024, mesNum - 1)
-            .toLocaleString("es-CO", { month: "short" })
-            .replace(".", ""),
-          mes: mesNum,
-          ingresos: Math.round(ingresosDelMes),
-          egresos: Math.round(egresosDelMes),
-          utilidad: Math.round(utilidadMes),
-          ordenes: ordenesCompletadas.filter((o) => o.mes === mesNum).length
-        };
-      });
+      console.log("✅ Wayra Taller - Ingresos:", todosIngresos.length, "Egresos:", todosEgresos.length);
 
-      const totalIngresos = porPeriodo.reduce((s, p) => s + p.ingresos, 0);
-      const totalEgresos = porPeriodo.reduce((s, p) => s + p.egresos, 0);
+      // CALCULAR TOTALES
+      const totalIngresos = todosIngresos.reduce((s, i) => s + i.monto, 0);
+      const totalEgresos = todosEgresos.reduce((s, e) => s + e.valor, 0);
       const utilidadNeta = totalIngresos - totalEgresos;
 
       console.log("💰 Totales Wayra Taller:", {
@@ -293,7 +314,53 @@ export async function GET(request: NextRequest) {
         egresos: totalEgresos,
         utilidadNeta,
       });
-      console.log("📊 Por periodo generado:", porPeriodo);
+
+      // GENERAR DATOS POR PERIODO
+      let porPeriodo: any[] = [];
+
+      if (periodo === "mensual" && mes) {
+        // Agrupar por día
+        const diasEnMes = new Date(año, mes, 0).getDate();
+        porPeriodo = Array.from({ length: diasEnMes }, (_, i) => {
+          const dia = i + 1;
+          const ingresosDia = todosIngresos.filter(ing => new Date(ing.fecha).getDate() === dia);
+          const egresosDia = todosEgresos.filter(egr => new Date(egr.fecha).getDate() === dia);
+
+          const ingresosVal = ingresosDia.reduce((s, i) => s + i.monto, 0);
+          const egresosVal = egresosDia.reduce((s, e) => s + e.valor, 0);
+
+          return {
+            periodo: `Día ${dia}`,
+            mes: mes,
+            ingresos: Math.round(ingresosVal),
+            egresos: Math.round(egresosVal),
+            utilidad: Math.round(ingresosVal - egresosVal),
+            ordenes: ingresosDia.filter(i => i.tipo === "SERVICIO").length
+          };
+        });
+      } else {
+        // Agrupar por mes (trimestral, semestral, anual)
+        porPeriodo = mesesRango.map(mesNum => {
+          const ingresosMes = todosIngresos.filter(i => i.mes === mesNum);
+          const egresosMes = todosEgresos.filter(e => e.mes === mesNum);
+
+          const ingresosVal = ingresosMes.reduce((s, i) => s + i.monto, 0);
+          const egresosVal = egresosMes.reduce((s, e) => s + e.valor, 0);
+
+          return {
+            periodo: new Date(año, mesNum - 1)
+              .toLocaleString("es-CO", { month: "short" })
+              .replace(".", ""),
+            mes: mesNum,
+            ingresos: Math.round(ingresosVal),
+            egresos: Math.round(egresosVal),
+            utilidad: Math.round(ingresosVal - egresosVal),
+            ordenes: ingresosMes.filter(i => i.tipo === "SERVICIO").length
+          };
+        });
+      }
+
+      console.log("📊 Por periodo Wayra Taller:", porPeriodo.length, "puntos");
 
       return NextResponse.json({
         resumen: {
@@ -304,10 +371,10 @@ export async function GET(request: NextRequest) {
             totalIngresos > 0
               ? ((utilidadNeta / totalIngresos) * 100).toFixed(2)
               : "0",
-          totalOrdenes: ordenesCompletadas.length,
+          totalOrdenes: todosIngresos.filter(i => i.tipo === "SERVICIO").length,
         },
         porPeriodo,
-        egresos: egresosMovimientos.slice(0, 50),
+        egresos: todosEgresos.slice(0, 50),
       });
     }
 
@@ -319,49 +386,68 @@ export async function GET(request: NextRequest) {
 
       const año2 = parseInt(searchParams.get("año2") || String(año - 1));
 
-      // 🔥 USAR MOVIMIENTOS CONTABLES EN VEZ DE ÓRDENES
-      const ingresos1 = await prisma.movimientoContable.findMany({
-        where: { 
-          tipo: "INGRESO", 
-          entidad: "WAYRA", 
-          anio: año,
-          concepto: { in: ["VENTA_DESDE_ORDEN", "VENTA_PRODUCTO"] }
-        },
-      });
+      // Procesar datos de cada año
+      const procesarDatosAnio = async (anioTarget: number) => {
+        const todosIngresos: any[] = [];
+        const todosEgresos: any[] = [];
 
-      const ingresos2 = await prisma.movimientoContable.findMany({
-        where: { 
-          tipo: "INGRESO", 
-          entidad: "WAYRA", 
-          anio: año2,
-          concepto: { in: ["VENTA_DESDE_ORDEN", "VENTA_PRODUCTO"] }
-        },
-      });
+        for (let mesNum = 1; mesNum <= 12; mesNum++) {
+          // Obtener órdenes completadas
+          const ordenesCompletadas = await prisma.ordenServicio.findMany({
+            where: {
+              estado: "COMPLETADO",
+              mes: mesNum,
+              anio: anioTarget,
+            },
+            include: {
+              servicios: true,
+              repuestosExternos: true,
+            },
+          });
 
-      const egresos1 = await prisma.movimientoContable.findMany({
-        where: { tipo: "EGRESO", entidad: "WAYRA", anio: año },
-      });
+          ordenesCompletadas.forEach((orden) => {
+            const ingresoOrden = 
+              orden.servicios.reduce((s, serv) => s + serv.precio, 0) +
+              orden.repuestosExternos.reduce((s, r) => s + r.subtotal, 0) +
+              (orden.manoDeObra || 0);
 
-      const egresos2 = await prisma.movimientoContable.findMany({
-        where: { tipo: "EGRESO", entidad: "WAYRA", anio: año2 },
-      });
+            todosIngresos.push({
+              monto: ingresoOrden,
+              mes: mesNum
+            });
+          });
 
-      const procesarDatos = (ingresos: any[], egresos: any[]) => {
+          // Obtener egresos
+          const egresosMes = await prisma.movimientoContable.findMany({
+            where: {
+              tipo: "EGRESO",
+              entidad: "WAYRA",
+              mes: mesNum,
+              anio: anioTarget,
+            },
+          });
+
+          todosEgresos.push(...egresosMes.map(e => ({
+            valor: e.monto,
+            mes: mesNum
+          })));
+        }
+
+        // Calcular por mes
         const porMes = Array.from({ length: 12 }, (_, i) => {
           const mesNum = i + 1;
-          const ingresosDelMes = ingresos
-            .filter((m) => m.mes === mesNum)
-            .reduce((s, m) => s + Number(m.monto), 0);
-          const egresosDelMes = egresos
-            .filter((m) => m.mes === mesNum)
-            .reduce((s, m) => s + Number(m.monto), 0);
+          const ingresosMes = todosIngresos.filter(ing => ing.mes === mesNum);
+          const egresosMes = todosEgresos.filter(egr => egr.mes === mesNum);
+
+          const ingresosVal = ingresosMes.reduce((s, i) => s + i.monto, 0);
+          const egresosVal = egresosMes.reduce((s, e) => s + e.valor, 0);
 
           return {
             mes: mesNum,
-            ingresos: Math.round(ingresosDelMes),
-            egresos: Math.round(egresosDelMes),
-            utilidad: Math.round(ingresosDelMes - egresosDelMes),
-            ordenes: 0,
+            ingresos: Math.round(ingresosVal),
+            egresos: Math.round(egresosVal),
+            utilidad: Math.round(ingresosVal - egresosVal),
+            ordenes: ingresosMes.length
           };
         });
 
@@ -369,13 +455,13 @@ export async function GET(request: NextRequest) {
           totalIngresos: porMes.reduce((s, m) => s + m.ingresos, 0),
           totalEgresos: porMes.reduce((s, m) => s + m.egresos, 0),
           utilidadTotal: porMes.reduce((s, m) => s + m.utilidad, 0),
-          totalOrdenes: 0,
+          totalOrdenes: porMes.reduce((s, m) => s + m.ordenes, 0),
           porMes,
         };
       };
 
-      const datos1 = procesarDatos(ingresos1, egresos1);
-      const datos2 = procesarDatos(ingresos2, egresos2);
+      const datos1 = await procesarDatosAnio(año);
+      const datos2 = await procesarDatosAnio(año2);
 
       const crecimientoIngresos =
         datos2.totalIngresos > 0
@@ -395,12 +481,22 @@ export async function GET(request: NextRequest) {
             ).toFixed(2)
           : "0";
 
+      const crecimientoOrdenes =
+        datos2.totalOrdenes > 0
+          ? (
+              ((datos1.totalOrdenes - datos2.totalOrdenes) /
+                datos2.totalOrdenes) *
+              100
+            ).toFixed(2)
+          : "0";
+
       return NextResponse.json({
         año1: { año, ...datos1 },
         año2: { año: año2, ...datos2 },
         crecimiento: {
           ingresos: crecimientoIngresos,
           utilidad: crecimientoUtilidad,
+          ordenes: crecimientoOrdenes
         },
       });
     }

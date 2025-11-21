@@ -1,152 +1,177 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
-import { Plus, Search, CreditCard as Edit, Trash2, User, Phone, Mail, MapPin, Car, FileText, Eye } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Modal } from '@/components/ui/modal'
-import { useForm } from 'react-hook-form'
-import toast from 'react-hot-toast'
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { redirect } from "next/navigation";
+import {
+  Plus,
+  Search,
+  CreditCard as Edit,
+  Trash2,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Car,
+  FileText,
+  Eye,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 
 interface Cliente {
-  id: string
-  nombre: string
-  telefono?: string
-  email?: string
-  direccion?: string
-  tipoDocumento: string
-  numeroDocumento?: string
-  vehiculos: any[]
-  _count: { ordenes: number }
-  createdAt: string
+  id: string;
+  nombre: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  tipoDocumento: string;
+  numeroDocumento?: string;
+  vehiculos: any[];
+  _count: { ordenes: number };
+  createdAt: string;
 }
 
 interface ClienteForm {
-  nombre: string
-  telefono: string
-  email: string
-  direccion: string
-  tipoDocumento: string
-  numeroDocumento: string
+  nombre: string;
+  telefono: string;
+  email: string;
+  direccion: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
 }
 
 export default function ClientesPage() {
-  const { data: session } = useSession()
-  const [clientes, setClientes] = useState<Cliente[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null)
+  const { data: session } = useSession();
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
 
   // Verificar permisos
-  const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
+  const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+    session?.user?.role || ""
+  );
 
-  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<ClienteForm>()
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue,
+  } = useForm<ClienteForm>();
 
   useEffect(() => {
     if (hasAccess) {
-      fetchClientes()
+      fetchClientes();
     }
-  }, [hasAccess])
+  }, [hasAccess]);
 
   useEffect(() => {
     if (editingCliente) {
-      setValue('nombre', editingCliente.nombre)
-      setValue('telefono', editingCliente.telefono || '')
-      setValue('email', editingCliente.email || '')
-      setValue('direccion', editingCliente.direccion || '')
-      setValue('tipoDocumento', editingCliente.tipoDocumento)
-      setValue('numeroDocumento', editingCliente.numeroDocumento || '')
+      setValue("nombre", editingCliente.nombre);
+      setValue("telefono", editingCliente.telefono || "");
+      setValue("email", editingCliente.email || "");
+      setValue("direccion", editingCliente.direccion || "");
+      setValue("tipoDocumento", editingCliente.tipoDocumento);
+      setValue("numeroDocumento", editingCliente.numeroDocumento || "");
     }
-  }, [editingCliente, setValue])
+  }, [editingCliente, setValue]);
 
   const fetchClientes = async () => {
     try {
-      const response = await fetch('/api/clientes')
+      const response = await fetch("/api/clientes");
       if (response.ok) {
-        const data = await response.json()
-        setClientes(data)
+        const data = await response.json();
+        setClientes(data);
       } else {
-        toast.error('Error al cargar clientes')
+        toast.error("Error al cargar clientes");
       }
     } catch (error) {
-      toast.error('Error al cargar clientes')
+      toast.error("Error al cargar clientes");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const onSubmit = async (data: ClienteForm) => {
     try {
-      const url = editingCliente ? `/api/clientes/${editingCliente.id}` : '/api/clientes'
-      const method = editingCliente ? 'PATCH' : 'PATCH'
+      const url = editingCliente
+        ? `/api/clientes/${editingCliente.id}`
+        : "/api/clientes";
+      const method = editingCliente ? "PATCH" : "POST"; // ✅ CORREGIDO
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
       if (response.ok) {
-        toast.success(editingCliente ? 'Cliente actualizado' : 'Cliente creado exitosamente')
-        fetchClientes()
-        handleCloseModal()
+        toast.success(
+          editingCliente ? "Cliente actualizado" : "Cliente creado exitosamente"
+        );
+        fetchClientes();
+        handleCloseModal();
       } else {
-        const error = await response.json()
-        toast.error(error.error || 'Error al guardar cliente')
+        const error = await response.json();
+        toast.error(error.error || "Error al guardar cliente");
       }
     } catch (error) {
-      toast.error('Error al guardar cliente')
+      toast.error("Error al guardar cliente");
     }
-  }
+  };
 
   const handleCloseModal = () => {
-    setShowModal(false)
-    setEditingCliente(null)
-    reset()
-  }
+    setShowModal(false);
+    setEditingCliente(null);
+    reset();
+  };
 
   const deleteCliente = async (clienteId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este cliente?')) return
+    if (!confirm("¿Estás seguro de eliminar este cliente?")) return;
 
     try {
       const response = await fetch(`/api/clientes/${clienteId}`, {
-        method: 'DELETE'
-      })
-      
+        method: "DELETE",
+      });
+
       if (response.ok) {
-        toast.success('Cliente eliminado correctamente')
-        fetchClientes()
+        toast.success("Cliente eliminado correctamente");
+        fetchClientes();
       } else {
-        const error = await response.json()
-        toast.error(error.error || 'Error al eliminar cliente')
+        const error = await response.json();
+        toast.error(error.error || "Error al eliminar cliente");
       }
     } catch (error) {
-      toast.error('Error al eliminar cliente')
+      toast.error("Error al eliminar cliente");
     }
-  }
+  };
 
   if (!hasAccess) {
-    redirect('/dashboard')
+    redirect("/dashboard");
   }
 
-  const filteredClientes = clientes.filter(cliente =>
-    cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.telefono?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.numeroDocumento?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredClientes = clientes.filter(
+    (cliente) =>
+      cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.telefono?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.numeroDocumento?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -159,8 +184,12 @@ export default function ClientesPage() {
               <User className="h-6 sm:h-10 w-6 sm:w-10 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2">Gestión de Clientes</h1>
-              <p className="text-blue-100 text-base sm:text-lg">Administra la información de clientes</p>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+                Gestión de Clientes
+              </h1>
+              <p className="text-blue-100 text-base sm:text-lg">
+                Administra la información de clientes
+              </p>
             </div>
           </div>
           <Button
@@ -201,19 +230,31 @@ export default function ClientesPage() {
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Cliente</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Contacto</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Documento</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Vehículos</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Órdenes</th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-700">Acciones</th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
+                    Cliente
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
+                    Contacto
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
+                    Documento
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
+                    Vehículos
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
+                    Órdenes
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-700">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredClientes.map((cliente, index) => (
-                  <tr 
-                    key={cliente.id} 
-                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
+                  <tr
+                    key={cliente.id}
+                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors duration-200 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
                   >
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-3">
@@ -221,9 +262,14 @@ export default function ClientesPage() {
                           <User className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
-                          <div className="font-semibold text-gray-900">{cliente.nombre}</div>
+                          <div className="font-semibold text-gray-900">
+                            {cliente.nombre}
+                          </div>
                           <div className="text-sm text-gray-500">
-                            Cliente desde {new Date(cliente.createdAt).toLocaleDateString('es-CO')}
+                            Cliente desde{" "}
+                            {new Date(cliente.createdAt).toLocaleDateString(
+                              "es-CO"
+                            )}
                           </div>
                         </div>
                       </div>
@@ -246,9 +292,13 @@ export default function ClientesPage() {
                     </td>
                     <td className="py-4 px-6">
                       <div className="text-sm">
-                        <div className="font-medium">{cliente.tipoDocumento}</div>
+                        <div className="font-medium">
+                          {cliente.tipoDocumento}
+                        </div>
                         {cliente.numeroDocumento && (
-                          <div className="text-gray-500">{cliente.numeroDocumento}</div>
+                          <div className="text-gray-500">
+                            {cliente.numeroDocumento}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -268,8 +318,8 @@ export default function ClientesPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setEditingCliente(cliente)
-                            setShowModal(true)
+                            setEditingCliente(cliente);
+                            setShowModal(true);
                           }}
                           className="hover:bg-blue-50 transition-all duration-300 hover:scale-110"
                         >
@@ -294,16 +344,24 @@ export default function ClientesPage() {
           {/* Mobile Card View */}
           <div className="md:hidden space-y-4 p-4 overflow-y-auto max-h-[60vh] transition-all duration-300">
             {filteredClientes.map((cliente) => (
-              <Card key={cliente.id} className="shadow-md transition-all duration-300 hover:shadow-lg hover:scale-102">
+              <Card
+                key={cliente.id}
+                className="shadow-md transition-all duration-300 hover:shadow-lg hover:scale-102"
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start space-x-4">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:rotate-12">
                       <User className="h-5 w-5 text-blue-600" />
                     </div>
                     <div className="flex-grow">
-                      <div className="font-semibold text-gray-900">{cliente.nombre}</div>
+                      <div className="font-semibold text-gray-900">
+                        {cliente.nombre}
+                      </div>
                       <div className="text-sm text-gray-500 mb-2">
-                        Cliente desde {new Date(cliente.createdAt).toLocaleDateString('es-CO')}
+                        Cliente desde{" "}
+                        {new Date(cliente.createdAt).toLocaleDateString(
+                          "es-CO"
+                        )}
                       </div>
                       <div className="space-y-2 text-sm">
                         {cliente.telefono && (
@@ -320,7 +378,10 @@ export default function ClientesPage() {
                         )}
                         <div className="flex items-center space-x-2">
                           <FileText className="h-4 w-4 text-gray-400" />
-                          <span>{cliente.tipoDocumento} {cliente.numeroDocumento || ''}</span>
+                          <span>
+                            {cliente.tipoDocumento}{" "}
+                            {cliente.numeroDocumento || ""}
+                          </span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Car className="h-4 w-4 text-gray-400" />
@@ -341,8 +402,8 @@ export default function ClientesPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          setEditingCliente(cliente)
-                          setShowModal(true)
+                          setEditingCliente(cliente);
+                          setShowModal(true);
                         }}
                         className="hover:bg-blue-50 transition-all duration-300 hover:scale-110"
                       >
@@ -362,15 +423,19 @@ export default function ClientesPage() {
               </Card>
             ))}
           </div>
-          
+
           {filteredClientes.length === 0 && (
             <div className="text-center py-16 animate-fade-in">
               <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-transform duration-300 hover:scale-105">
                 <User className="h-12 w-12 text-blue-500" />
               </div>
-              <div className="text-gray-500 text-xl font-medium">No se encontraron clientes</div>
+              <div className="text-gray-500 text-xl font-medium">
+                No se encontraron clientes
+              </div>
               <p className="text-gray-400 mt-2">
-                {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Registra el primer cliente'}
+                {searchTerm
+                  ? "Intenta con otros términos de búsqueda"
+                  : "Registra el primer cliente"}
               </p>
             </div>
           )}
@@ -378,23 +443,28 @@ export default function ClientesPage() {
       </Card>
 
       {/* Modal */}
-      <Modal 
-        isOpen={showModal} 
-        onClose={handleCloseModal} 
-        title={editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}
+      <Modal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingCliente ? "Editar Cliente" : "Nuevo Cliente"}
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 animate-fade-in">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-4 animate-fade-in"
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Nombre Completo *
             </label>
             <Input
-              {...register('nombre', { required: 'El nombre es requerido' })}
+              {...register("nombre", { required: "El nombre es requerido" })}
               placeholder="Nombre del cliente"
-              className={`${errors.nombre ? 'border-red-500' : ''} transition-all duration-300 focus:scale-102`}
+              className={`${errors.nombre ? "border-red-500" : ""} transition-all duration-300 focus:scale-102`}
             />
             {errors.nombre && (
-              <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.nombre.message}
+              </p>
             )}
           </div>
 
@@ -404,7 +474,7 @@ export default function ClientesPage() {
                 Tipo de Documento
               </label>
               <select
-                {...register('tipoDocumento')}
+                {...register("tipoDocumento")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 focus:scale-102"
               >
                 <option value="CC">Cédula de Ciudadanía</option>
@@ -418,7 +488,7 @@ export default function ClientesPage() {
                 Número de Documento
               </label>
               <Input
-                {...register('numeroDocumento')}
+                {...register("numeroDocumento")}
                 placeholder="Número de documento"
                 className="transition-all duration-300 focus:scale-102"
               />
@@ -431,7 +501,7 @@ export default function ClientesPage() {
                 Teléfono
               </label>
               <Input
-                {...register('telefono')}
+                {...register("telefono")}
                 placeholder="Número de teléfono"
                 className="transition-all duration-300 focus:scale-102"
               />
@@ -441,7 +511,7 @@ export default function ClientesPage() {
                 Email
               </label>
               <Input
-                {...register('email')}
+                {...register("email")}
                 type="email"
                 placeholder="correo@ejemplo.com"
                 className="transition-all duration-300 focus:scale-102"
@@ -454,22 +524,30 @@ export default function ClientesPage() {
               Dirección
             </label>
             <Input
-              {...register('direccion')}
+              {...register("direccion")}
               placeholder="Dirección completa"
               className="transition-all duration-300 focus:scale-102"
             />
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={handleCloseModal} className="transition-all duration-300 hover:scale-105">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseModal}
+              className="transition-all duration-300 hover:scale-105"
+            >
               Cancelar
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 transition-all duration-300 hover:scale-105">
-              {editingCliente ? 'Actualizar' : 'Crear'} Cliente
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 transition-all duration-300 hover:scale-105"
+            >
+              {editingCliente ? "Actualizar" : "Crear"} Cliente
             </Button>
           </div>
         </form>
       </Modal>
     </div>
-  )
+  );
 }

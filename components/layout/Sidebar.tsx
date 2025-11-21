@@ -8,7 +8,8 @@ import {
   Home, Package, Users, Settings, ChevronRight, X,
   ChevronLeft, Plus, History, Filter, Droplets, Car, Bolt,
   FileText, ClipboardCheck, Wrench, Calculator, TrendingUp, DollarSign,
-  PieChart, Building, Stethoscope, BarChart3, Activity, Briefcase
+  PieChart, Building, Stethoscope, BarChart3, Activity, Briefcase,
+  Shield
 } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
@@ -44,7 +45,7 @@ const menuItems: MenuItem[] = [
     title: 'Wayra Productos',
     icon: Package,
     logo: '/images/WayraLogo.png',
-    roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA', 'ADMIN_WAYRA_TALLER'],
+    roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA'],
     children: [
       { 
         title: 'Productos Wayra', 
@@ -62,7 +63,7 @@ const menuItems: MenuItem[] = [
         title: 'Reportes Wayra', 
         href: '/reportes/wayra-productos', 
         icon: BarChart3,
-        roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS']
+        roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA']
       },
       { 
         title: 'Contabilidad Wayra', 
@@ -76,12 +77,12 @@ const menuItems: MenuItem[] = [
     title: 'TorniRepuestos',
     icon: Package,
     logo: '/images/TorniRepuestos.png',
-    roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI', 'ADMIN_WAYRA_TALLER'],
+    roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'],
     children: [
-      { title: 'Repuestos', href: '/inventario/repuestos', icon: Car, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI', 'ADMIN_WAYRA_TALLER'] },
-      { title: 'Filtros', href: '/inventario/filtros', icon: Filter, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI', 'ADMIN_WAYRA_TALLER'] },
-      { title: 'Lubricantes', href: '/inventario/lubricantes', icon: Droplets, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI', 'ADMIN_WAYRA_TALLER'] },
-      { title: 'Tornillería', href: '/inventario/tornilleria', icon: Bolt, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI', 'ADMIN_WAYRA_TALLER'] },
+      { title: 'Repuestos', href: '/inventario/repuestos', icon: Car, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'] },
+      { title: 'Filtros', href: '/inventario/filtros', icon: Filter, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'] },
+      { title: 'Lubricantes', href: '/inventario/lubricantes', icon: Droplets, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'] },
+      { title: 'Tornillería', href: '/inventario/tornilleria', icon: Bolt, roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI'] },
       { 
         title: 'Configuración', 
         href: '/tornirepuestos/configuracion', 
@@ -92,7 +93,7 @@ const menuItems: MenuItem[] = [
         title: 'Reportes TorniRepuestos', 
         href: '/reportes/tornirepuestos', 
         icon: TrendingUp,
-        roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS']
+        roles: ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS', 'VENDEDOR_TORNI']
       },
       { 
         title: 'Contabilidad TorniRepuestos', 
@@ -109,7 +110,6 @@ const menuItems: MenuItem[] = [
     children: [
       { title: 'Órdenes Activas', href: '/ordenes', icon: ClipboardCheck, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'] },
       { title: 'Nueva Orden', href: '/ordenes/nueva', icon: Plus, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
-      { title: 'Historial', href: '/ordenes/historial', icon: History, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Clientes', href: '/clientes', icon: Users, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Vehículos', href: '/vehiculos', icon: Car, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },
       { title: 'Facturación', href: '/facturacion', icon: FileText, roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'] },

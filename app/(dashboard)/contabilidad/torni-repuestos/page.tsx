@@ -203,9 +203,6 @@ export default function ContabilidadTorniRepuestosPage() {
                     icon={<CalendarDays className="h-4 w-4 text-slate-500" />}
                   />
                 </div>
-                <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium rounded-xl shadow-md transition-all h-10">
-                  <Download className="h-4 w-4 mr-2" /> Exportar PDF
-                </Button>
               </div>
             </CardContent>
           </Card>

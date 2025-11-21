@@ -203,9 +203,6 @@ export default function ContabilidadWayraProductosPage() {
                     icon={<CalendarDays className="h-4 w-4 text-slate-500" />}
                   />
                 </div>
-                <Button className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-medium rounded-xl shadow-md transition-all h-10">
-                  <Download className="h-4 w-4 mr-2" /> Exportar PDF
-                </Button>
               </div>
             </CardContent>
           </Card>
