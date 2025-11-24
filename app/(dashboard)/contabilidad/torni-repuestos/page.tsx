@@ -119,7 +119,7 @@ export default function ContabilidadTorniRepuestosPage() {
     const totalIngresos = ingresos.reduce((sum, i) => sum + i.precioVenta * i.cantidad, 0);
     const totalCostos = ingresos.reduce((sum, i) => sum + i.precioCompra * i.cantidad, 0);
     const totalEgresos = egresos.reduce((sum, e) => sum + e.valor, 0);
-    const totalUtilidad = totalIngresos - totalCostos - totalEgresos;
+    const totalUtilidad = totalIngresos -  totalEgresos;
     return { totalIngresos, totalCostos, totalEgresos, totalUtilidad };
   };
 

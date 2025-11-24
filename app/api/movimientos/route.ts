@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { prisma } from "@/lib/db/prisma";
+import {
+  auditarMovimientoInventario,
+  auditarVenta,
+  obtenerInfoRequest,
+} from "@/lib/auditoria";
 
 const ROLES_ENTRADA = [
   "SUPER_USUARIO",
@@ -246,6 +251,31 @@ export async function POST(request: NextRequest) {
 
       return nuevoMovimiento;
     });
+
+    const { ip, userAgent } = obtenerInfoRequest(request);
+
+    // Si es SALIDA (venta directa)
+    if (tipo === "SALIDA" && precioUnitarioNum) {
+      await auditarVenta(
+        producto.nombre,
+        cantidadNum,
+        precioUnitarioNum * cantidadNum,
+        session.user.id,
+        ip,
+        userAgent
+      );
+    } else {
+      // ENTRADA o AJUSTE
+      await auditarMovimientoInventario(
+        tipo as "ENTRADA" | "SALIDA",
+        producto.nombre,
+        cantidadNum,
+        motivo || "Sin motivo",
+        session.user.id,
+        ip,
+        userAgent
+      );
+    }
 
     return NextResponse.json(movimiento, { status: 201 });
   } catch (error) {

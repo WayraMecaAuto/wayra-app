@@ -5,13 +5,13 @@ import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { 
   Settings, Percent, Calculator, Car, Filter, Droplets, Bolt,
-  Save, RefreshCw
+  Save, RefreshCw, Zap, CheckCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import toast from 'react-hot-toast'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Configuracion {
   clave: string
@@ -24,6 +24,7 @@ export default function TorniRepuestosConfiguracionPage() {
   const [configuraciones, setConfiguraciones] = useState<Configuracion[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [productosActualizados, setProductosActualizados] = useState<number | null>(null)
 
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_TORNI_REPUESTOS'].includes(session?.user?.role || '')
 
@@ -58,12 +59,21 @@ export default function TorniRepuestosConfiguracionPage() {
       })
 
       if (response.ok) {
+        const data = await response.json()
         setConfiguraciones(prev => 
           prev.map(config => 
             config.clave === clave ? { ...config, valor } : config
           )
         )
-        toast.success('Guardado correctamente')
+        
+        if (data.productosActualizados > 0) {
+          setProductosActualizados(data.productosActualizados)
+          toast.success(`${data.productosActualizados} productos actualizados automáticamente`)
+          
+          setTimeout(() => setProductosActualizados(null), 5000)
+        } else {
+          toast.success('Guardado correctamente')
+        }
       } else {
         toast.error('Error al actualizar')
       }
@@ -74,15 +84,35 @@ export default function TorniRepuestosConfiguracionPage() {
 
   const saveAllConfigurations = async () => {
     setSaving(true)
+    let totalProductosActualizados = 0
+    
     try {
       const torniConfigs = configuraciones.filter(c => 
         c.clave.includes('TORNI') || c.clave.includes('TORNILLERIA')
       )
       
       for (const config of torniConfigs) {
-        await updateConfiguracion(config.clave, config.valor)
+        const response = await fetch('/api/configuracion', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clave: config.clave, valor: config.valor })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.productosActualizados) {
+            totalProductosActualizados += data.productosActualizados
+          }
+        }
       }
-      toast.success('¡Todas las configuraciones se guardaron con éxito!')
+      
+      if (totalProductosActualizados > 0) {
+        setProductosActualizados(totalProductosActualizados)
+        toast.success(`¡Guardado! ${totalProductosActualizados} productos actualizados`)
+        setTimeout(() => setProductosActualizados(null), 5000)
+      } else {
+        toast.success('¡Todas las configuraciones se guardaron!')
+      }
     } catch (error) {
       toast.error('Error al guardar')
     } finally {
@@ -122,6 +152,28 @@ export default function TorniRepuestosConfiguracionPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-8">
 
+        {/* Alerta de productos actualizados */}
+        <AnimatePresence>
+          {productosActualizados !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-green-50 border-2 border-green-500 rounded-xl p-4 shadow-lg"
+            >
+              <div className="flex items-center gap-3">
+                <Zap className="h-6 w-6 text-green-600 animate-pulse" />
+                <div>
+                  <h3 className="font-bold text-green-900">Actualización Automática Exitosa</h3>
+                  <p className="text-green-700 text-sm">
+                    {productosActualizados} productos han sido recalculados con los nuevos márgenes
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Header Hero */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -137,7 +189,7 @@ export default function TorniRepuestosConfiguracionPage() {
                 </div>
                 <div className="text-white">
                   <h1 className="text-2xl sm:text-3xl font-bold">Configuración TorniRepuestos</h1>
-                  <p className="text-white/80 mt-1 text-sm sm:text-base">Gestión de márgenes y descuentos por categoría</p>
+                  <p className="text-white/80 mt-1 text-sm sm:text-base">Los cambios se aplican automáticamente al inventario</p>
                 </div>
               </div>
 
@@ -155,7 +207,7 @@ export default function TorniRepuestosConfiguracionPage() {
                 ) : (
                   <>
                     <Save className="w-5 h-5 mr-2" />
-                    Guardar Todo
+                    Guardar y Actualizar
                   </>
                 )}
               </Button>
@@ -184,9 +236,11 @@ export default function TorniRepuestosConfiguracionPage() {
                   type="number"
                   value={getConfigValue('TORNI_MARGEN_REPUESTOS')}
                   onChange={(e) => setConfigValue('TORNI_MARGEN_REPUESTOS', e.target.value)}
+                  onBlur={(e) => updateConfiguracion('TORNI_MARGEN_REPUESTOS', e.target.value)}
                   placeholder="25"
                   className="mt-2 text-2xl font-bold text-indigo-700 border-2 focus:border-indigo-500 transition-all"
                 />
+                <p className="text-xs text-gray-500 mt-2">Se actualizarán automáticamente</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -210,9 +264,11 @@ export default function TorniRepuestosConfiguracionPage() {
                   type="number"
                   value={getConfigValue('TORNI_MARGEN_FILTROS')}
                   onChange={(e) => setConfigValue('TORNI_MARGEN_FILTROS', e.target.value)}
+                  onBlur={(e) => updateConfiguracion('TORNI_MARGEN_FILTROS', e.target.value)}
                   placeholder="25"
                   className="mt-2 text-2xl font-bold text-teal-700 border-2 focus:border-teal-500 transition-all"
                 />
+                <p className="text-xs text-gray-500 mt-2">Se actualizarán automáticamente</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -236,9 +292,11 @@ export default function TorniRepuestosConfiguracionPage() {
                   type="number"
                   value={getConfigValue('TORNI_MARGEN_LUBRICANTES')}
                   onChange={(e) => setConfigValue('TORNI_MARGEN_LUBRICANTES', e.target.value)}
+                  onBlur={(e) => updateConfiguracion('TORNI_MARGEN_LUBRICANTES', e.target.value)}
                   placeholder="15"
                   className="mt-2 text-2xl font-bold text-indigo-700 border-2 focus:border-indigo-500 transition-all"
                 />
+                <p className="text-xs text-gray-500 mt-2">Se actualizarán automáticamente</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -263,12 +321,14 @@ export default function TorniRepuestosConfiguracionPage() {
                     type="number"
                     value={getConfigValue('TORNILLERIA_MARGEN')}
                     onChange={(e) => setConfigValue('TORNILLERIA_MARGEN', e.target.value)}
+                    onBlur={(e) => updateConfiguracion('TORNILLERIA_MARGEN', e.target.value)}
                     placeholder="100"
                     className="mt-2 text-2xl font-bold text-gray-800 border-2 focus:border-gray-600 transition-all"
                   />
+                  <p className="text-xs text-gray-500 mt-2">Se actualizarán automáticamente</p>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg">
-                  <strong>Nota:</strong> IVA 19% obligatorio. Margen alto por competencia y rotación.
+                  <strong>Nota:</strong> IVA 19% obligatorio.
                 </div>
               </CardContent>
             </Card>
@@ -296,10 +356,11 @@ export default function TorniRepuestosConfiguracionPage() {
                     type="number"
                     value={getConfigValue('TORNI_DESCUENTO_MINORISTA')}
                     onChange={(e) => setConfigValue('TORNI_DESCUENTO_MINORISTA', e.target.value)}
+                    onBlur={(e) => updateConfiguracion('TORNI_DESCUENTO_MINORISTA', e.target.value)}
                     placeholder="2"
                     className="text-3xl font-bold text-emerald-700 border-2 focus:border-emerald-500 transition-all"
                   />
-                  <p className="text-sm text-gray-500">Se aplica sobre el precio final de venta</p>
+                  <p className="text-sm text-gray-500">Los precios se actualizarán automáticamente</p>
                 </div>
 
                 <div className="space-y-3">
@@ -308,10 +369,48 @@ export default function TorniRepuestosConfiguracionPage() {
                     type="number"
                     value={getConfigValue('TORNI_DESCUENTO_MAYORISTA')}
                     onChange={(e) => setConfigValue('TORNI_DESCUENTO_MAYORISTA', e.target.value)}
+                    onBlur={(e) => updateConfiguracion('TORNI_DESCUENTO_MAYORISTA', e.target.value)}
                     placeholder="5"
                     className="text-3xl font-bold text-teal-700 border-2 focus:border-teal-500 transition-all"
                   />
-                  <p className="text-sm text-gray-500">Se aplica sobre el precio final de venta</p>
+                  <p className="text-sm text-gray-500">Los precios se actualizarán automáticamente</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Sistema de Actualización */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+        >
+          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur">
+            <CardHeader className="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <Settings className="h-6 w-6" />
+                Sistema de Actualización Automática
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200">
+                  <Zap className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-blue-700 mb-1">Instantáneo</div>
+                  <p className="text-sm font-medium text-gray-700">Los cambios se aplican inmediatamente</p>
+                </div>
+
+                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl border border-green-200">
+                  <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-green-700 mb-1">Sin Errores</div>
+                  <p className="text-sm font-medium text-gray-700">Recálculo automático garantizado</p>
+                </div>
+
+                <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl border border-purple-200">
+                  <RefreshCw className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-purple-700 mb-1">Sincronizado</div>
+                  <p className="text-sm font-medium text-gray-700">Inventario siempre actualizado</p>
                 </div>
               </div>
             </CardContent>

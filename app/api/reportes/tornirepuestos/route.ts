@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
       const totalIngresos = todosIngresos.reduce((sum, i) => sum + i.precioVenta * i.cantidad, 0)
       const totalCostos = todosIngresos.reduce((sum, i) => sum + i.precioCompra * i.cantidad, 0)
       const totalEgresos = todosEgresos.reduce((sum, e) => sum + e.valor, 0)
-      const totalUtilidad = totalIngresos - totalCostos - totalEgresos
+      const totalUtilidad = totalIngresos  - totalEgresos
 
       console.log('💰 Totales TorniRepuestos:', { 
         ingresos: totalIngresos, 
@@ -215,7 +215,7 @@ export async function GET(request: NextRequest) {
             ingresos: Math.round(ingresosVal),
             costos: Math.round(costosVal),
             egresos: Math.round(egresosVal),
-            utilidad: Math.round(ingresosVal - costosVal - egresosVal)
+            utilidad: Math.round(ingresosVal - egresosVal)
           }
         })
       } else {
@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
             ingresos: Math.round(ingresosVal),
             costos: Math.round(costosVal),
             egresos: Math.round(egresosVal),
-            utilidad: Math.round(ingresosVal - costosVal - egresosVal)
+            utilidad: Math.round(ingresosVal - egresosVal)
           }
         })
       }
@@ -285,7 +285,7 @@ export async function GET(request: NextRequest) {
             return s + m.detalleIngresos.reduce((sum: number, d: any) => sum + Number(d.subtotalCompra), 0)
           }, 0)
           const egresos = movsDelMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
-          const utilidad = ingresos - costos - egresos
+          const utilidad = ingresos - egresos
           
           return { mes: mesNum, ingresos, costos, egresos, utilidad }
         })

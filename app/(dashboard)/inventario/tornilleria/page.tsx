@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import {
   Plus,
@@ -43,6 +43,7 @@ export default function TornilleriaPage() {
   const { data: session } = useSession();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [showProductForm, setShowProductForm] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
@@ -59,13 +60,7 @@ export default function TornilleriaPage() {
     session?.user?.role || ""
   );
 
-  useEffect(() => {
-    if (hasAccess) {
-      fetchProducts();
-    }
-  }, [hasAccess]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch(
         "/api/productos?tipo=TORNILLERIA&categoria=TORNILLERIA"
@@ -73,6 +68,7 @@ export default function TornilleriaPage() {
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
+        setLastUpdate(new Date());
       } else {
         toast.error("Error al cargar productos");
       }
@@ -81,7 +77,46 @@ export default function TornilleriaPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (hasAccess) {
+      fetchProducts();
+    }
+  }, [hasAccess, fetchProducts]);
+
+  //Polling
+  useEffect(() => {
+    if (!hasAccess) return;
+    const interval = setInterval(() => {
+      console.log("🔄 Refrescando tornillería...");
+      fetchProducts();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [hasAccess, fetchProducts]);
+
+  // Listener
+  useEffect(() => {
+    const handlePriceUpdate = (event: CustomEvent) => {
+      console.log("⚡ Precios actualizados, refrescando tornillería...");
+      fetchProducts();
+      if (
+        event.detail?.productosActualizados > 0 &&
+        event.detail?.tipo === "TORNI"
+      ) {
+        toast.success(
+          `Precios actualizados: ${event.detail.productosActualizados} productos`,
+          {
+            icon: "🔄",
+            duration: 4000,
+          }
+        );
+      }
+    };
+    window.addEventListener("price-update" as any, handlePriceUpdate);
+    return () =>
+      window.removeEventListener("price-update" as any, handlePriceUpdate);
+  }, [fetchProducts]);
 
   const deleteProduct = async (productId: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este producto?")) {
@@ -158,6 +193,9 @@ export default function TornilleriaPage() {
               </h1>
               <p className="text-gray-200 text-base sm:text-lg">
                 Tornillos, tuercas, arandelas y más
+              </p>
+              <p className="text-gray-200 text-xs sm:text-sm mt-1">
+                Última actualización: {lastUpdate.toLocaleTimeString("es-CO")}
               </p>
               <div className="flex flex-wrap gap-2 mt-3 text-sm">
                 <span className="bg-white/20 px-3 py-1 rounded-full">

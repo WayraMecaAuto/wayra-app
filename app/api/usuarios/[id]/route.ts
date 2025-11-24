@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
+import { registrarAuditoria, obtenerInfoRequest } from "@/lib/auditoria";
 import bcrypt from 'bcryptjs'
 
 export async function PATCH(
@@ -39,6 +40,24 @@ export async function PATCH(
       }
     })
 
+    const { ip, userAgent } = obtenerInfoRequest(request);
+    
+        await registrarAuditoria({
+          accion: "EDITAR",
+          entidad: "Usuario",
+          entidadId: user.id,
+          descripcion: `Editó usuario ${user.name} con rol ${user.role}`,
+          datosNuevos: {
+            nombre: user.name,
+            email: user.email,
+            role: user.role,
+            isActive: user.isActive,
+          },
+          usuarioId: session.user.id,
+          ip,
+          userAgent,
+        });
+    
     return NextResponse.json(user)
   } catch (error) {
     console.error('Error updating user:', error)
@@ -53,25 +72,56 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    // Solo SUPER_USUARIO puede eliminar usuarios
     if (!session || session.user.role !== 'SUPER_USUARIO') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id } = await params
 
-    // No permitir eliminar el propio usuario
     if (session.user.id === id) {
       return NextResponse.json({ error: 'No puedes eliminar tu propio usuario' }, { status: 400 })
     }
 
-    // ✅ MEJORA: Eliminación permanente (solo para casos extremos)
-    // El Super Usuario puede decidir si desactivar o eliminar
+    // 1. Primero obtener los datos del usuario antes de eliminarlo
+    const usuarioAEliminar = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+      }
+    })
+
+    if (!usuarioAEliminar) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
     await prisma.user.delete({
       where: { id }
     })
 
+    const { ip, userAgent } = obtenerInfoRequest(request);
+    
+    await registrarAuditoria({
+      accion: "ELIMINAR",
+      entidad: "Usuario",
+      entidadId: usuarioAEliminar.id,
+      descripcion: `Eliminó usuario ${usuarioAEliminar.name} (${usuarioAEliminar.email}) con rol ${usuarioAEliminar.role}`,
+      datosAnteriores: {
+        nombre: usuarioAEliminar.name,
+        email: usuarioAEliminar.email,
+        role: usuarioAEliminar.role,
+        isActive: usuarioAEliminar.isActive,
+      },
+      usuarioId: session.user.id,
+      ip,
+      userAgent,
+    });
+
     return NextResponse.json({ message: 'Usuario eliminado correctamente' })
+
   } catch (error) {
     console.error('Error deleting user:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

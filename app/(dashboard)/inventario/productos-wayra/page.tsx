@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import {
   Plus,
@@ -55,6 +55,7 @@ export default function ProductosWayraPage() {
   const { data: session } = useSession();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<
     "ALL" | "WAYRA_ENI" | "WAYRA_CALAN"
@@ -79,18 +80,13 @@ export default function ProductosWayraPage() {
     session?.user?.role || ""
   );
 
-  useEffect(() => {
-    if (hasAccess) {
-      fetchProducts();
-    }
-  }, [hasAccess]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch("/api/productos?tipo=WAYRA_ENI,WAYRA_CALAN");
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
+        setLastUpdate(new Date());
       } else {
         toast.error("Error al cargar productos");
       }
@@ -99,7 +95,50 @@ export default function ProductosWayraPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (hasAccess) {
+      fetchProducts();
+    }
+  }, [hasAccess, fetchProducts]);
+
+  useEffect(() => {
+    if (!hasAccess) return;
+
+    const interval = setInterval(() => {
+      console.log("🔄 Refrescando productos Wayra...");
+      fetchProducts();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [hasAccess, fetchProducts]);
+
+  useEffect(() => {
+    const handlePriceUpdate = (event: CustomEvent) => {
+      console.log("⚡ Precios actualizados, refrescando productos Wayra...");
+      fetchProducts();
+
+      if (
+        event.detail?.productosActualizados > 0 &&
+        event.detail?.tipo === "WAYRA"
+      ) {
+        toast.success(
+          `Precios actualizados: ${event.detail.productosActualizados} productos`,
+          {
+            icon: "🔄",
+            duration: 4000,
+          }
+        );
+      }
+    };
+
+    window.addEventListener("price-update" as any, handlePriceUpdate);
+
+    return () => {
+      window.removeEventListener("price-update" as any, handlePriceUpdate);
+    };
+  }, [fetchProducts]);
 
   const handleBarcodeScanned = async (code: string) => {
     try {
@@ -243,6 +282,9 @@ export default function ProductosWayraPage() {
                 </h1>
                 <p className="text-blue-100 text-sm sm:text-base lg:text-lg">
                   ENI (Nacional) y CALAN (Importado)
+                </p>
+                <p className="text-blue-100 text-xs sm:text-sm mt-1">
+                  Última actualización: {lastUpdate.toLocaleTimeString("es-CO")}
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-3 text-xs sm:text-sm">
                   <span className="bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">

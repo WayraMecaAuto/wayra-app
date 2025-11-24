@@ -5,14 +5,14 @@ import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { 
   Settings, DollarSign, Percent, Calculator, Globe, Package,
-  Save, RefreshCw, AlertCircle, CheckCircle
+  Save, RefreshCw, AlertCircle, CheckCircle, Zap
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Configuracion {
   clave: string
@@ -25,6 +25,7 @@ export default function WayraConfiguracionPage() {
   const [configuraciones, setConfiguraciones] = useState<Configuracion[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [productosActualizados, setProductosActualizados] = useState<number | null>(null)
 
   const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS'].includes(session?.user?.role || '')
 
@@ -50,42 +51,49 @@ export default function WayraConfiguracionPage() {
     }
   }
 
-  const updateConfiguracion = async (clave: string, valor: string) => {
-    try {
-      const response = await fetch('/api/configuracion', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clave, valor })
-      })
-
-      if (response.ok) {
-        setConfiguraciones(prev => 
-          prev.map(config => 
-            config.clave === clave ? { ...config, valor } : config
-          )
-        )
-        toast.success('Configuración actualizada')
-      } else {
-        toast.error('Error al actualizar configuración')
-      }
-    } catch (error) {
-      toast.error('Error al actualizar configuración')
-    }
-  }
-
   const saveAllConfigurations = async () => {
     setSaving(true)
+    let totalProductosActualizados = 0
+    
     try {
       const wayraConfigs = configuraciones.filter(c => 
         c.clave.includes('WAYRA') || c.clave.includes('TASA_USD') || c.clave.includes('IVA_CALAN')
       )
       
       for (const config of wayraConfigs) {
-        await updateConfiguracion(config.clave, config.valor)
+        const response = await fetch('/api/configuracion', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clave: config.clave, valor: config.valor })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.productosActualizados) {
+            totalProductosActualizados += data.productosActualizados
+          }
+        }
       }
-      toast.success('Configuraciones de Wayra guardadas')
+      
+      if (totalProductosActualizados > 0) {
+        setProductosActualizados(totalProductosActualizados)
+        toast.success(`¡Guardado! ${totalProductosActualizados} productos actualizados`)
+        
+        // Emitir evento para notificar a las páginas de inventario
+        window.dispatchEvent(new CustomEvent('price-update', {
+          detail: {
+            productosActualizados: totalProductosActualizados,
+            timestamp: new Date().toISOString(),
+            tipo: 'WAYRA'
+          }
+        }))
+        
+        setTimeout(() => setProductosActualizados(null), 5000)
+      } else {
+        toast.success('¡Todas las configuraciones se guardaron!')
+      }
     } catch (error) {
-      toast.error('Error al guardar configuraciones')
+      toast.error('Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -109,7 +117,7 @@ export default function WayraConfiguracionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -122,6 +130,29 @@ export default function WayraConfiguracionPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+        
+        {/* Alerta de productos actualizados */}
+        <AnimatePresence>
+          {productosActualizados !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-green-50 border-2 border-green-500 rounded-xl p-4 shadow-lg"
+            >
+              <div className="flex items-center gap-3">
+                <Zap className="h-6 w-6 text-green-600 animate-pulse" />
+                <div>
+                  <h3 className="font-bold text-green-900">Actualización Automática Exitosa</h3>
+                  <p className="text-green-700 text-sm">
+                    {productosActualizados} productos han sido recalculados con los nuevos márgenes y tasas
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Header Hero */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -143,7 +174,7 @@ export default function WayraConfiguracionPage() {
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Configuración Wayra</h1>
-                <p className="text-blue-100 text-sm sm:text-base mt-1">Gestión avanzada de márgenes, tasas e IVA</p>
+                <p className="text-blue-100 text-sm sm:text-base mt-1">Modifica los valores y presiona "Guardar y Actualizar Todo"</p>
               </div>
             </div>
 
@@ -156,12 +187,12 @@ export default function WayraConfiguracionPage() {
               {saving ? (
                 <>
                   <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                  Guardando...
+                  Guardando y Actualizando...
                 </>
               ) : (
                 <>
                   <Save className="h-5 w-5 mr-2" />
-                  Guardar Todo
+                  Guardar y Actualizar Todo
                 </>
               )}
             </Button>
@@ -198,7 +229,7 @@ export default function WayraConfiguracionPage() {
                     placeholder="35"
                     className="text-lg font-bold border-2 focus:border-blue-500 transition-all"
                   />
-                  <p className="text-xs text-gray-500">Sobre precio de compra</p>
+                  <p className="text-xs text-gray-500">Presiona "Guardar y Actualizar Todo" para aplicar</p>
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -271,6 +302,7 @@ export default function WayraConfiguracionPage() {
                     placeholder="4000"
                     className="text-lg font-bold border-2 focus:border-orange-500 transition-all"
                   />
+                  <p className="text-xs text-gray-500">Productos CALAN se recalcularán con la nueva tasa</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -305,10 +337,10 @@ export default function WayraConfiguracionPage() {
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <CheckCircle className="h-4 w-4 text-orange-700" />
-                    <span className="font-medium text-orange-800 text-sm">Características CALAN</span>
+                    <span className="font-medium text-orange-800 text-sm">Actualización Manual</span>
                   </div>
                   <p className="text-xs text-orange-700 leading-relaxed">
-                    IVA obligatorio del 15% + conversión automática USD a COP.
+                    Los cambios se aplicarán al presionar "Guardar y Actualizar Todo".
                   </p>
                 </div>
               </CardContent>
@@ -326,37 +358,28 @@ export default function WayraConfiguracionPage() {
             <CardHeader className="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
               <CardTitle className="flex items-center gap-3 text-xl">
                 <Settings className="h-6 w-6" />
-                Resumen del Sistema Wayra
+                Sistema de Actualización Manual
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200"
-                >
-                  <div className="text-4xl font-bold text-blue-700 mb-2">ENI</div>
-                  <p className="text-sm font-medium text-gray-700">Productos Nacionales</p>
-                  <p className="text-xs text-gray-600 mt-1">IVA opcional</p>
-                </motion.div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200">
+                  <Save className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-blue-700 mb-1">Manual</div>
+                  <p className="text-sm font-medium text-gray-700">Solo al presionar guardar</p>
+                </div>
 
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl border border-orange-200"
-                >
-                  <div className="text-4xl font-bold text-orange-700 mb-2">CALAN</div>
-                  <p className="text-sm font-medium text-gray-700">Productos Importados</p>
-                  <p className="text-xs text-gray-600 mt-1">IVA 15% obligatorio</p>
-                </motion.div>
+                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl border border-green-200">
+                  <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-green-700 mb-1">Control Total</div>
+                  <p className="text-sm font-medium text-gray-700">Tú decides cuándo aplicar</p>
+                </div>
 
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl border border-green-200"
-                >
-                  <div className="text-4xl font-bold text-green-700 mb-2">35%</div>
-                  <p className="text-sm font-medium text-gray-700">Margen Estándar</p>
-                  <p className="text-xs text-gray-600 mt-1">Aplica a ambos tipos</p>
-                </motion.div>
+                <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl border border-purple-200">
+                  <RefreshCw className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-purple-700 mb-1">Sincronizado</div>
+                  <p className="text-sm font-medium text-gray-700">Inventario se actualiza automáticamente</p>
+                </div>
               </div>
             </CardContent>
           </Card>

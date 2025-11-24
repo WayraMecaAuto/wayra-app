@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useSession, signOut } from 'next-auth/react'
-import { Menu, Bell, LogOut, Clock, X, CheckCircle, AlertTriangle, Info, Check, ChevronDown, Filter, Loader2 } from 'lucide-react'
+import { Menu, Bell, LogOut, Clock, X, CheckCircle, AlertTriangle, Info, Check, ChevronDown, Filter, Loader2, Archive, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import Dropdown from '@/components/forms/Dropdown'
 
 interface NavbarProps {
   onMenuClick: () => void
@@ -13,6 +14,7 @@ interface NavbarProps {
 
 interface Notification {
   id: string
+  notificacionId: string
   title: string
   message: string
   time: string
@@ -44,7 +46,9 @@ function NotificationsModal({
   onClose, 
   notifications, 
   markAsRead, 
+  markAsUnread,
   markAllAsRead, 
+  archiveNotifications,
   mesFilter,
   añoFilter,
   onFilterChange,
@@ -54,18 +58,21 @@ function NotificationsModal({
   onClose: () => void
   notifications: Notification[]
   markAsRead: (ids: string[]) => void
+  markAsUnread: (ids: string[]) => void
   markAllAsRead: () => void
-  mesFilter: string | null
-  añoFilter: string | null
-  onFilterChange: (mes: string | null, año: string | null) => void
+  archiveNotifications: (ids: string[]) => void
+  mesFilter: string
+  añoFilter: string
+  onFilterChange: (mes: string, año: string) => void
   isLoading: boolean
 }) {
   const [showFilters, setShowFilters] = useState(false)
-  const [localMes, setLocalMes] = useState(mesFilter || '')
-  const [localAño, setLocalAño] = useState(añoFilter || new Date().getFullYear().toString())
+  const [localMes, setLocalMes] = useState(mesFilter)
+  const [localAño, setLocalAño] = useState(añoFilter)
+  const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set())
 
   const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: 3 }, (_, i) => currentYear - i)
+  const years = Array.from({ length: 3 }, (_, i) => ({ value: String(currentYear - i), label: String(currentYear - i) }))
 
   useEffect(() => {
     if (showModal) {
@@ -76,10 +83,41 @@ function NotificationsModal({
     }
   }, [showModal])
 
+  useEffect(() => {
+    setLocalMes(mesFilter)
+    setLocalAño(añoFilter)
+  }, [mesFilter, añoFilter])
+
   if (!showModal || typeof window === 'undefined') return null
 
-  const hasActiveFilters = mesFilter || añoFilter
   const unreadCount = notifications.filter(n => !n.read).length
+  const selectedCount = selectedNotifications.size
+
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedNotifications)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedNotifications(newSet)
+  }
+
+  const selectAll = () => {
+    setSelectedNotifications(new Set(notifications.map(n => n.id)))
+  }
+
+  const clearSelection = () => {
+    setSelectedNotifications(new Set())
+  }
+
+  const handleBulkAction = (action: 'read' | 'unread' | 'archive') => {
+    const ids = Array.from(selectedNotifications)
+    if (action === 'read') markAsRead(ids)
+    else if (action === 'unread') markAsUnread(ids)
+    else if (action === 'archive') archiveNotifications(ids)
+    clearSelection()
+  }
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -113,13 +151,9 @@ function NotificationsModal({
           <div className="flex-1">
             <h3 className="font-bold text-gray-900 text-lg sm:text-2xl">Centro de Notificaciones</h3>
             <p className="text-sm text-gray-600 mt-1">
-              {hasActiveFilters ? (
-                <span className="text-blue-600 font-medium">
-                  Filtrando: {mesFilter && MESES.find(m => m.value === mesFilter)?.label} {añoFilter}
-                </span>
-              ) : (
-                'Todas las notificaciones del sistema'
-              )}
+              <span className="text-blue-600 font-medium">
+                {MESES.find(m => m.value === mesFilter)?.label} {añoFilter}
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-2 ml-4">
@@ -127,7 +161,7 @@ function NotificationsModal({
               variant="outline"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className={hasActiveFilters ? "bg-blue-50 border-blue-300" : ""}
+              className="bg-blue-50 border-blue-300"
             >
               <Filter className="h-4 w-4 mr-2" />
               Filtros
@@ -150,29 +184,26 @@ function NotificationsModal({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Mes</label>
-                <select
+                <Dropdown
+                  options={MESES}
                   value={localMes}
-                  onChange={(e) => setLocalMes(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="">Todos</option>
-                  {MESES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
+                  onChange={setLocalMes}
+                  placeholder="Seleccionar mes"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Año</label>
-                <select
+                <Dropdown
+                  options={years}
                   value={localAño}
-                  onChange={(e) => setLocalAño(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                  onChange={setLocalAño}
+                  placeholder="Seleccionar año"
+                />
               </div>
               <div className="flex items-end gap-2">
                 <Button 
                   onClick={() => {
-                    onFilterChange(localMes || null, localAño || null)
+                    onFilterChange(localMes, localAño)
                     setShowFilters(false)
                   }} 
                   className="flex-1"
@@ -181,17 +212,46 @@ function NotificationsModal({
                 </Button>
                 <Button 
                   onClick={() => {
-                    setLocalMes('')
-                    setLocalAño(currentYear.toString())
-                    onFilterChange(null, null)
+                    const now = new Date()
+                    const mes = String(now.getMonth() + 1)
+                    const año = String(now.getFullYear())
+                    setLocalMes(mes)
+                    setLocalAño(año)
+                    onFilterChange(mes, año)
                     setShowFilters(false)
                   }} 
                   variant="outline" 
                   className="flex-1"
                 >
-                  Limpiar
+                  Hoy
                 </Button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Acciones en masa */}
+        {selectedCount > 0 && (
+          <div className="p-3 bg-blue-50 border-b flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedCount} seleccionada{selectedCount > 1 ? 's' : ''}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleBulkAction('read')}>
+                <Check className="h-4 w-4 mr-1" />
+                Marcar leídas
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleBulkAction('unread')}>
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Marcar no leídas
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleBulkAction('archive')}>
+                <Archive className="h-4 w-4 mr-1" />
+                Archivar
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                Cancelar
+              </Button>
             </div>
           </div>
         )}
@@ -209,12 +269,18 @@ function NotificationsModal({
                 <div
                   key={n.id}
                   className={cn(
-                    "p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md",
-                    getNotificationColor(n.type, n.priority, n.read)
+                    "p-4 rounded-lg border transition-all hover:shadow-md relative",
+                    getNotificationColor(n.type, n.priority, n.read),
+                    selectedNotifications.has(n.id) && "ring-2 ring-blue-500"
                   )}
-                  onClick={() => markAsRead([n.id])}
                 >
                   <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedNotifications.has(n.id)}
+                      onChange={() => toggleSelection(n.id)}
+                      className="mt-1 rounded"
+                    />
                     <div className="mt-1">{getNotificationIcon(n.type)}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
@@ -232,6 +298,39 @@ function NotificationsModal({
                         </span>
                         <span className="text-xs text-gray-500 font-medium">{n.time}</span>
                       </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        {!n.read && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              markAsRead([n.id])
+                            }}
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                          >
+                            Marcar leída
+                          </button>
+                        )}
+                        {n.read && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              markAsUnread([n.id])
+                            }}
+                            className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                          >
+                            No leída
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            archiveNotifications([n.id])
+                          }}
+                          className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                        >
+                          Archivar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -242,7 +341,7 @@ function NotificationsModal({
               <Bell className="h-20 w-20 text-gray-300 mx-auto mb-4" />
               <h4 className="text-xl font-medium text-gray-500 mb-2">No hay notificaciones</h4>
               <p className="text-gray-400">
-                {hasActiveFilters ? 'No hay notificaciones para este período' : 'Todas las notificaciones aparecerán aquí'}
+                No hay notificaciones para este período
               </p>
             </div>
           )}
@@ -257,7 +356,14 @@ function NotificationsModal({
                 <span className="ml-2 text-blue-600 font-medium">• {unreadCount} sin leer</span>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={onClose}>Cerrar</Button>
+            <div className="flex items-center gap-2">
+              {selectedCount === 0 && notifications.length > 0 && (
+                <Button variant="outline" size="sm" onClick={selectAll}>
+                  Seleccionar todas
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={onClose}>Cerrar</Button>
+            </div>
           </div>
         </div>
       </div>
@@ -273,15 +379,17 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   const [showAllNotifications, setShowAllNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [mesFilter, setMesFilter] = useState<string | null>(null)
-  const [añoFilter, setAñoFilter] = useState<string | null>(null)
+  
+  const now = new Date()
+  const [mesFilter, setMesFilter] = useState(String(now.getMonth() + 1))
+  const [añoFilter, setAñoFilter] = useState(String(now.getFullYear()))
 
-  const fetchNotifications = async (mes?: string | null, año?: string | null) => {
+  const fetchNotifications = async (mes: string, año: string) => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
-      if (mes) params.append('mes', mes)
-      if (año) params.append('año', año)
+      params.append('mes', mes)
+      params.append('año', año)
       
       const response = await fetch(`/api/notifications?${params}`)
       if (response.ok) {
@@ -304,27 +412,64 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   const markAsRead = async (ids: string[]) => {
     if (!ids.length) return
     
-    // Remover de UI inmediatamente
-    setNotifications(prev => prev.filter(n => !ids.includes(n.id)))
-
     try {
-      await fetch('/api/notifications', {
+      const response = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notificationIds: ids, action: 'mark_read' })
       })
       
-      // Refrescar después de un momento
-      setTimeout(() => fetchNotifications(mesFilter, añoFilter), 500)
+      if (response.ok) {
+        setNotifications(prev => prev.map(n => 
+          ids.includes(n.id) ? { ...n, read: true } : n
+        ))
+      }
     } catch (error) {
       console.error('Error:', error)
-      fetchNotifications(mesFilter, añoFilter)
+    }
+  }
+
+  const markAsUnread = async (ids: string[]) => {
+    if (!ids.length) return
+    
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationIds: ids, action: 'mark_unread' })
+      })
+      
+      if (response.ok) {
+        setNotifications(prev => prev.map(n => 
+          ids.includes(n.id) ? { ...n, read: false } : n
+        ))
+      }
+    } catch (error) {
+      console.error('Error:', error)
     }
   }
 
   const markAllAsRead = () => {
-    const allIds = notifications.map(n => n.id)
-    markAsRead(allIds)
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id)
+    markAsRead(unreadIds)
+  }
+
+  const archiveNotifications = async (ids: string[]) => {
+    if (!ids.length) return
+    
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationIds: ids, action: 'archive' })
+      })
+      
+      if (response.ok) {
+        setNotifications(prev => prev.filter(n => !ids.includes(n.id)))
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
   }
 
   const getNotificationIcon = (type: string) => {
@@ -414,7 +559,9 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="font-bold">Notificaciones</h3>
-                          <p className="text-xs text-gray-600">Últimas actualizaciones</p>
+                          <p className="text-xs text-gray-600">
+                            {MESES.find(m => m.value === mesFilter)?.label} {añoFilter}
+                          </p>
                         </div>
                         {unreadCount > 0 && (
                           <button
@@ -437,7 +584,6 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                           className={cn("p-3 border-b cursor-pointer", getNotificationColor(n.type, n.priority, n.read))}
                           onClick={() => {
                             markAsRead([n.id])
-                            setShowNotifications(false)
                           }}
                         >
                           <div className="flex items-start gap-3">
@@ -519,7 +665,9 @@ export function Navbar({ onMenuClick }: NavbarProps) {
         onClose={() => setShowAllNotifications(false)}
         notifications={notifications}
         markAsRead={markAsRead}
+        markAsUnread={markAsUnread}
         markAllAsRead={markAllAsRead}
+        archiveNotifications={archiveNotifications}
         mesFilter={mesFilter}
         añoFilter={añoFilter}
         onFilterChange={(mes, año) => {

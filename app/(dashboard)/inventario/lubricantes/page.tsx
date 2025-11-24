@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import {
   Plus,
@@ -48,6 +48,7 @@ export default function LubricantesPage() {
   const { data: session } = useSession();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [showProductForm, setShowProductForm] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
@@ -66,13 +67,7 @@ export default function LubricantesPage() {
     session?.user?.role || ""
   );
 
-  useEffect(() => {
-    if (hasAccess) {
-      fetchProducts();
-    }
-  }, [hasAccess]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch(
         "/api/productos?tipo=TORNI_REPUESTO&categoria=LUBRICANTES"
@@ -80,6 +75,7 @@ export default function LubricantesPage() {
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
+        setLastUpdate(new Date());
       } else {
         toast.error("Error al cargar productos");
       }
@@ -88,7 +84,46 @@ export default function LubricantesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (hasAccess) {
+      fetchProducts();
+    }
+  }, [hasAccess, fetchProducts]);
+
+  //Polling
+  useEffect(() => {
+    if (!hasAccess) return;
+    const interval = setInterval(() => {
+      console.log("🔄 Refrescando lubricantes...");
+      fetchProducts();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [hasAccess, fetchProducts]);
+
+  // Listener
+  useEffect(() => {
+    const handlePriceUpdate = (event: CustomEvent) => {
+      console.log("⚡ Precios actualizados, refrescando lubricantes...");
+      fetchProducts();
+      if (
+        event.detail?.productosActualizados > 0 &&
+        event.detail?.tipo === "TORNI"
+      ) {
+        toast.success(
+          `Precios actualizados: ${event.detail.productosActualizados} productos`,
+          {
+            icon: "🔄",
+            duration: 4000,
+          }
+        );
+      }
+    };
+    window.addEventListener("price-update" as any, handlePriceUpdate);
+    return () =>
+      window.removeEventListener("price-update" as any, handlePriceUpdate);
+  }, [fetchProducts]);
 
   const handleBarcodeScanned = async (code: string) => {
     console.log("🔍 Código escaneado en página:", code);
@@ -178,7 +213,7 @@ export default function LubricantesPage() {
     withIva: products.filter((p) => p.aplicaIva).length,
   };
 
-   if (!hasAccess) {
+  if (!hasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-red-50 to-red-100">
         <div className="text-center animate-fade-in">
@@ -195,7 +230,7 @@ export default function LubricantesPage() {
       </div>
     );
   }
-   
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -225,6 +260,9 @@ export default function LubricantesPage() {
               </h1>
               <p className="text-indigo-100 text-base sm:text-lg">
                 Aceites, grasas y lubricantes especializados
+              </p>
+              <p className="text-indigo-100 text-xs sm:text-sm mt-1">
+                Última actualización de precios: {lastUpdate.toLocaleTimeString("es-CO")}
               </p>
               <div className="flex flex-wrap gap-2 mt-3 text-sm">
                 <span className="bg-white/20 px-3 py-1 rounded-full">

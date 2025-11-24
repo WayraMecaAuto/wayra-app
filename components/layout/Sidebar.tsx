@@ -123,6 +123,12 @@ const menuItems: MenuItem[] = [
       }
     ]
   },
+  {
+    title: 'Auditoría',
+    href: '/auditoria',
+    icon: Shield,
+    roles: ['SUPER_USUARIO']
+  },
 ]
 
 function MenuItem({ item, level = 0, isCollapsed, onItemClick }: { 

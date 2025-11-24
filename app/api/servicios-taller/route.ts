@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
-    const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER'].includes(session?.user?.role || '')
+    const hasAccess = ['SUPER_USUARIO', 'ADMIN_WAYRA_TALLER', 'MECANICO'].includes(session?.user?.role || '')
     if (!session || !hasAccess) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -45,7 +45,7 @@ export async function GET() {
   }
 }
 
-// 🔥 ACTUALIZAR SERVICIOS (PATCH mantiene compatibilidad)
+// ACTUALIZAR SERVICIOS MASIVAMENTE
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -57,11 +57,22 @@ export async function PATCH(request: NextRequest) {
 
     const { servicios } = await request.json()
 
+    if (!Array.isArray(servicios)) {
+      return NextResponse.json({ error: 'Formato inválido' }, { status: 400 })
+    }
+
     for (const servicio of servicios) {
       await prisma.configuracion.upsert({
         where: { clave: servicio.clave },
-        update: { valor: servicio.valor, descripcion: servicio.descripcion },
-        create: { clave: servicio.clave, valor: servicio.valor, descripcion: servicio.descripcion }
+        update: { 
+          valor: servicio.valor.toString(), 
+          descripcion: servicio.descripcion 
+        },
+        create: { 
+          clave: servicio.clave, 
+          valor: servicio.valor.toString(), 
+          descripcion: servicio.descripcion 
+        }
       })
     }
 
@@ -72,7 +83,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// 🔥 NUEVO: CREAR SERVICIO
+// CREAR NUEVO SERVICIO
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -82,31 +93,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { descripcion, precio } = await request.json()
+    const body = await request.json()
+    console.log('📥 Body recibido:', body)
 
-    if (!descripcion || !precio) {
-      return NextResponse.json({ error: 'Campos requeridos' }, { status: 400 })
+    const { descripcion, valor } = body
+
+    //  Validación más flexible
+    if (!descripcion || (valor === undefined && body.precio === undefined)) {
+      return NextResponse.json({ 
+        error: 'Campos requeridos: descripcion y valor/precio' 
+      }, { status: 400 })
     }
 
-    // Generar clave única
-    const clave = `SERVICIO_${descripcion.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${Date.now()}`
+    // Aceptar tanto "valor" como "precio"
+    const precioFinal = valor || body.precio
+
+    // Generar clave única basada en descripción
+    const clave = `SERVICIO_${descripcion
+      .toUpperCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^A-Z0-9_]/g, '')}_${Date.now()}`
 
     const nuevoServicio = await prisma.configuracion.create({
       data: {
         clave,
-        valor: precio.toString(),
+        valor: precioFinal.toString(),
         descripcion
       }
     })
 
+    console.log('✅ Servicio creado:', nuevoServicio)
     return NextResponse.json(nuevoServicio, { status: 201 })
   } catch (error) {
-    console.error('Error creating servicio:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    console.error('❌ Error creating servicio:', error)
+    return NextResponse.json({ 
+      error: 'Error interno del servidor',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
 
-// 🔥 NUEVO: ELIMINAR SERVICIO
+// ELIMINAR SERVICIO
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -123,11 +150,26 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Clave requerida' }, { status: 400 })
     }
 
+    // Verificar si el servicio está siendo usado en órdenes
+    const servicioEnUso = await prisma.servicioOrden.findFirst({
+      where: {
+        descripcion: {
+          contains: clave.replace('SERVICIO_', '').replace(/_/g, ' ')
+        }
+      }
+    })
+
+    if (servicioEnUso) {
+      return NextResponse.json({ 
+        error: 'No se puede eliminar: el servicio está en uso en órdenes existentes' 
+      }, { status: 400 })
+    }
+
     await prisma.configuracion.delete({
       where: { clave }
     })
 
-    return NextResponse.json({ message: 'Servicio eliminado' })
+    return NextResponse.json({ message: 'Servicio eliminado correctamente' })
   } catch (error) {
     console.error('Error deleting servicio:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

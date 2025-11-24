@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { prisma } from "@/lib/db/prisma";
+import {
+  registrarAuditoria,
+  auditarOrden,
+  obtenerInfoRequest,
+} from "@/lib/auditoria";
 
 export async function GET(
   request: NextRequest,
@@ -98,10 +103,17 @@ export async function PATCH(
 
     // Si es CANCELADO, eliminar la orden
     if (ordenData.estado === "CANCELADO") {
-      await prisma.ordenServicio.delete({
-        where: { id },
-      });
-      return NextResponse.json({ message: "Orden cancelada y eliminada" });
+      const { ip, userAgent } = obtenerInfoRequest(request);
+
+      await auditarOrden(
+        "CANCELAR",
+        ordenActual?.numeroOrden || "",
+        "", // nombre cliente
+        0,
+        session.user.id,
+        ip,
+        userAgent
+      );
     }
 
     // Actualizar servicios si se proporcionan
@@ -202,11 +214,22 @@ export async function PATCH(
       },
     });
 
-    // 🔥 Si se marca como COMPLETADA, registrar en contabilidad
+    // Si se marca como COMPLETADA, registrar en contabilidad
     if (
       ordenData.estado === "COMPLETADO" &&
       ordenActual?.estado !== "COMPLETADO"
     ) {
+      const { ip, userAgent } = obtenerInfoRequest(request);
+
+      await auditarOrden(
+        "COMPLETAR",
+        orden.numeroOrden,
+        orden.cliente.nombre,
+        orden.total,
+        session.user.id,
+        ip,
+        userAgent
+      );
       const ahora = new Date();
       const mes = ahora.getMonth() + 1;
       const anio = ahora.getFullYear();

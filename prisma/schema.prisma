@@ -69,8 +69,49 @@ model User {
   movimientos    MovimientoInventario[]
   notificaciones NotificacionUsuario[]
   movimientosContables MovimientoContable[]
+  auditorias     Auditoria[]
 
   @@map("users")
+}
+
+// Agregar al final de prisma/schema.prisma
+
+enum AccionAuditoria {
+  CREAR
+  EDITAR
+  ELIMINAR
+  VENTA
+  ENTRADA_INVENTARIO
+  SALIDA_INVENTARIO
+  COMPLETAR_ORDEN
+  CANCELAR_ORDEN
+  GENERAR_FACTURA
+  ANULAR_FACTURA
+  CREAR_EGRESO
+  OTRO
+}
+
+model Auditoria {
+  id              String           @id @default(cuid())
+  accion          AccionAuditoria
+  entidad         String           // Usuario, Producto, Orden, etc.
+  entidadId       String?          // ID del registro afectado
+  descripcion     String
+  datosAnteriores Json?            // Estado anterior (para ediciones)
+  datosNuevos     Json?            // Estado nuevo
+  ip              String?
+  userAgent       String?
+  
+  usuario         User             @relation(fields: [usuarioId], references: [id])
+  usuarioId       String
+  
+  createdAt       DateTime         @default(now())
+
+  @@index([usuarioId])
+  @@index([entidad])
+  @@index([accion])
+  @@index([createdAt])
+  @@map("auditorias")
 }
 
 model Producto {
@@ -297,15 +338,31 @@ model Notificacion {
   id          String   @id @default(cuid())
   titulo      String
   mensaje     String
-  tipo        String
-  categoria   String
-  prioridad   String
+  tipo        String   // warning, success, info, error
+  categoria   String   // stock, inventory, orders, billing, users
+  prioridad   String   // high, medium, low
   data        Json?
+  
+  // Campos para eventos del sistema (OPCIONALES para migración segura)
+  entidad     String?  // Producto, Orden, Usuario, etc.
+  entidadId   String?  // ID del registro relacionado
+  accion      String?  // CREAR, EDITAR, VENTA, etc.
+  
+  // Campos de fecha y periodo (CON DEFAULTS)
+  mes         Int      @default(1)
+  anio        Int      @default(2024)
+  
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt 
   
   // Relaciones
   usuarios    NotificacionUsuario[]
   
+  @@index([categoria])
+  @@index([tipo])
+  @@index([prioridad])
+  @@index([mes, anio])
+  @@index([createdAt])
   @@map("notificaciones")
 }
 
@@ -313,6 +370,8 @@ model NotificacionUsuario {
   id              String   @id @default(cuid())
   leida           Boolean  @default(false)
   fechaLeida      DateTime?
+  archivada       Boolean  @default(false) 
+  fechaArchivada  DateTime?
   
   // Relaciones
   notificacion    Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
@@ -321,6 +380,8 @@ model NotificacionUsuario {
   usuarioId       String
   
   @@unique([notificacionId, usuarioId])
+  @@index([usuarioId, leida])
+  @@index([usuarioId, archivada]) 
   @@map("notificaciones_usuarios")
 }
 

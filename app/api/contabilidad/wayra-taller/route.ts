@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { prisma } from "@/lib/db/prisma";
+import { auditarEgreso, obtenerInfoRequest } from "@/lib/auditoria";
 
 export async function GET(request: NextRequest) {
   try {
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    const { ip, userAgent } = obtenerInfoRequest(request);
     const body = await request.json();
     const { descripcion, valor, concepto } = body;
 
@@ -206,6 +208,15 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    await auditarEgreso(
+      descripcion,
+      parseFloat(valor),
+      "WAYRA",
+      session.user.id,
+      ip,
+      userAgent
+    );
 
     return NextResponse.json(
       {

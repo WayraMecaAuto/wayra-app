@@ -1,16 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth/config'
-import { prisma } from '@/lib/db/prisma'
-import bcrypt from 'bcryptjs'
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/config";
+import { prisma } from "@/lib/db/prisma";
+import { registrarAuditoria, obtenerInfoRequest } from "@/lib/auditoria";
+import bcrypt from "bcryptjs";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    
+    const session = await getServerSession(authOptions);
+
     // Solo SUPER_USUARIO puede gestionar usuarios
-    if (!session || session.user.role !== 'SUPER_USUARIO') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!session || session.user.role !== "SUPER_USUARIO") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const users = await prisma.user.findMany({
@@ -21,48 +22,57 @@ export async function GET() {
         role: true,
         isActive: true,
         createdAt: true,
-        lastLogin: true
+        lastLogin: true,
       },
       orderBy: [
-        { isActive: 'desc' }, // Activos primero
-        { createdAt: 'desc' }
-      ]
-    })
+        { isActive: "desc" }, // Activos primero
+        { createdAt: "desc" },
+      ],
+    });
 
-    return NextResponse.json(users)
+    return NextResponse.json(users);
   } catch (error) {
-    console.error('Error fetching users:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    console.error("Error fetching users:", error);
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    
+    const session = await getServerSession(authOptions);
+
     // Solo SUPER_USUARIO puede crear usuarios
-    if (!session || session.user.role !== 'SUPER_USUARIO') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!session || session.user.role !== "SUPER_USUARIO") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { name, email, password, role } = await request.json()
+    const { name, email, password, role } = await request.json();
 
     // Validaciones
     if (!name || !email || !password || !role) {
-      return NextResponse.json({ error: 'Todos los campos son requeridos' }, { status: 400 })
+      return NextResponse.json(
+        { error: "Todos los campos son requeridos" },
+        { status: 400 }
+      );
     }
 
     // Verificar si el email ya existe
     const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+      where: { email },
+    });
 
     if (existingUser) {
-      return NextResponse.json({ error: 'El email ya está registrado' }, { status: 400 })
+      return NextResponse.json(
+        { error: "El email ya está registrado" },
+        { status: 400 }
+      );
     }
 
     // Encriptar contraseña
-    const hashedPassword = await bcrypt.hash(password, 12)
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // Crear usuario
     const user = await prisma.user.create({
@@ -71,7 +81,7 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         role,
-        isActive: true
+        isActive: true,
       },
       select: {
         id: true,
@@ -79,13 +89,34 @@ export async function POST(request: NextRequest) {
         email: true,
         role: true,
         isActive: true,
-        createdAt: true
-      }
-    })
+        createdAt: true,
+      },
+    });
 
-    return NextResponse.json(user, { status: 201 })
+    const { ip, userAgent } = obtenerInfoRequest(request);
+
+    await registrarAuditoria({
+      accion: "CREAR",
+      entidad: "Usuario",
+      entidadId: user.id,
+      descripcion: `Creó usuario ${user.name} con rol ${user.role}`,
+      datosNuevos: {
+        nombre: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+      },
+      usuarioId: session.user.id,
+      ip,
+      userAgent,
+    });
+
+    return NextResponse.json(user, { status: 201 });
   } catch (error) {
-    console.error('Error creating user:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    console.error("Error creating user:", error);
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 }
+    );
   }
 }

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { prisma } from "@/lib/db/prisma";
+import {
+  registrarAuditoria,
+  auditarOrden,
+  obtenerInfoRequest,
+} from "@/lib/auditoria";
 
 export async function GET(request: NextRequest) {
   try {
@@ -114,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     const numeroOrden = `ORD-${anio}-${mes.toString().padStart(2, "0")}-${orderNumber.toString().padStart(3, "0")}`;
 
-    // 🔥 Obtener tasa de cambio para CALAN
+    //  Obtener tasa de cambio para CALAN
     let tasaDolar = 4000;
     try {
       const tasaConfig = await prisma.configuracion.findUnique({
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
     const manoDeObraNum = parseFloat(manoDeObra) || 0;
     const total = subtotal + manoDeObraNum;
 
-    // 🔥 Calcular utilidad con conversión CALAN
+    //  Calcular utilidad con conversión CALAN
     let utilidad = 0;
 
     if (productos?.length > 0) {
@@ -167,7 +172,7 @@ export async function POST(request: NextRequest) {
           where: { id: prod.id },
         });
         if (producto) {
-          // ✅ CALCULAR PRECIO DE COMPRA EN COP (SOLO SI ES CALAN EN USD)
+          // CALCULAR PRECIO DE COMPRA EN COP (SOLO SI ES CALAN EN USD)
           let precioCompraContable = producto.precioCompra;
 
           // Solo convertir si es CALAN en USD Y el precio no está ya convertido
@@ -247,7 +252,7 @@ export async function POST(request: NextRequest) {
       console.log(`✅ ${servicios.length} servicios agregados`);
     }
 
-    // ✅ PROCESAR PRODUCTOS Y ACTUALIZAR INVENTARIO
+    //  PROCESAR PRODUCTOS Y ACTUALIZAR INVENTARIO
     if (productos?.length > 0) {
       for (const prod of productos) {
         const producto = await prisma.producto.findUnique({
@@ -320,6 +325,31 @@ export async function POST(request: NextRequest) {
         `✅ ${repuestosExternos.length} repuestos externos agregados`
       );
     }
+    
+    const { ip, userAgent } = obtenerInfoRequest(request);
+
+    // Obtener nombre del cliente
+    const cliente = await prisma.cliente.findUnique({
+      where: { id: clienteId },
+      select: { nombre: true },
+    });
+
+    await registrarAuditoria({
+      accion: "CREAR",
+      entidad: "Orden",
+      entidadId: orden.id,
+      descripcion: `Creó orden ${orden.numeroOrden} para ${cliente?.nombre}`,
+      datosNuevos: {
+        numeroOrden: orden.numeroOrden,
+        clienteId,
+        vehiculoId,
+        total: orden.total,
+        estado: "PENDIENTE",
+      },
+      usuarioId: session.user.id,
+      ip,
+      userAgent,
+    });
 
     return NextResponse.json(orden, { status: 201 });
   } catch (error) {
