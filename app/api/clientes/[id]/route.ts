@@ -11,7 +11,7 @@ import {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } 
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -23,8 +23,11 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    // ✅ await params
+    const { id } = await params;
+
     const cliente = await prisma.cliente.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         vehiculos: {
           where: { isActive: true },
@@ -55,7 +58,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } 
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -67,6 +70,7 @@ export async function PATCH(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    // ✅ await params
     const { id } = await params;
 
     const clienteAnterior = await prisma.cliente.findUnique({
@@ -91,7 +95,7 @@ export async function PATCH(
     }
 
     const cliente = await prisma.cliente.update({
-      where: { id: params.id },
+      where: { id }, // ✅ Usar la variable id
       data: {
         nombre,
         telefono,
@@ -141,7 +145,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // ← ¡Promise!
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -153,10 +157,10 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // 1. Resolver params correctamente
+    // await params
     const { id } = await params;
 
-    // 2. Obtener cliente ANTES de cualquier cambio
+    // Obtener cliente ANTES de cualquier cambio
     const cliente = await prisma.cliente.findUnique({
       where: { id },
       select: {
@@ -174,7 +178,7 @@ export async function DELETE(
 
     const { ip, userAgent } = obtenerInfoRequest(request);
 
-    // 3. Contar órdenes y vehículos (¡ambos pueden bloquear hard delete!)
+    // Contar órdenes y vehículos
     const [ordenesCount, vehiculosCount] = await Promise.all([
       prisma.ordenServicio.count({ where: { clienteId: id } }),
       prisma.vehiculo.count({ where: { clienteId: id } }),

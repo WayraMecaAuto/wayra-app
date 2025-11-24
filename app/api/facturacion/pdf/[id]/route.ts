@@ -8,12 +8,14 @@ import { es } from "date-fns/locale";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     // 🔹 1. Obtener la factura con todas las relaciones
     const factura = await prisma.factura.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         cliente: true,
         orden: {
