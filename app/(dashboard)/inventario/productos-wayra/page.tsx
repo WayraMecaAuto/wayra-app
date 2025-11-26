@@ -18,6 +18,7 @@ import {
   DollarSign,
   Globe,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +59,7 @@ export default function ProductosWayraPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<
-    "ALL" | "WAYRA_ENI" | "WAYRA_CALAN"
+    "ALL" | "WAYRA_ENI" | "WAYRA_CALAN" | "WAYRA_OTROS"
   >("ALL");
   const [showProductForm, setShowProductForm] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
@@ -67,8 +68,9 @@ export default function ProductosWayraPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showBarcodeView, setShowBarcodeView] = useState<Product | null>(null);
   const [newProductType, setNewProductType] = useState<
-    "WAYRA_ENI" | "WAYRA_CALAN"
+    "WAYRA_ENI" | "WAYRA_CALAN" | "WAYRA_OTROS"
   >("WAYRA_ENI");
+  const [scannedBarcode, setScannedBarcode] = useState<string>("");
 
   // Verificar permisos
   const hasAccess = [
@@ -82,7 +84,7 @@ export default function ProductosWayraPage() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const response = await fetch("/api/productos?tipo=WAYRA_ENI,WAYRA_CALAN");
+      const response = await fetch("/api/productos?tipo=WAYRA_ENI,WAYRA_CALAN,WAYRA_OTROS");
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
@@ -148,7 +150,7 @@ export default function ProductosWayraPage() {
 
       if (response.ok) {
         const product = await response.json();
-        if (product.tipo === "WAYRA_ENI" || product.tipo === "WAYRA_CALAN") {
+        if (product.tipo === "WAYRA_ENI" || product.tipo === "WAYRA_CALAN" || product.tipo === "WAYRA_OTROS") {
           if (session?.user?.role === "VENDEDOR") {
             setSelectedProduct({ ...product, movementType: "SALIDA" });
           } else {
@@ -165,18 +167,8 @@ export default function ProductosWayraPage() {
             `Producto con código ${code} no encontrado.\n¿Deseas crear un nuevo producto Wayra con este código?`
           );
           if (shouldCreate) {
+            setScannedBarcode(code);
             setShowProductForm(true);
-            setTimeout(() => {
-              const barcodeInput = document.querySelector(
-                'input[name="codigoBarras"]'
-              ) as HTMLInputElement;
-              if (barcodeInput) {
-                barcodeInput.value = code;
-                barcodeInput.dispatchEvent(
-                  new Event("input", { bubbles: true })
-                );
-              }
-            }, 100);
           }
         } else {
           toast.error("Producto no encontrado");
@@ -224,6 +216,7 @@ export default function ProductosWayraPage() {
   const stats = {
     totalENI: products.filter((p) => p.tipo === "WAYRA_ENI").length,
     totalCALAN: products.filter((p) => p.tipo === "WAYRA_CALAN").length,
+    totalOTROS: products.filter((p) => p.tipo === "WAYRA_OTROS").length,
     lowStock: products.filter((p) => p.stock <= p.stockMinimo).length,
     totalValue: products.reduce((sum, p) => sum + p.stock * p.precioVenta, 0),
   };
@@ -281,7 +274,7 @@ export default function ProductosWayraPage() {
                   Productos Wayra
                 </h1>
                 <p className="text-blue-100 text-sm sm:text-base lg:text-lg">
-                  ENI (Nacional) y CALAN (Importado)
+                  ENI (Nacional), CALAN (Importado) y Otros
                 </p>
                 <p className="text-blue-100 text-xs sm:text-sm mt-1">
                   Última actualización: {lastUpdate.toLocaleTimeString("es-CO")}
@@ -294,7 +287,7 @@ export default function ProductosWayraPage() {
                     CALAN: IVA 15%
                   </span>
                   <span className="bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-                    Conversión USD
+                    Otros: Configurable
                   </span>
                 </div>
               </div>
@@ -314,6 +307,7 @@ export default function ProductosWayraPage() {
                   <Button
                     onClick={() => {
                       setNewProductType("WAYRA_ENI");
+                      setScannedBarcode("");
                       setShowProductForm(true);
                     }}
                     className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
@@ -324,12 +318,24 @@ export default function ProductosWayraPage() {
                   <Button
                     onClick={() => {
                       setNewProductType("WAYRA_CALAN");
+                      setScannedBarcode("");
                       setShowProductForm(true);
                     }}
                     className="bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Nuevo CALAN
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setNewProductType("WAYRA_OTROS");
+                      setScannedBarcode("");
+                      setShowProductForm(true);
+                    }}
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo OTROS
                   </Button>
                 </>
               )}
@@ -338,7 +344,7 @@ export default function ProductosWayraPage() {
         </div>
 
         {/* Stats Cards - Mejorado con animaciones y responsive */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
           <Card
             className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 animate-slide-up"
             style={{ animationDelay: "0.1s" }}
@@ -378,8 +384,26 @@ export default function ProductosWayraPage() {
           </Card>
 
           <Card
-            className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 animate-slide-up"
+            className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 animate-slide-up"
             style={{ animationDelay: "0.3s" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-purple-700">
+                Productos OTROS
+              </CardTitle>
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-purple-800">
+                {stats.totalOTROS}
+              </div>
+              <p className="text-xs text-purple-600 mt-1">Productos varios</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 animate-slide-up"
+            style={{ animationDelay: "0.4s" }}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-xs sm:text-sm font-medium text-red-700">
@@ -397,7 +421,7 @@ export default function ProductosWayraPage() {
 
           <Card
             className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 animate-slide-up"
-            style={{ animationDelay: "0.4s" }}
+            style={{ animationDelay: "0.5s" }}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-xs sm:text-sm font-medium text-green-700">
@@ -417,7 +441,7 @@ export default function ProductosWayraPage() {
         {/* Filters and Search - Mejorado responsive */}
         <Card
           className="shadow-xl border-0 bg-white/80 backdrop-blur-sm animate-slide-up"
-          style={{ animationDelay: "0.5s" }}
+          style={{ animationDelay: "0.6s" }}
         >
           <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col space-y-3 sm:space-y-4">
@@ -437,10 +461,11 @@ export default function ProductosWayraPage() {
                       { value: "ALL", label: "Todos los productos" },
                       { value: "WAYRA_ENI", label: "Solo ENI (Nacional)" },
                       { value: "WAYRA_CALAN", label: "Solo CALAN (Importado)" },
+                      { value: "WAYRA_OTROS", label: "Solo OTROS" },
                     ]}
                     value={filterType}
                     onChange={(val) =>
-                      setFilterType(val as "ALL" | "WAYRA_ENI" | "WAYRA_CALAN")
+                      setFilterType(val as "ALL" | "WAYRA_ENI" | "WAYRA_CALAN" | "WAYRA_OTROS")
                     }
                     placeholder="Filtrar por tipo..."
                     icon={<Filter className="h-4 w-4 text-gray-500" />}
@@ -459,7 +484,10 @@ export default function ProductosWayraPage() {
                 </Button>
                 {canEdit && (
                   <Button
-                    onClick={() => setShowProductForm(true)}
+                    onClick={() => {
+                      setScannedBarcode("");
+                      setShowProductForm(true);
+                    }}
                     className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg h-10 text-sm"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -474,7 +502,7 @@ export default function ProductosWayraPage() {
         {/* Products Table/Cards - Vista responsive */}
         <Card
           className="shadow-2xl border-0 bg-white overflow-hidden animate-slide-up"
-          style={{ animationDelay: "0.6s" }}
+          style={{ animationDelay: "0.7s" }}
         >
           <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl flex items-center space-x-2">
@@ -487,7 +515,7 @@ export default function ProductosWayraPage() {
             <div className="hidden lg:block overflow-x-auto">
               <div className="max-h-[600px] overflow-y-auto">
                 <table className="w-full">
-                  <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
+                  <thead className="bg-gradient-to-r from-gray-50 to-blue-50 sticky top-0 z-10">
                     <tr>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700">
                         Producto
@@ -523,13 +551,17 @@ export default function ProductosWayraPage() {
                               className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md transition-transform hover:scale-110 ${
                                 product.tipo === "WAYRA_ENI"
                                   ? "bg-gradient-to-br from-blue-100 to-blue-200"
-                                  : "bg-gradient-to-br from-orange-100 to-orange-200"
+                                  : product.tipo === "WAYRA_CALAN"
+                                  ? "bg-gradient-to-br from-orange-100 to-orange-200"
+                                  : "bg-gradient-to-br from-purple-100 to-purple-200"
                               }`}
                             >
                               {product.tipo === "WAYRA_ENI" ? (
                                 <Package className="h-6 w-6 text-blue-600" />
-                              ) : (
+                              ) : product.tipo === "WAYRA_CALAN" ? (
                                 <Globe className="h-6 w-6 text-orange-600" />
+                              ) : (
+                                <Sparkles className="h-6 w-6 text-purple-600" />
                               )}
                             </div>
                             <div>
@@ -552,15 +584,21 @@ export default function ProductosWayraPage() {
                             className={`${
                               product.tipo === "WAYRA_ENI"
                                 ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                : product.tipo === "WAYRA_CALAN"
+                                ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                : product.tipo === "WAYRA_OTROS"
+                                ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
+                                : "bg-green-100 text-green-700 hover:bg-green-200"
                             } transition-colors`}
                           >
-                            {product.tipo === "WAYRA_ENI" ? "ENI" : "CALAN"}
+                            {product.tipo === "WAYRA_ENI" ? "ENI" : product.tipo === "WAYRA_CALAN" ? "CALAN" : "OTROS"}
                           </Badge>
                           <div className="text-xs text-gray-500 mt-1">
                             {product.tipo === "WAYRA_ENI"
                               ? "Nacional"
-                              : "Importado"}
+                              : product.tipo === "WAYRA_CALAN"
+                              ? "Importado"
+                              : "Varios"}
                           </div>
                         </td>
                         <td className="py-4 px-6">
@@ -725,7 +763,7 @@ export default function ProductosWayraPage() {
                                 : "bg-orange-100 text-orange-700"
                             }`}
                           >
-                            {product.tipo === "WAYRA_ENI" ? "ENI" : "CALAN"}
+                            {product.tipo === "WAYRA_ENI" ? "ENI" : product.tipo === "WAYRA_CALAN" ? "CALAN" : "OTROS"}
                           </Badge>
                         </div>
                         <div className="text-xs sm:text-sm text-gray-500 mt-1">
@@ -901,10 +939,14 @@ export default function ProductosWayraPage() {
         <>
           <ProductForm
             isOpen={showProductForm}
-            onClose={() => setShowProductForm(false)}
+            onClose={() => {
+              setShowProductForm(false);
+              setScannedBarcode("");
+            }}
             onSuccess={fetchProducts}
             tipo={newProductType}
             categoria={newProductType === "WAYRA_ENI" ? "ENI" : "CALAN"}
+            initialBarcode={scannedBarcode}
           />
 
           <ProductForm

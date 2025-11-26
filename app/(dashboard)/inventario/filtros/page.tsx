@@ -55,6 +55,7 @@ export default function FiltrosPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showBarcodeView, setShowBarcodeView] = useState<Product | null>(null);
+  const [scannedBarcode, setScannedBarcode] = useState<string>("");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // Verificar permisos
@@ -129,7 +130,7 @@ export default function FiltrosPage() {
   }, [fetchProducts]);
 
   const handleBarcodeScanned = async (code: string) => {
-    console.log("🔍 Código escaneado en página:", code);
+    console.log("🔍 Código escaneado:", code);
     try {
       const response = await fetch(`/api/productos/barcode/${code}`);
       console.log("📡 Respuesta del servidor:", response.status);
@@ -137,6 +138,8 @@ export default function FiltrosPage() {
       if (response.ok) {
         const product = await response.json();
         console.log("📦 Producto encontrado:", product);
+
+        // Verificar que corresponde a la categoría actual
         if (
           product.tipo === "TORNI_REPUESTO" &&
           product.categoria === "FILTROS"
@@ -155,19 +158,11 @@ export default function FiltrosPage() {
           const shouldCreate = confirm(
             `Producto con código ${code} no encontrado.\n¿Deseas crear un nuevo producto con este código de barras?`
           );
+
           if (shouldCreate) {
+            // Guardar el código escaneado en el estado
+            setScannedBarcode(code); 
             setShowProductForm(true);
-            setTimeout(() => {
-              const barcodeInput = document.querySelector(
-                'input[placeholder*="Escanear"]'
-              ) as HTMLInputElement;
-              if (barcodeInput) {
-                barcodeInput.value = code;
-                barcodeInput.dispatchEvent(
-                  new Event("input", { bubbles: true })
-                );
-              }
-            }, 100);
           }
         } else {
           toast.error("Error al buscar producto");
@@ -737,10 +732,14 @@ export default function FiltrosPage() {
         <>
           <ProductForm
             isOpen={showProductForm}
-            onClose={() => setShowProductForm(false)}
+            onClose={() => {
+              setShowProductForm(false);
+              setScannedBarcode("");
+            }}
             onSuccess={fetchProducts}
             tipo="TORNI_REPUESTO"
             categoria="FILTROS"
+            initialBarcode={scannedBarcode} 
           />
 
           <ProductForm

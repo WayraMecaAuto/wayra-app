@@ -55,6 +55,7 @@ export default function RepuestosPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [scannedBarcode, setScannedBarcode] = useState<string>("");
   const [showBarcodeView, setShowBarcodeView] = useState<Product | null>(null);
 
   // Verificar permisos
@@ -126,7 +127,7 @@ export default function RepuestosPage() {
   }, [fetchProducts]);
 
   const handleBarcodeScanned = async (code: string) => {
-    console.log("🔍 Código escaneado en página:", code);
+    console.log("🔍 Código escaneado:", code);
     try {
       const response = await fetch(`/api/productos/barcode/${code}`);
       console.log("📡 Respuesta del servidor:", response.status);
@@ -134,6 +135,8 @@ export default function RepuestosPage() {
       if (response.ok) {
         const product = await response.json();
         console.log("📦 Producto encontrado:", product);
+
+        // Verificar que corresponde a la categoría actual
         if (
           product.tipo === "TORNI_REPUESTO" &&
           product.categoria === "REPUESTOS"
@@ -152,19 +155,11 @@ export default function RepuestosPage() {
           const shouldCreate = confirm(
             `Producto con código ${code} no encontrado.\n¿Deseas crear un nuevo producto con este código de barras?`
           );
+
           if (shouldCreate) {
+            // Guardar el código escaneado en el estado
+            setScannedBarcode(code);
             setShowProductForm(true);
-            setTimeout(() => {
-              const barcodeInput = document.querySelector(
-                'input[placeholder*="Escanear"]'
-              ) as HTMLInputElement;
-              if (barcodeInput) {
-                barcodeInput.value = code;
-                barcodeInput.dispatchEvent(
-                  new Event("input", { bubbles: true })
-                );
-              }
-            }, 100);
           }
         } else {
           toast.error("Error al buscar producto");
@@ -262,7 +257,8 @@ export default function RepuestosPage() {
                 Gestión de repuestos TorniRepuestos
               </p>
               <p className="text-red-100 text-xs sm:text-sm mt-1">
-                Última actualización de precios: {lastUpdate.toLocaleTimeString("es-CO")}
+                Última actualización de precios:{" "}
+                {lastUpdate.toLocaleTimeString("es-CO")}
               </p>
               <div className="flex flex-wrap gap-2 mt-3 text-sm">
                 <span className="bg-white/20 px-3 py-1 rounded-full">
@@ -734,10 +730,14 @@ export default function RepuestosPage() {
         <>
           <ProductForm
             isOpen={showProductForm}
-            onClose={() => setShowProductForm(false)}
+            onClose={() => {
+              setShowProductForm(false);
+              setScannedBarcode("");
+            }}
             onSuccess={fetchProducts}
             tipo="TORNI_REPUESTO"
             categoria="REPUESTOS"
+            initialBarcode={scannedBarcode} 
           />
 
           <ProductForm

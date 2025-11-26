@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useSession } from "next-auth/react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   Info,
   DollarSign,
 } from "lucide-react";
+import Dropdown from "@/components/forms/Dropdown";
 import toast from "react-hot-toast";
 import { useEffect } from "react";
 
@@ -99,6 +100,8 @@ export function MovementForm({
     handleSubmit,
     formState: { errors },
     watch,
+    control,
+    setValue,
     reset,
   } = useForm<MovementFormData>({
     defaultValues: {
@@ -526,27 +529,55 @@ export function MovementForm({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tipo de Precio *
               </label>
-              <select
-                {...register("tipoPrecio", {
-                  required: "Selecciona un tipo de precio",
-                })}
-                className="w-full h-12 px-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-500"
-              >
-                <option value="VENTA">
-                  💰 Precio Venta - ${product.precioVenta?.toLocaleString()}
-                </option>
-                <option value="MINORISTA">
-                  🏪 Precio Minorista - $
-                  {product.precioMinorista?.toLocaleString()}
-                </option>
-                <option value="MAYORISTA">
-                  📦 Precio Mayorista - $
-                  {product.precioMayorista?.toLocaleString()}
-                </option>
-                <option value="MANUAL">✏️ Precio Manual (personalizado)</option>
-              </select>
+
+              {/* Dropdown con Controller para react-hook-form */}
+              <Controller
+                name="tipoPrecio"
+                control={control}
+                rules={{ required: "Selecciona un tipo de precio" }}
+                render={({ field: { onChange, value } }) => (
+                  <Dropdown
+                    options={[
+                      {
+                        value: "VENTA",
+                        label: `💰 Precio Venta - $${product.precioVenta?.toLocaleString() || 0}`,
+                      },
+                      {
+                        value: "MINORISTA",
+                        label: `🏪 Precio Minorista - $${product.precioMinorista?.toLocaleString() || 0}`,
+                      },
+                      {
+                        value: "MAYORISTA",
+                        label: `📦 Precio Mayorista - $${product.precioMayorista?.toLocaleString() || 0}`,
+                      },
+                      {
+                        value: "MANUAL",
+                        label: "✏️ Precio Manual (personalizado)",
+                      },
+                    ]}
+                    value={value || ""}
+                    onChange={(selectedValue) => {
+                      onChange(selectedValue); // Actualiza react-hook-form
+                      if (selectedValue !== "MANUAL") {
+                        setValue("precioManual", ""); // Limpia precio manual
+                      }
+                    }}
+                    placeholder="Selecciona un tipo de precio..."
+                    icon={<DollarSign className="h-4 w-4 text-green-600" />}
+                  />
+                )}
+              />
+
+              {/* Mostrar error si existe */}
+              {errors.tipoPrecio && (
+                <p className="mt-1 text-sm text-red-600 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  {errors.tipoPrecio.message}
+                </p>
+              )}
             </div>
 
+            {/* Precio Manual */}
             {tipoPrecio === "MANUAL" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -559,7 +590,8 @@ export function MovementForm({
                     validate: (value) => {
                       if (tipoPrecio === "MANUAL") {
                         const precio = parseFloat(value || "0");
-                        if (precio <= 0) return "El precio debe ser mayor a 0";
+                        if (isNaN(precio) || precio <= 0)
+                          return "El precio debe ser mayor a 0";
                       }
                       return true;
                     },

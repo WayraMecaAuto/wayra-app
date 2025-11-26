@@ -28,6 +28,14 @@ let PRICING_CONFIG: Record<string, PricingConfig> = {
     descuentoMinorista: 3,
     descuentoMayorista: 10
   },
+  'WAYRA_OTROS': {
+    margenGanancia: 30,
+    ivaObligatorio: false,
+    porcentajeIva: 19,
+    conversionUSD: false,
+    descuentoMinorista: 3,
+    descuentoMayorista: 10
+  },
   'TORNILLERIA': {
     margenGanancia: 100,
     ivaObligatorio: true,
@@ -80,13 +88,17 @@ export async function updatePricingConfigFromDB() {
         case 'WAYRA_MARGEN_CALAN':
           PRICING_CONFIG.WAYRA_CALAN.margenGanancia = valor
           break
+        case 'WAYRA_MARGEN_OTROS':
+          PRICING_CONFIG.WAYRA_OTROS.margenGanancia = valor
         case 'WAYRA_DESCUENTO_MINORISTA':
           PRICING_CONFIG.WAYRA_ENI.descuentoMinorista = valor
           PRICING_CONFIG.WAYRA_CALAN.descuentoMinorista = valor
+          PRICING_CONFIG.WAYRA_OTROS.descuentoMinorista = valor
           break
         case 'WAYRA_DESCUENTO_MAYORISTA':
           PRICING_CONFIG.WAYRA_ENI.descuentoMayorista = valor
           PRICING_CONFIG.WAYRA_CALAN.descuentoMayorista = valor
+          PRICING_CONFIG.WAYRA_OTROS.descuentoMayorista = valor
           break
         case 'TORNI_MARGEN_REPUESTOS':
           PRICING_CONFIG.TORNI_REPUESTOS.margenGanancia = valor

@@ -30,6 +30,7 @@ enum TipoMovimiento {
 enum TipoProducto {
   WAYRA_ENI
   WAYRA_CALAN
+  WAYRA_OTROS
   TORNI_REPUESTO
   TORNILLERIA
 }

@@ -23,6 +23,7 @@ interface ProductFormProps {
   product?: any
   tipo: string
   categoria: string
+  initialBarcode?: string
 }
 
 interface ProductFormData {
@@ -48,7 +49,8 @@ export function ProductForm({
   onSuccess, 
   product, 
   tipo, 
-  categoria 
+  categoria,
+  initialBarcode 
 }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
@@ -79,19 +81,20 @@ export function ProductForm({
       const timestamp = Date.now().toString().slice(-6)
       const prefix = tipo === 'WAYRA_ENI' ? 'WE' : 
                    tipo === 'WAYRA_CALAN' ? 'WC' : 
+                   tipo === 'WAYRA_OTROS' ? 'WO' :
                    tipo === 'TORNILLERIA' ? 'TO' : 'TR'
       setValue('codigo', `${prefix}${timestamp}`)
       
       if (tipo !== 'TORNILLERIA') {
-        setValue('codigoBarras', generateEAN13())
+        setValue('codigoBarras', initialBarcode || generateEAN13())
       }
       
       setValue('monedaCompra', esCalan ? 'USD' : 'COP')
       setValue('stockInicial', '0')
-      setValue('stockMinimo', '5')
+      setValue('stockMinimo', '1')
       setValue('aplicaIva', config.ivaObligatorio)
     }
-  }, [product, isOpen, tipo, categoria, esCalan, setValue, config.ivaObligatorio])
+  }, [product, isOpen, tipo, categoria, esCalan, setValue, config.ivaObligatorio, initialBarcode])
 
   useEffect(() => {
     if (precioCompra && parseFloat(precioCompra) > 0) {
@@ -174,6 +177,7 @@ export function ProductForm({
                 <h3 className="text-2xl font-bold text-gray-900">
                   {tipo === 'WAYRA_ENI' ? 'Wayra ENI' : 
                    tipo === 'WAYRA_CALAN' ? 'Wayra CALAN' :
+                   tipo === 'WAYRA_OTROS' ? 'Wayra OTROS' :
                    tipo === 'TORNILLERIA' ? 'Tornillería' : 
                    `TorniRepuestos - ${categoria}`}
                 </h3>

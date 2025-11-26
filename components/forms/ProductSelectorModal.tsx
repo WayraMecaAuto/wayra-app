@@ -4,13 +4,11 @@ import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Search,
-  Package,
-  Plus,
-} from "lucide-react";
+import { Search, Package, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
+import Dropdown from "./Dropdown";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Producto {
   id: string;
@@ -22,6 +20,7 @@ interface Producto {
   precioVenta: number;
   precioMinorista: number;
   precioMayorista: number;
+  isActive?: boolean;
 }
 
 interface ProductSelectorModalProps {
@@ -29,6 +28,15 @@ interface ProductSelectorModalProps {
   onClose: () => void;
   onSelect: (producto: Producto, tipoPrecio: string) => void;
 }
+
+const tipoOptions = [
+  { value: "ALL", label: "Todos los tipos" },
+  { value: "WAYRA_ENI", label: "Wayra ENI" },
+  { value: "WAYRA_CALAN", label: "Wayra CALAN" },
+  { value: "WAYRA_OTROS", label: "Wayra OTROS" },
+  { value: "TORNI_REPUESTO", label: "TorniRepuestos" },
+  { value: "TORNILLERIA", label: "Tornillería" },
+];
 
 export function ProductSelectorModal({
   isOpen,
@@ -44,38 +52,33 @@ export function ProductSelectorModal({
   useEffect(() => {
     if (isOpen) {
       fetchProductos();
+      setSearch("");
+      setFilterTipo("ALL");
+      setFilterCategoria("ALL");
     }
   }, [isOpen]);
 
   const fetchProductos = async () => {
     setLoading(true);
     try {
-      // Cargar todos los productos disponibles
-      const [wayraEni, wayraCalan, torniRepuestos, tornilleria] =
+      const [wayraEni, wayraCalan, wayraOtros, torniRepuestos, tornilleria] =
         await Promise.all([
-          fetch("/api/productos?tipo=WAYRA_ENI").then((r) =>
-            r.ok ? r.json() : []
-          ),
-          fetch("/api/productos?tipo=WAYRA_CALAN").then((r) =>
-            r.ok ? r.json() : []
-          ),
-          fetch("/api/productos?tipo=TORNI_REPUESTO").then((r) =>
-            r.ok ? r.json() : []
-          ),
-          fetch("/api/productos?tipo=TORNILLERIA").then((r) =>
-            r.ok ? r.json() : []
-          ),
+          fetch("/api/productos?tipo=WAYRA_ENI").then((r) => (r.ok ? r.json() : [])),
+          fetch("/api/productos?tipo=WAYRA_CALAN").then((r) => (r.ok ? r.json() : [])),
+          fetch("/api/productos?tipo=WAYRA_OTROS").then((r) => (r.ok ? r.json() : [])),
+          fetch("/api/productos?tipo=TORNI_REPUESTO").then((r) => (r.ok ? r.json() : [])),
+          fetch("/api/productos?tipo=TORNILLERIA").then((r) => (r.ok ? r.json() : [])),
         ]);
 
       const todosProductos = [
         ...wayraEni,
         ...wayraCalan,
+        ...wayraOtros,
         ...torniRepuestos,
         ...tornilleria,
-      ].filter((p) => p.stock > 0 && p.isActive);
+      ].filter((p) => p.stock > 0 && p.isActive !== false);
 
       setProductos(todosProductos);
-      console.log(`✅ ${todosProductos.length} productos cargados`);
     } catch (error) {
       console.error("Error cargando productos:", error);
       toast.error("Error al cargar productos");
@@ -88,229 +91,219 @@ export function ProductSelectorModal({
     const matchesSearch =
       p.nombre.toLowerCase().includes(search.toLowerCase()) ||
       p.codigo.toLowerCase().includes(search.toLowerCase());
-
     const matchesTipo = filterTipo === "ALL" || p.tipo === filterTipo;
-
-    const matchesCategoria =
-      filterCategoria === "ALL" || p.categoria === filterCategoria;
-
+    const matchesCategoria = filterCategoria === "ALL" || p.categoria === filterCategoria;
     return matchesSearch && matchesTipo && matchesCategoria;
   });
 
+  const categorias = Array.from(new Set(productos.map((p) => p.categoria)))
+    .filter(Boolean)
+    .sort();
+
+  const categoriaOptions = [
+    { value: "ALL", label: "Todas las categorías" },
+    ...categorias.map((cat) => ({ value: cat, label: cat })),
+  ];
+
   const handleSelectProduct = (producto: Producto, tipoPrecio: string) => {
     onSelect(producto, tipoPrecio);
-    toast.success(`${producto.nombre} agregado con precio ${tipoPrecio}`);
-  };
-
-  const getTipoLabel = (tipo: string) => {
-    const labels: { [key: string]: string } = {
-      WAYRA_ENI: "Wayra ENI",
-      WAYRA_CALAN: "Wayra CALAN",
-      TORNI_REPUESTO: "TorniRepuestos",
-      TORNILLERIA: "Tornillería",
-    };
-    return labels[tipo] || tipo;
+    toast.success(`${producto.nombre} agregado (${tipoPrecio})`);
+    onClose();
   };
 
   const getTipoColor = (tipo: string) => {
-    const colors: { [key: string]: string } = {
-      WAYRA_ENI: "bg-blue-100 text-blue-700",
-      WAYRA_CALAN: "bg-cyan-100 text-cyan-700",
-      TORNI_REPUESTO: "bg-purple-100 text-purple-700",
-      TORNILLERIA: "bg-gray-100 text-gray-700",
+    const colors: Record<string, string> = {
+      WAYRA_ENI: "bg-blue-100 text-blue-700 border-blue-200",
+      WAYRA_CALAN: "bg-cyan-100 text-cyan-700 border-cyan-200",
+      WAYRA_OTROS: "bg-purple-100 text-purple-700 border-purple-200",
+      TORNI_REPUESTO: "bg-indigo-100 text-indigo-700 border-indigo-200",
+      TORNILLERIA: "bg-gray-100 text-gray-700 border-gray-300",
     };
-    return colors[tipo] || "bg-gray-100 text-gray-700";
+    return colors[tipo] || "bg-gray-100 text-gray-700 border-gray-300";
   };
 
-  const categorias = Array.from(
-    new Set(productos.map((p) => p.categoria))
-  ).sort();
-
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Seleccionar Productos"
-      size="xl"
-    >
-      {/* Contenedor principal con altura controlada */}
-      <div className="flex flex-col" style={{ height: 'calc(90vh - 180px)', maxHeight: '600px' }}>
-        {/* Filtros - Fijo arriba */}
-        <div className="flex-shrink-0 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar producto..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+    <Modal isOpen={isOpen} onClose={onClose} title="Seleccionar Producto" size="xl">
+      <div className="flex flex-col h-[85vh] max-h-[700px]">
+        {/* Filtros - siempre visibles */}
+        <div className="flex flex-col gap-4 pb-4 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Input
+              placeholder="Buscar por nombre o código..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-11 h-12 text-base"
+            />
+          </div>
 
-            <select
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Dropdown
+              options={tipoOptions}
               value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            >
-              <option value="ALL">Todos los tipos</option>
-              <option value="WAYRA_ENI">Wayra ENI</option>
-              <option value="WAYRA_CALAN">Wayra CALAN</option>
-              <option value="TORNI_REPUESTO">TorniRepuestos</option>
-              <option value="TORNILLERIA">Tornillería</option>
-            </select>
-
-            <select
+              onChange={setFilterTipo}
+              placeholder="Tipo de producto"
+              icon={<Package className="h-4 w-4" />}
+            />
+            <Dropdown
+              options={categoriaOptions}
               value={filterCategoria}
-              onChange={(e) => setFilterCategoria(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            >
-              <option value="ALL">Todas las categorías</option>
-              {categorias.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              onChange={setFilterCategoria}
+              placeholder="Categoría"
+              icon={<div className="w-4 h-4 rounded bg-gray-300" />}
+            />
           </div>
         </div>
 
-        {/* Lista de productos con scroll - Área flexible */}
-        <div className="flex-1 overflow-y-auto min-h-0 pr-2 -mr-2 custom-scrollbar">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+        {/* Lista de productos con scroll controlado */}
+        <div className="flex-1 overflow-hidden mt-4">
+          <div className="h-full overflow-y-auto pr-2 -mr-2 custom-scrollbar">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-full py-20">
+                <div className="w-14 h-14 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
                 <p className="text-gray-600 font-medium">Cargando productos...</p>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-2 pb-2">
-              {filteredProductos.length > 0 ? (
-                filteredProductos.map((producto) => (
-                  <div
-                    key={producto.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 hover:shadow-md transition-all duration-200"
+            ) : (
+              <AnimatePresence mode="wait">
+                {filteredProductos.length > 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-3 pb-6"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <h4 className="font-semibold text-gray-900 truncate">
-                            {producto.nombre}
-                          </h4>
-                          <Badge className={getTipoColor(producto.tipo)}>
-                            {getTipoLabel(producto.tipo)}
-                          </Badge>
-                          {producto.categoria && (
-                            <Badge variant="outline" className="text-xs">
-                              {producto.categoria}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-gray-600 mb-3">
-                          <span className="font-medium">Código: {producto.codigo}</span>
-                          <span
-                            className={`font-semibold ${
-                              producto.stock <= 5
-                                ? "text-red-600 bg-red-50 px-2 py-0.5 rounded"
-                                : "text-green-600 bg-green-50 px-2 py-0.5 rounded"
-                            }`}
-                          >
-                            Stock: {producto.stock}
-                          </span>
-                        </div>
+                    {filteredProductos.map((producto, index) => (
+                      <motion.div
+                        key={producto.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.02 }}
+                        className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg hover:border-gray-300 transition-all duration-300"
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-gray-900 text-lg truncate">
+                                {producto.nombre}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <Badge className={getTipoColor(producto.tipo)}>
+                                  {tipoOptions.find(o => o.value === producto.tipo)?.label || producto.tipo}
+                                </Badge>
+                                {producto.categoria && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {producto.categoria}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-sm text-gray-500">Código</span>
+                              <p className="font-mono font-medium text-gray-800">
+                                {producto.codigo}
+                              </p>
+                            </div>
+                          </div>
 
-                        {/* Opciones de precio */}
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleSelectProduct(producto, "VENTA")}
-                            className="bg-green-600 hover:bg-green-700 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Venta: ${producto.precioVenta.toLocaleString()}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSelectProduct(producto, "MINORISTA")}
-                            className="bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Minorista: ${producto.precioMinorista.toLocaleString()}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSelectProduct(producto, "MAYORISTA")}
-                            className="bg-purple-600 hover:bg-purple-700 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Mayorista: ${producto.precioMayorista.toLocaleString()}
-                          </Button>
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`font-semibold px-3 py-1 rounded-full text-sm ${
+                                producto.stock <= 5
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-green-100 text-green-700"
+                              }`}
+                            >
+                              Stock: {producto.stock}
+                            </span>
+                          </div>
+
+                          {/* Botones de precio */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSelectProduct(producto, "VENTA")}
+                              className="bg-green-600 hover:bg-green-700 text-white font-medium h-11"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Venta: ${producto.precioVenta.toLocaleString()}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSelectProduct(producto, "MINORISTA")}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-11"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Minorista: ${producto.precioMinorista.toLocaleString()}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSelectProduct(producto, "MAYORISTA")}
+                              className="bg-purple-600 hover:bg-purple-700 text-white font-medium h-11"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Mayorista: ${producto.precioMayorista.toLocaleString()}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center h-full min-h-[200px]">
-                  <div className="text-center">
-                    <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 font-medium text-lg">
-                      {search
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center h-full py-20 text-center"
+                  >
+                    <Package className="h-20 w-20 text-gray-300 mb-4" />
+                    <p className="text-xl font-medium text-gray-600">
+                      {search || filterTipo !== "ALL" || filterCategoria !== "ALL"
                         ? "No se encontraron productos"
                         : "No hay productos disponibles"}
                     </p>
-                    {search && (
-                      <p className="text-gray-400 text-sm mt-2">
-                        Intenta con otra búsqueda
+                    {(search || filterTipo !== "ALL" || filterCategoria !== "ALL") && (
+                      <p className="text-gray-500 mt-2">
+                        Prueba ajustando los filtros
                       </p>
                     )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+          </div>
         </div>
 
-        {/* Footer - Fijo abajo */}
-        <div className="flex-shrink-0 pt-4 border-t mt-4">
-          <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-gray-600">
-              {filteredProductos.length} producto{filteredProductos.length !== 1 ? "s" : ""} disponible{filteredProductos.length !== 1 ? "s" : ""}
-            </p>
-            <Button 
-              variant="outline" 
-              onClick={onClose}
-              className="hover:bg-gray-100 transition-colors"
-            >
-              Cerrar
-            </Button>
-          </div>
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-4 border-t">
+          <p className="text-sm font-medium text-gray-600">
+            {filteredProductos.length} producto{filteredProductos.length !== 1 ? "s" : ""}{" "}
+            encontrado{filteredProductos.length !== 1 ? "s" : ""}
+          </p>
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
+          </Button>
         </div>
       </div>
 
-      <style>{`
+      {/* Scrollbar personalizado */}
+      <style jsx>{`
         .custom-scrollbar {
           scrollbar-width: thin;
-          scrollbar-color: rgba(59, 130, 246, 0.5) transparent;
+          scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
         }
-
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
-          border-radius: 10px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(59, 130, 246, 0.5);
-          border-radius: 10px;
+          background-color: rgba(156, 163, 175, 0.5);
+          border-radius: 9999px;
+          border: 2px solid transparent;
+          background-clip: content-box;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(59, 130, 246, 0.7);
+          background-color: rgba(107, 114, 128, 0.7);
         }
       `}</style>
     </Modal>

@@ -156,6 +156,11 @@ async function main() {
       valor: '35',
       descripcion: 'Margen de ganancia para productos Wayra CALAN'
     },
+    { 
+      clave: 'WAYRA_MARGEN_OTROS',
+      valor: '30',
+      descripcion: 'Margen de ganancia para productos Wayra OTROS'
+    },
     {
       clave: 'WAYRA_DESCUENTO_MINORISTA',
       valor: '3',
