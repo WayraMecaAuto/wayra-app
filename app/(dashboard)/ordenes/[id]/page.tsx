@@ -559,7 +559,7 @@ export default function OrdenDetallePage() {
     precioPersonalizado?: number
   ) => {
     try {
-      // ✅ Usar precio personalizado si se proporciona
+      // Usar precio personalizado si se proporciona
       let precio = precioPersonalizado || producto.precioVenta;
 
       if (!precioPersonalizado) {
@@ -583,7 +583,7 @@ export default function OrdenDetallePage() {
         body: JSON.stringify({
           productoId: producto.id,
           cantidad: 1,
-          precioUnitario: precio, // ✅ Enviar precio correcto (personalizado o por tipo)
+          precioUnitario: precio, // Enviar precio correcto (personalizado o por tipo)
           tipoPrecio,
         }),
       });

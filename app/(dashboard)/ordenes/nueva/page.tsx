@@ -261,7 +261,7 @@ export default function NuevaOrdenPage() {
     setShowScanner(false);
   };
 
-  const handleProductSelected = async (producto: any, tipoPrecio: string) => {
+  const handleProductSelected = async (producto: any, tipoPrecio: string, precioPersonalizado?: number) => {
     // Verificar si ya está agregado
     const exists = productosSeleccionados.find((p) => p.id === producto.id);
     if (exists) {
@@ -270,7 +270,7 @@ export default function NuevaOrdenPage() {
     }
 
     // Determinar el precio según el tipo seleccionado
-    let precio = producto.precioVenta;
+    let precio = precioPersonalizado || producto.precioVenta;
     switch (tipoPrecio) {
       case "MINORISTA":
         precio = producto.precioMinorista;
