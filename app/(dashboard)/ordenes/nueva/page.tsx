@@ -31,7 +31,7 @@ import { Modal } from "@/components/ui/modal";
 import { ClienteForm } from "@/components/forms/ClienteForm";
 import { VehiculoForm } from "@/components/forms/VehiculoForm";
 import { LubricacionModal } from "@/components/forms/LubricacionModal";
-import { ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
+import  {ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
 import Dropdown from "@/components/forms/Dropdown";
 import toast from "react-hot-toast";
 

@@ -262,20 +262,44 @@ export default function OrdenDetallePage() {
     useState(false);
   const [showAgregarServicios, setShowAgregarServicios] = useState(false);
 
+  // PERMISOS ACTUALIZADOS PARA MECANICO
   const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
     session?.user?.role || ""
   );
+
   const canAddServices = [
     "SUPER_USUARIO",
     "ADMIN_WAYRA_TALLER",
     "MECANICO",
   ].includes(session?.user?.role || "");
+
   const isMecanico = session?.user?.role === "MECANICO";
 
-  // 🔥 Verificar si la orden está completada
+  // NUEVOS PERMISOS ESPECÍFICOS
+  const canCheckServices = [
+    "SUPER_USUARIO",
+    "ADMIN_WAYRA_TALLER",
+    "MECANICO", //  Mecánico puede marcar servicios completados
+  ].includes(session?.user?.role || "");
+
+  const canAddProducts = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+    session?.user?.role || ""
+  );
+
+  const canChangeStatus = [
+    "SUPER_USUARIO",
+    "ADMIN_WAYRA_TALLER",
+    "MECANICO", //  Mecánico puede cambiar estado de la orden
+  ].includes(session?.user?.role || "");
+
+  //  Verificar si la orden está completada
   const isCompletado = orden?.estado === "COMPLETADO";
   const canModify = !isCompletado && canEdit;
-  const canAddItems = !isCompletado && canAddServices;
+  const canAddItems = !isCompletado && canAddProducts; // Solo admins
+
+  const canAddInventoryItems = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
+    session?.user?.role || ""
+  );
 
   useEffect(() => {
     if (params.id) {
@@ -529,14 +553,29 @@ export default function OrdenDetallePage() {
     }
   };
 
-  const handleProductSelected = async (producto: any, tipoPrecio: string) => {
+  const handleProductSelected = async (
+    producto: any,
+    tipoPrecio: string,
+    precioPersonalizado?: number
+  ) => {
     try {
-      const precio =
-        tipoPrecio === "MINORISTA"
-          ? producto.precioMinorista
-          : tipoPrecio === "MAYORISTA"
-            ? producto.precioMayorista
-            : producto.precioVenta;
+      // ✅ Usar precio personalizado si se proporciona
+      let precio = precioPersonalizado || producto.precioVenta;
+
+      if (!precioPersonalizado) {
+        switch (tipoPrecio) {
+          case "MINORISTA":
+            precio = producto.precioMinorista;
+            break;
+          case "MAYORISTA":
+            precio = producto.precioMayorista;
+            break;
+          case "VENTA":
+          default:
+            precio = producto.precioVenta;
+            break;
+        }
+      }
 
       const response = await fetch(`/api/ordenes/${params.id}/productos`, {
         method: "POST",
@@ -544,13 +583,15 @@ export default function OrdenDetallePage() {
         body: JSON.stringify({
           productoId: producto.id,
           cantidad: 1,
-          precioUnitario: precio,
+          precioUnitario: precio, // ✅ Enviar precio correcto (personalizado o por tipo)
           tipoPrecio,
         }),
       });
 
       if (response.ok) {
-        toast.success(`${producto.nombre} agregado a la orden`);
+        toast.success(
+          `${producto.nombre} agregado${precioPersonalizado ? " con precio personalizado" : ""}`
+        );
         fetchOrden();
         setShowProductSelector(false);
       } else {
@@ -831,7 +872,8 @@ export default function OrdenDetallePage() {
               {orden.numeroOrden}
             </h1>
             <p className="text-sm sm:text-base text-gray-600">
-              Orden de trabajo {isCompletado && " - 🔒 Completada (solo lectura)"}
+              Orden de trabajo{" "}
+              {isCompletado && " - 🔒 Completada (solo lectura)"}
             </p>
           </div>
         </div>
@@ -853,7 +895,7 @@ export default function OrdenDetallePage() {
       </div>
 
       {/* Estado Actions */}
-      {canEdit &&
+      {canChangeStatus &&
         orden.estado !== "COMPLETADO" &&
         orden.estado !== "CANCELADO" && (
           <Card className="animate-fade-in">
@@ -886,16 +928,18 @@ export default function OrdenDetallePage() {
                     Marcar Completado
                   </Button>
                 )}
-                <Button
-                  onClick={() => updateEstado("CANCELADO")}
-                  disabled={updating}
-                  variant="outline"
-                  className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform w-full sm:w-auto"
-                  size="sm"
-                >
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Cancelar Orden
-                </Button>
+                {canEdit && (
+                  <Button
+                    onClick={() => updateEstado("CANCELADO")}
+                    disabled={updating}
+                    variant="outline"
+                    className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform w-full sm:w-auto"
+                    size="sm"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Cancelar Orden
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1065,7 +1109,7 @@ export default function OrdenDetallePage() {
                 }`}
               >
                 <div className="flex items-center space-x-3 flex-1 w-full">
-                  {!isMecanico && !isCompletado && (
+                  {canCheckServices && !isCompletado && (
                     <Checkbox
                       checked={serviciosCompletados[servicio.id] || false}
                       onCheckedChange={() =>
@@ -1099,7 +1143,8 @@ export default function OrdenDetallePage() {
                   {!isMecanico && (
                     <div className="flex items-center space-x-2">
                       {editando?.tipo === "servicios" &&
-                      editando.id === servicio.id && !isCompletado ? (
+                      editando.id === servicio.id &&
+                      !isCompletado ? (
                         <>
                           <input
                             type="number"
@@ -1176,15 +1221,16 @@ export default function OrdenDetallePage() {
               <span>Productos</span>
             </div>
 
-            <Button
-              size="sm"
-              onClick={() => setShowProductSelector(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={isCompletado}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Producto
-            </Button>
+            {canAddInventoryItems && !isCompletado && (
+              <Button
+                size="sm"
+                onClick={() => setShowProductSelector(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Producto
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
 
@@ -1239,7 +1285,8 @@ export default function OrdenDetallePage() {
                           <>
                             <td className="py-3 px-3">
                               {editando?.tipo === "productos" &&
-                              editando.id === detalle.id && !isCompletado ? (
+                              editando.id === detalle.id &&
+                              !isCompletado ? (
                                 <div className="flex items-center space-x-2">
                                   <input
                                     type="number"
@@ -1343,7 +1390,8 @@ export default function OrdenDetallePage() {
                         <div className="text-sm sm:text-base text-right">
                           <div className="flex items-center justify-end space-x-2">
                             {editando?.tipo === "productos" &&
-                            editando.id === detalle.id && !isCompletado ? (
+                            editando.id === detalle.id &&
+                            !isCompletado ? (
                               <>
                                 <input
                                   type="number"
@@ -1437,15 +1485,16 @@ export default function OrdenDetallePage() {
               <FileText className="h-5 w-5 text-orange-600" />
               <span>Repuestos Externos</span>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setShowRepuestoExternoModal(true)}
-              className="bg-orange-600 hover:bg-orange-700"
-              disabled={isCompletado}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Repuesto Externo
-            </Button>
+            {canAddInventoryItems && !isCompletado && (
+              <Button
+                size="sm"
+                onClick={() => setShowRepuestoExternoModal(true)}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Repuesto Externo
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
 
@@ -1453,7 +1502,9 @@ export default function OrdenDetallePage() {
           <CardContent>
             {/* Similar a productos, con botones deshabilitados si isCompletado */}
             {/* Aquí iría el mismo patrón de tabla desktop/mobile con botones disabled={isCompletado} */}
-            <p className="text-gray-500 text-sm">Repuestos externos listados aquí...</p>
+            <p className="text-gray-500 text-sm">
+              Repuestos externos listados aquí...
+            </p>
           </CardContent>
         ) : (
           <CardContent className="text-center text-gray-500 py-8">

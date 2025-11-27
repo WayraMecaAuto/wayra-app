@@ -84,14 +84,20 @@ export function LubricacionModal({
 }: LubricacionModalProps) {
   const [aceites, setAceites] = useState<Producto[]>([]);
   const [filtros, setFiltros] = useState<Producto[]>([]);
-  const [productosInventario, setProductosInventario] = useState<ProductoSeleccionado[]>([]);
-  const [productosExternos, setProductosExternos] = useState<ProductoExterno[]>([]);
+  const [productosInventario, setProductosInventario] = useState<
+    ProductoSeleccionado[]
+  >([]);
+  const [productosExternos, setProductosExternos] = useState<ProductoExterno[]>(
+    []
+  );
   const [loading, setLoading] = useState(false);
   const [searchAceite, setSearchAceite] = useState("");
   const [searchFiltro, setSearchFiltro] = useState("");
   const [precioServicioTotal, setPrecioServicioTotal] = useState<string>("");
   const [showExternoForm, setShowExternoForm] = useState(false);
-  const [tipoExternoForm, setTipoExternoForm] = useState<"ACEITE" | "FILTRO">("ACEITE");
+  const [tipoExternoForm, setTipoExternoForm] = useState<"ACEITE" | "FILTRO">(
+    "ACEITE"
+  );
 
   // Form externo
   const [nombreExterno, setNombreExterno] = useState("");
@@ -148,8 +154,12 @@ export function LubricacionModal({
 
       const wayraEniArray = Array.isArray(wayraEniRes) ? wayraEniRes : [];
       const wayraCalanArray = Array.isArray(wayraCalanRes) ? wayraCalanRes : [];
-      const torniLubricantesArray = Array.isArray(torniLubricantesRes) ? torniLubricantesRes : [];
-      const torniFiltrosArray = Array.isArray(torniFiltrosRes) ? torniFiltrosRes : [];
+      const torniLubricantesArray = Array.isArray(torniLubricantesRes)
+        ? torniLubricantesRes
+        : [];
+      const torniFiltrosArray = Array.isArray(torniFiltrosRes)
+        ? torniFiltrosRes
+        : [];
 
       const wayraEniProductos = wayraEniArray.map((p) => ({
         ...p,
@@ -232,7 +242,10 @@ export function LubricacionModal({
     }
   };
 
-  const agregarProductoInventario = (producto: Producto, tipo: "ACEITE" | "FILTRO") => {
+  const agregarProductoInventario = (
+    producto: Producto,
+    tipo: "ACEITE" | "FILTRO"
+  ) => {
     if (productosInventario.some((p) => p.id === producto.id)) {
       toast.error("Este producto ya está agregado");
       return;
@@ -249,10 +262,11 @@ export function LubricacionModal({
         precioVenta: producto.precioVenta,
         precioMinorista: producto.precioMinorista,
         precioCompra: producto.precioCompra,
-        monedaCompra: producto.monedaCompra || 'COP',
+        monedaCompra: producto.monedaCompra || "COP",
         tipo,
         inventarioTipo: productoConOrigen.inventarioOrigen || producto.tipo,
         cantidad: 1,
+        stock: producto.stock,
       },
     ]);
     toast.success(`✅ ${producto.nombre} agregado`);
@@ -307,7 +321,9 @@ export function LubricacionModal({
     };
 
     setProductosExternos((prev) => [...prev, nuevoExterno]);
-    toast.success(`✅ ${tipoExternoForm === "ACEITE" ? "Aceite" : "Filtro"} externo agregado`);
+    toast.success(
+      `✅ ${tipoExternoForm === "ACEITE" ? "Aceite" : "Filtro"} externo agregado`
+    );
     resetExternoForm();
     setShowExternoForm(false);
   };
@@ -331,7 +347,9 @@ export function LubricacionModal({
   };
 
   const calcularTotalProductos = () => {
-    return calcularTotalProductosInventario() + calcularTotalProductosExternos();
+    return (
+      calcularTotalProductosInventario() + calcularTotalProductosExternos()
+    );
   };
 
   const calcularPrecioManoObra = () => {
@@ -345,10 +363,12 @@ export function LubricacionModal({
 
   const handleSubmit = () => {
     // Validaciones
-    const totalAceites = productosInventario.filter(p => p.tipo === "ACEITE").length + 
-                        productosExternos.filter(p => p.tipo === "ACEITE").length;
-    const totalFiltros = productosInventario.filter(p => p.tipo === "FILTRO").length + 
-                        productosExternos.filter(p => p.tipo === "FILTRO").length;
+    const totalAceites =
+      productosInventario.filter((p) => p.tipo === "ACEITE").length +
+      productosExternos.filter((p) => p.tipo === "ACEITE").length;
+    const totalFiltros =
+      productosInventario.filter((p) => p.tipo === "FILTRO").length +
+      productosExternos.filter((p) => p.tipo === "FILTRO").length;
 
     if (totalAceites === 0) {
       toast.error("⚠️ Debes agregar al menos un aceite");
@@ -369,7 +389,9 @@ export function LubricacionModal({
     const costoProductos = calcularTotalProductos();
 
     if (precioTotal < costoProductos) {
-      toast.error("⚠️ El precio del servicio no puede ser menor al costo de los productos");
+      toast.error(
+        "⚠️ El precio del servicio no puede ser menor al costo de los productos"
+      );
       return;
     }
 
@@ -469,14 +491,22 @@ export function LubricacionModal({
               </h4>
               <div className="text-sm text-blue-700 space-y-1">
                 <p>
-                  1. Selecciona <span className="font-semibold">productos del inventario</span> y/o{" "}
-                  <span className="font-semibold">productos externos</span>
+                  1. Selecciona{" "}
+                  <span className="font-semibold">
+                    productos del inventario
+                  </span>{" "}
+                  y/o <span className="font-semibold">productos externos</span>
                 </p>
                 <p>
-                  2. Ingresa el <span className="font-semibold">precio total del servicio</span>
+                  2. Ingresa el{" "}
+                  <span className="font-semibold">
+                    precio total del servicio
+                  </span>
                 </p>
                 <p className="text-xs text-blue-600 mt-2">
-                  💡 Los productos del inventario descontarán stock. Los externos se registrarán como repuestos. La diferencia será mano de obra.
+                  💡 Los productos del inventario descontarán stock. Los
+                  externos se registrarán como repuestos. La diferencia será
+                  mano de obra.
                 </p>
               </div>
             </div>
@@ -490,14 +520,19 @@ export function LubricacionModal({
               <CheckCircle2 className="h-5 w-5 mr-2" />
               Productos Seleccionados
             </h5>
-            
+
             {/* Inventario */}
             {productosInventario.length > 0 && (
               <div className="mb-3">
-                <div className="text-sm font-semibold text-gray-700 mb-2">Del Inventario:</div>
+                <div className="text-sm font-semibold text-gray-700 mb-2">
+                  Del Inventario:
+                </div>
                 <div className="space-y-2">
                   {productosInventario.map((prod) => (
-                    <div key={prod.id} className="bg-white border border-green-300 rounded-lg p-3">
+                    <div
+                      key={prod.id}
+                      className="bg-white border border-green-300 rounded-lg p-3"
+                    >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-900 text-sm">
@@ -509,22 +544,34 @@ export function LubricacionModal({
                               ${prod.precioMinorista.toLocaleString()} c/u
                             </span>
                             {prod.inventarioTipo && (
-                              <span className={`px-2 py-0.5 rounded-full ${getInventarioColor(prod.inventarioTipo)}`}>
+                              <span
+                                className={`px-2 py-0.5 rounded-full ${getInventarioColor(prod.inventarioTipo)}`}
+                              >
                                 {getInventarioLabel(prod.inventarioTipo)}
                               </span>
                             )}
                           </div>
                           <div className="mt-2 flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Cantidad:</span>
+                            <span className="text-xs text-gray-600">
+                              Cantidad:
+                            </span>
                             <input
                               type="number"
                               min="1"
                               value={prod.cantidad}
-                              onChange={(e) => actualizarCantidadInventario(prod.id, parseInt(e.target.value))}
+                              onChange={(e) =>
+                                actualizarCantidadInventario(
+                                  prod.id,
+                                  parseInt(e.target.value)
+                                )
+                              }
                               className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                             />
                             <span className="text-sm font-bold text-green-700">
-                              Subtotal: ${(prod.precioMinorista * prod.cantidad).toLocaleString()}
+                              Subtotal: $
+                              {(
+                                prod.precioMinorista * prod.cantidad
+                              ).toLocaleString()}
                             </span>
                           </div>
                         </div>
@@ -547,24 +594,42 @@ export function LubricacionModal({
             {/* Externos */}
             {productosExternos.length > 0 && (
               <div>
-                <div className="text-sm font-semibold text-gray-700 mb-2">Externos:</div>
+                <div className="text-sm font-semibold text-gray-700 mb-2">
+                  Externos:
+                </div>
                 <div className="space-y-2">
                   {productosExternos.map((prod) => (
-                    <div key={prod.id} className="bg-white border border-purple-300 rounded-lg p-3">
+                    <div
+                      key={prod.id}
+                      className="bg-white border border-purple-300 rounded-lg p-3"
+                    >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-900 text-sm">
                             {prod.tipo === "ACEITE" ? "🛢️" : "🔧"} {prod.nombre}
                           </div>
-                          <div className="text-xs text-gray-600 mt-1">{prod.descripcion}</div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {prod.descripcion}
+                          </div>
                           <div className="flex items-center gap-2 text-xs mt-1">
-                            <span className="text-gray-600">Cant: {prod.cantidad}</span>
-                            <span className="text-orange-600">Compra: ${prod.precioCompra.toLocaleString()}</span>
-                            <span className="font-bold text-green-600">Venta: ${prod.precioVenta.toLocaleString()}</span>
-                            <span className="text-purple-600">Proveedor: {prod.proveedor}</span>
+                            <span className="text-gray-600">
+                              Cant: {prod.cantidad}
+                            </span>
+                            <span className="text-orange-600">
+                              Compra: ${prod.precioCompra.toLocaleString()}
+                            </span>
+                            <span className="font-bold text-green-600">
+                              Venta: ${prod.precioVenta.toLocaleString()}
+                            </span>
+                            <span className="text-purple-600">
+                              Proveedor: {prod.proveedor}
+                            </span>
                           </div>
                           <div className="mt-1 text-sm font-bold text-purple-700">
-                            Subtotal: ${(prod.precioVenta * prod.cantidad).toLocaleString()}
+                            Subtotal: $
+                            {(
+                              prod.precioVenta * prod.cantidad
+                            ).toLocaleString()}
                           </div>
                         </div>
                         <Button
@@ -633,12 +698,16 @@ export function LubricacionModal({
                   <div className="divide-y divide-gray-200">
                     {filteredAceites.map((aceite) => {
                       const productoConOrigen = aceite as any;
-                      const yaAgregado = productosInventario.some((p) => p.id === aceite.id);
+                      const yaAgregado = productosInventario.some(
+                        (p) => p.id === aceite.id
+                      );
 
                       return (
                         <button
                           key={aceite.id}
-                          onClick={() => agregarProductoInventario(aceite, "ACEITE")}
+                          onClick={() =>
+                            agregarProductoInventario(aceite, "ACEITE")
+                          }
                           disabled={yaAgregado}
                           className="w-full text-left p-3 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -648,19 +717,29 @@ export function LubricacionModal({
                                 {aceite.nombre}
                               </h5>
                               <div className="flex flex-wrap gap-2 text-xs mt-1">
-                                <span className="text-gray-600">{aceite.codigo}</span>
-                                <span className="text-green-600 font-medium">Stock: {aceite.stock}</span>
+                                <span className="text-gray-600">
+                                  {aceite.codigo}
+                                </span>
+                                <span className="text-green-600 font-medium">
+                                  Stock: {aceite.stock}
+                                </span>
                                 <span className="font-bold text-blue-600">
                                   ${aceite.precioMinorista.toLocaleString()}
                                 </span>
                                 {productoConOrigen.inventarioOrigen && (
-                                  <span className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}>
-                                    {getInventarioLabel(productoConOrigen.inventarioOrigen)}
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}
+                                  >
+                                    {getInventarioLabel(
+                                      productoConOrigen.inventarioOrigen
+                                    )}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            {!yaAgregado && <Plus className="h-4 w-4 text-blue-600 ml-2" />}
+                            {!yaAgregado && (
+                              <Plus className="h-4 w-4 text-blue-600 ml-2" />
+                            )}
                           </div>
                         </button>
                       );
@@ -670,7 +749,9 @@ export function LubricacionModal({
                   <div className="text-center py-8">
                     <Box className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
-                      {searchAceite ? "No se encontraron aceites" : "No hay aceites disponibles"}
+                      {searchAceite
+                        ? "No se encontraron aceites"
+                        : "No hay aceites disponibles"}
                     </p>
                   </div>
                 )}
@@ -716,12 +797,16 @@ export function LubricacionModal({
                   <div className="divide-y divide-gray-200">
                     {filteredFiltros.map((filtro) => {
                       const productoConOrigen = filtro as any;
-                      const yaAgregado = productosInventario.some((p) => p.id === filtro.id);
+                      const yaAgregado = productosInventario.some(
+                        (p) => p.id === filtro.id
+                      );
 
                       return (
                         <button
                           key={filtro.id}
-                          onClick={() => agregarProductoInventario(filtro, "FILTRO")}
+                          onClick={() =>
+                            agregarProductoInventario(filtro, "FILTRO")
+                          }
                           disabled={yaAgregado}
                           className="w-full text-left p-3 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -731,19 +816,29 @@ export function LubricacionModal({
                                 {filtro.nombre}
                               </h5>
                               <div className="flex flex-wrap gap-2 text-xs mt-1">
-                                <span className="text-gray-600">{filtro.codigo}</span>
-                                <span className="text-green-600 font-medium">Stock: {filtro.stock}</span>
+                                <span className="text-gray-600">
+                                  {filtro.codigo}
+                                </span>
+                                <span className="text-green-600 font-medium">
+                                  Stock: {filtro.stock}
+                                </span>
                                 <span className="font-bold text-green-600">
                                   ${filtro.precioMinorista.toLocaleString()}
                                 </span>
                                 {productoConOrigen.inventarioOrigen && (
-                                  <span className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}>
-                                    {getInventarioLabel(productoConOrigen.inventarioOrigen)}
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full ${getInventarioColor(productoConOrigen.inventarioOrigen)}`}
+                                  >
+                                    {getInventarioLabel(
+                                      productoConOrigen.inventarioOrigen
+                                    )}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            {!yaAgregado && <Plus className="h-4 w-4 text-green-600 ml-2" />}
+                            {!yaAgregado && (
+                              <Plus className="h-4 w-4 text-green-600 ml-2" />
+                            )}
                           </div>
                         </button>
                       );
@@ -753,7 +848,9 @@ export function LubricacionModal({
                   <div className="text-center py-8">
                     <Box className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
-                      {searchFiltro ? "No se encontraron filtros" : "No hay filtros disponibles"}
+                      {searchFiltro
+                        ? "No se encontraron filtros"
+                        : "No hay filtros disponibles"}
                     </p>
                   </div>
                 )}
@@ -767,7 +864,8 @@ export function LubricacionModal({
           <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h5 className="font-bold text-purple-900">
-                Agregar {tipoExternoForm === "ACEITE" ? "Aceite" : "Filtro"} Externo
+                Agregar {tipoExternoForm === "ACEITE" ? "Aceite" : "Filtro"}{" "}
+                Externo
               </h5>
               <Button
                 type="button"
@@ -900,7 +998,8 @@ export function LubricacionModal({
                   Precio Total del Servicio *
                 </label>
                 <p className="text-sm text-indigo-700 mb-3">
-                  Ingresa el precio total que cobrarás al cliente (incluye productos + mano de obra)
+                  Ingresa el precio total que cobrarás al cliente (incluye
+                  productos + mano de obra)
                 </p>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 font-medium text-lg">
@@ -917,7 +1016,8 @@ export function LubricacionModal({
                   />
                 </div>
                 <p className="text-xs text-indigo-600 mt-2">
-                  Mínimo: ${calcularTotalProductos().toLocaleString()} (costo de productos)
+                  Mínimo: ${calcularTotalProductos().toLocaleString()} (costo de
+                  productos)
                 </p>
               </div>
             </div>
@@ -933,30 +1033,50 @@ export function LubricacionModal({
                 <h5 className="font-bold text-green-900 mb-3">
                   Resumen del Servicio:
                 </h5>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <div className="bg-white rounded-lg p-3 border border-green-200">
-                    <div className="text-xs text-gray-600 mb-1">Aceites Inventario</div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Aceites Inventario
+                    </div>
                     <div className="text-lg font-bold text-blue-600">
-                      {productosInventario.filter(p => p.tipo === "ACEITE").length}
+                      {
+                        productosInventario.filter((p) => p.tipo === "ACEITE")
+                          .length
+                      }
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-green-200">
-                    <div className="text-xs text-gray-600 mb-1">Filtros Inventario</div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Filtros Inventario
+                    </div>
                     <div className="text-lg font-bold text-green-600">
-                      {productosInventario.filter(p => p.tipo === "FILTRO").length}
+                      {
+                        productosInventario.filter((p) => p.tipo === "FILTRO")
+                          .length
+                      }
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-purple-200">
-                    <div className="text-xs text-gray-600 mb-1">Aceites Externos</div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Aceites Externos
+                    </div>
                     <div className="text-lg font-bold text-purple-600">
-                      {productosExternos.filter(p => p.tipo === "ACEITE").length}
+                      {
+                        productosExternos.filter((p) => p.tipo === "ACEITE")
+                          .length
+                      }
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-purple-200">
-                    <div className="text-xs text-gray-600 mb-1">Filtros Externos</div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Filtros Externos
+                    </div>
                     <div className="text-lg font-bold text-purple-600">
-                      {productosExternos.filter(p => p.tipo === "FILTRO").length}
+                      {
+                        productosExternos.filter((p) => p.tipo === "FILTRO")
+                          .length
+                      }
                     </div>
                   </div>
                 </div>
@@ -976,27 +1096,36 @@ export function LubricacionModal({
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200">
-                    <span className="font-semibold text-gray-700">Total Productos:</span>
+                    <span className="font-semibold text-gray-700">
+                      Total Productos:
+                    </span>
                     <span className="font-bold text-gray-900">
                       ${calcularTotalProductos().toLocaleString()}
                     </span>
                   </div>
-                  {precioServicioTotal && parseFloat(precioServicioTotal) > 0 && (
-                    <>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">Precio Total Servicio:</span>
-                        <span className="font-bold text-indigo-600">
-                          ${parseFloat(precioServicioTotal).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200">
-                        <span className="font-semibold text-gray-700">Mano de Obra:</span>
-                        <span className={`font-bold text-lg ${calcularPrecioManoObra() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${calcularPrecioManoObra().toLocaleString()}
-                        </span>
-                      </div>
-                    </>
-                  )}
+                  {precioServicioTotal &&
+                    parseFloat(precioServicioTotal) > 0 && (
+                      <>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">
+                            Precio Total Servicio:
+                          </span>
+                          <span className="font-bold text-indigo-600">
+                            ${parseFloat(precioServicioTotal).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200">
+                          <span className="font-semibold text-gray-700">
+                            Mano de Obra:
+                          </span>
+                          <span
+                            className={`font-bold text-lg ${calcularPrecioManoObra() >= 0 ? "text-green-600" : "text-red-600"}`}
+                          >
+                            ${calcularPrecioManoObra().toLocaleString()}
+                          </span>
+                        </div>
+                      </>
+                    )}
                 </div>
 
                 <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-4 border-2 border-green-300">
@@ -1005,14 +1134,25 @@ export function LubricacionModal({
                   </div>
                   <div className="space-y-1 text-xs text-green-800">
                     {productosInventario.length > 0 && (
-                      <div>• Wayra Productos: Venta ${calcularTotalProductosInventario().toLocaleString()} (descuenta stock)</div>
+                      <div>
+                        • Wayra Productos: Venta $
+                        {calcularTotalProductosInventario().toLocaleString()}{" "}
+                        (descuenta stock)
+                      </div>
                     )}
                     {productosExternos.length > 0 && (
-                      <div>• Repuestos Externos: ${calcularTotalProductosExternos().toLocaleString()}</div>
+                      <div>
+                        • Repuestos Externos: $
+                        {calcularTotalProductosExternos().toLocaleString()}
+                      </div>
                     )}
-                    {precioServicioTotal && parseFloat(precioServicioTotal) > 0 && (
-                      <div>• Wayra Taller: Mano de obra ${calcularPrecioManoObra().toLocaleString()}</div>
-                    )}
+                    {precioServicioTotal &&
+                      parseFloat(precioServicioTotal) > 0 && (
+                        <div>
+                          • Wayra Taller: Mano de obra $
+                          {calcularPrecioManoObra().toLocaleString()}
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
@@ -1022,7 +1162,7 @@ export function LubricacionModal({
 
         {/* Advertencia */}
         {(productosInventario.length === 0 && productosExternos.length === 0) ||
-         !precioServicioTotal ? (
+        !precioServicioTotal ? (
           <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
             <div className="flex items-start space-x-3">
               <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -1031,7 +1171,8 @@ export function LubricacionModal({
                   Información requerida
                 </p>
                 <p className="text-sm text-amber-700 mt-1">
-                  {productosInventario.length === 0 && productosExternos.length === 0
+                  {productosInventario.length === 0 &&
+                  productosExternos.length === 0
                     ? "Debes agregar al menos un producto (del inventario o externo)"
                     : "Debes ingresar el precio total del servicio"}
                 </p>
@@ -1054,7 +1195,8 @@ export function LubricacionModal({
           <Button
             onClick={handleSubmit}
             disabled={
-              (productosInventario.length === 0 && productosExternos.length === 0) ||
+              (productosInventario.length === 0 &&
+                productosExternos.length === 0) ||
               !precioServicioTotal ||
               parseFloat(precioServicioTotal) <= 0 ||
               loading

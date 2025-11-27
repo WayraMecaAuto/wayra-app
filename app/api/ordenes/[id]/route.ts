@@ -68,9 +68,13 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
-      session?.user?.role || ""
-    );
+    // ✅ PERMISOS AMPLIADOS: Mecánico puede cambiar estado
+    const hasAccess = [
+      "SUPER_USUARIO",
+      "ADMIN_WAYRA_TALLER",
+      "MECANICO" // ✅ Agregado
+    ].includes(session?.user?.role || "");
+    
     if (!session || !hasAccess) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -101,14 +105,32 @@ export async function PATCH(
       );
     }
 
-    // Si es CANCELADO, eliminar la orden
+    // ✅ RESTRICCIÓN: Solo admins pueden editar servicios manualmente
+    const isMecanico = session?.user?.role === "MECANICO";
+    
+    if (isMecanico && servicios) {
+      return NextResponse.json(
+        { error: "Los mecánicos no pueden editar servicios directamente" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ RESTRICCIÓN: Solo admins pueden cancelar órdenes
+    if (isMecanico && ordenData.estado === "CANCELADO") {
+      return NextResponse.json(
+        { error: "Los mecánicos no pueden cancelar órdenes" },
+        { status: 403 }
+      );
+    }
+
+    // Si es CANCELADO, auditar (solo admins llegan aquí)
     if (ordenData.estado === "CANCELADO") {
       const { ip, userAgent } = obtenerInfoRequest(request);
 
       await auditarOrden(
         "CANCELAR",
         ordenActual?.numeroOrden || "",
-        "", // nombre cliente
+        "", 
         0,
         session.user.id,
         ip,
@@ -116,7 +138,7 @@ export async function PATCH(
       );
     }
 
-    // Actualizar servicios si se proporcionan
+    // Actualizar servicios si se proporcionan (solo admins)
     if (servicios && Array.isArray(servicios)) {
       const serviciosActuales = await prisma.servicioOrden.findMany({
         where: { ordenId: id },
@@ -234,7 +256,7 @@ export async function PATCH(
       const mes = ahora.getMonth() + 1;
       const anio = ahora.getFullYear();
 
-      // 🔥 Obtener tasa de cambio
+      //  Obtener tasa de cambio
       let tasaDolar = 4000;
       try {
         const tasaConfig = await prisma.configuracion.findUnique({
@@ -274,14 +296,12 @@ export async function PATCH(
         });
 
         for (const detalle of productosWayra) {
-          // 🔥 CALCULAR PRECIO DE COMPRA EN COP (SOLO SI ES CALAN EN USD)
           let precioCompraContable = detalle.producto.precioCompra;
 
-          // ✅ SOLO convertir si es CALAN en USD Y el precio no está ya convertido
           if (
             detalle.producto.tipo === "WAYRA_CALAN" &&
             detalle.producto.monedaCompra === "USD" &&
-            detalle.producto.precioCompra < 1000 // Si es menor a 1000, probablemente está en USD
+            detalle.producto.precioCompra < 1000
           ) {
             precioCompraContable = detalle.producto.precioCompra * tasaDolar;
             console.log(
@@ -301,11 +321,11 @@ export async function PATCH(
               movimientoContableId: movWayra.id,
               productoId: detalle.productoId,
               cantidad: detalle.cantidad,
-              precioCompra: precioCompraContable, // ✅ Precio en COP (convertido solo si era USD)
+              precioCompra: precioCompraContable,
               precioVenta: detalle.precioUnitario,
               subtotalCompra: subtotalCompra,
               subtotalVenta: detalle.subtotal,
-              utilidad: utilidadReal, // ✅ CORRECTO: Venta - (Compra en COP * cantidad)
+              utilidad: utilidadReal,
             },
           });
 
@@ -345,7 +365,6 @@ export async function PATCH(
         });
 
         for (const detalle of productosTorni) {
-          // TorniRepuestos siempre en COP, no necesita conversión
           await prisma.detalleIngresoContable.create({
             data: {
               movimientoContableId: movTorni.id,
@@ -413,7 +432,6 @@ export async function DELETE(
       );
     }
 
-    // Eliminar orden (Prisma eliminará automáticamente registros relacionados con onDelete: Cascade)
     await prisma.ordenServicio.delete({
       where: { id },
     });

@@ -84,7 +84,9 @@ export default function ProductosWayraPage() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const response = await fetch("/api/productos?tipo=WAYRA_ENI,WAYRA_CALAN,WAYRA_OTROS");
+      const response = await fetch(
+        "/api/productos?tipo=WAYRA_ENI,WAYRA_CALAN,WAYRA_OTROS"
+      );
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
@@ -150,7 +152,11 @@ export default function ProductosWayraPage() {
 
       if (response.ok) {
         const product = await response.json();
-        if (product.tipo === "WAYRA_ENI" || product.tipo === "WAYRA_CALAN" || product.tipo === "WAYRA_OTROS") {
+        if (
+          product.tipo === "WAYRA_ENI" ||
+          product.tipo === "WAYRA_CALAN" ||
+          product.tipo === "WAYRA_OTROS"
+        ) {
           if (session?.user?.role === "VENDEDOR") {
             setSelectedProduct({ ...product, movementType: "SALIDA" });
           } else {
@@ -161,23 +167,38 @@ export default function ProductosWayraPage() {
         } else {
           toast.error("Este producto no pertenece a Wayra");
         }
-      } else {
-        if (response.status === 404 && canEdit) {
-          const shouldCreate = confirm(
-            `Producto con código ${code} no encontrado.\n¿Deseas crear un nuevo producto Wayra con este código?`
+      } else if (response.status === 404 && canEdit) {
+        // Preguntar tipo al crear nuevo producto desde escáner
+        const tipo = prompt(
+          `Producto con código ${code} no encontrado.\n\n¿De qué tipo Wayra deseas crear este producto?\n\nEscribe: ENI | CALAN | OTROS`,
+          "ENI"
+        );
+
+        const tipoNormalizado = tipo?.trim().toUpperCase();
+        if (["ENI", "CALAN", "OTROS"].includes(tipoNormalizado)) {
+          const tipoMap = {
+            ENI: "WAYRA_ENI",
+            CALAN: "WAYRA_CALAN",
+            OTROS: "WAYRA_OTROS",
+          } as const;
+
+          setScannedBarcode(code);
+          setNewProductType(tipoMap[tipoNormalizado as keyof typeof tipoMap]);
+          setShowProductForm(true);
+          toast.success(
+            `Creando nuevo producto ${tipoNormalizado} con código ${code}`
           );
-          if (shouldCreate) {
-            setScannedBarcode(code);
-            setShowProductForm(true);
-          }
         } else {
-          toast.error("Producto no encontrado");
+          toast.error("Tipo no válido. Operación cancelada.");
         }
+      } else {
+        toast.error("Producto no encontrado");
       }
     } catch (error) {
       toast.error("Error al buscar producto");
+    } finally {
+      setShowScanner(false);
     }
-    setShowScanner(false);
   };
 
   const deleteProduct = async (productId: string) => {
@@ -465,7 +486,13 @@ export default function ProductosWayraPage() {
                     ]}
                     value={filterType}
                     onChange={(val) =>
-                      setFilterType(val as "ALL" | "WAYRA_ENI" | "WAYRA_CALAN" | "WAYRA_OTROS")
+                      setFilterType(
+                        val as
+                          | "ALL"
+                          | "WAYRA_ENI"
+                          | "WAYRA_CALAN"
+                          | "WAYRA_OTROS"
+                      )
                     }
                     placeholder="Filtrar por tipo..."
                     icon={<Filter className="h-4 w-4 text-gray-500" />}
@@ -474,25 +501,54 @@ export default function ProductosWayraPage() {
               </div>
 
               {/* Botones de acción móvil */}
-              <div className="flex gap-2 lg:hidden">
+              {/* Botones de acción móvil - AHORA CON LOS 3 BOTONES ESPECÍFICOS */}
+              <div className="flex flex-col gap-3 lg:hidden">
                 <Button
                   onClick={() => setShowScanner(true)}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg h-10 text-sm"
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg h-12 text-base"
                 >
-                  <Camera className="h-4 w-4 mr-2" />
-                  Escanear
+                  <Camera className="h-5 w-5 mr-2" />
+                  Escanear Código
                 </Button>
+
                 {canEdit && (
-                  <Button
-                    onClick={() => {
-                      setScannedBarcode("");
-                      setShowProductForm(true);
-                    }}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg h-10 text-sm"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo
-                  </Button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Button
+                      onClick={() => {
+                        setNewProductType("WAYRA_ENI");
+                        setScannedBarcode("");
+                        setShowProductForm(true);
+                      }}
+                      className="bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50 shadow-lg h-12 font-medium"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Nuevo ENI
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        setNewProductType("WAYRA_CALAN");
+                        setScannedBarcode("");
+                        setShowProductForm(true);
+                      }}
+                      className="bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-lg h-12 font-medium"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Nuevo CALAN
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        setNewProductType("WAYRA_OTROS");
+                        setScannedBarcode("");
+                        setShowProductForm(true);
+                      }}
+                      className="bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 shadow-lg h-12 font-medium"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Nuevo OTROS
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -552,8 +608,8 @@ export default function ProductosWayraPage() {
                                 product.tipo === "WAYRA_ENI"
                                   ? "bg-gradient-to-br from-blue-100 to-blue-200"
                                   : product.tipo === "WAYRA_CALAN"
-                                  ? "bg-gradient-to-br from-orange-100 to-orange-200"
-                                  : "bg-gradient-to-br from-purple-100 to-purple-200"
+                                    ? "bg-gradient-to-br from-orange-100 to-orange-200"
+                                    : "bg-gradient-to-br from-purple-100 to-purple-200"
                               }`}
                             >
                               {product.tipo === "WAYRA_ENI" ? (
@@ -585,20 +641,24 @@ export default function ProductosWayraPage() {
                               product.tipo === "WAYRA_ENI"
                                 ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
                                 : product.tipo === "WAYRA_CALAN"
-                                ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
-                                : product.tipo === "WAYRA_OTROS"
-                                ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
-                                : "bg-green-100 text-green-700 hover:bg-green-200"
+                                  ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                  : product.tipo === "WAYRA_OTROS"
+                                    ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
+                                    : "bg-green-100 text-green-700 hover:bg-green-200"
                             } transition-colors`}
                           >
-                            {product.tipo === "WAYRA_ENI" ? "ENI" : product.tipo === "WAYRA_CALAN" ? "CALAN" : "OTROS"}
+                            {product.tipo === "WAYRA_ENI"
+                              ? "ENI"
+                              : product.tipo === "WAYRA_CALAN"
+                                ? "CALAN"
+                                : "OTROS"}
                           </Badge>
                           <div className="text-xs text-gray-500 mt-1">
                             {product.tipo === "WAYRA_ENI"
                               ? "Nacional"
                               : product.tipo === "WAYRA_CALAN"
-                              ? "Importado"
-                              : "Varios"}
+                                ? "Importado"
+                                : "Varios"}
                           </div>
                         </td>
                         <td className="py-4 px-6">
@@ -763,7 +823,11 @@ export default function ProductosWayraPage() {
                                 : "bg-orange-100 text-orange-700"
                             }`}
                           >
-                            {product.tipo === "WAYRA_ENI" ? "ENI" : product.tipo === "WAYRA_CALAN" ? "CALAN" : "OTROS"}
+                            {product.tipo === "WAYRA_ENI"
+                              ? "ENI"
+                              : product.tipo === "WAYRA_CALAN"
+                                ? "CALAN"
+                                : "OTROS"}
                           </Badge>
                         </div>
                         <div className="text-xs sm:text-sm text-gray-500 mt-1">

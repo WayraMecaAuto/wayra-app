@@ -139,9 +139,13 @@ export async function POST(request: NextRequest) {
       nuevoStock -= cantidadNum;
     }
 
-    // Determinar entidad contable según tipo de producto
+    // ✅ CORREGIDO: Determinar entidad contable según tipo de producto
     let entidadContable = "TORNIREPUESTOS";
-    if (producto.tipo === "WAYRA_ENI" || producto.tipo === "WAYRA_CALAN") {
+    if (
+      producto.tipo === "WAYRA_ENI" || 
+      producto.tipo === "WAYRA_CALAN" || 
+      producto.tipo === "WAYRA_OTROS" // ✅ Agregado
+    ) {
       entidadContable = "WAYRA_PRODUCTOS";
     }
 
@@ -216,7 +220,7 @@ export async function POST(request: NextRequest) {
             monto: precioUnitarioNum * cantidadNum,
             fecha: ahora,
             descripcion: `Venta directa: ${producto.nombre} - ${motivo}`,
-            entidad: entidadContable,
+            entidad: entidadContable, // ✅ Ahora WAYRA_OTROS va a WAYRA_PRODUCTOS
             referencia: productoId,
             mes,
             anio,

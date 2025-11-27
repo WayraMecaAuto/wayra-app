@@ -283,7 +283,7 @@ export default function ContabilidadWayraProductosPage() {
                     item.tipo === "WAYRA_ENI" ? "bg-blue-100 text-blue-800" : "bg-cyan-100 text-cyan-800"
                   }`}
                 >
-                  {item.tipo === "WAYRA_ENI" ? "ENI" : "CALAN"}
+                  {item.tipo === "WAYRA_ENI" ? "ENI" : item.tipo === "WAYRA_CALAN" ? "CALAN" : "OTROS"}
                 </Badge>
               );
 

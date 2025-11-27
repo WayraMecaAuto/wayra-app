@@ -120,10 +120,10 @@ export default function FacturaDetailPage() {
       const { default: autoTable } = await import("jspdf-autotable");
 
       const doc = new jsPDF("p", "mm", "letter");
-      const pageWidth = doc.internal.pageSize.getWidth(); // 215.9 mm
-      const pageHeight = doc.internal.pageSize.getHeight(); // 279.4 mm
+      const pageWidth = doc.internal.pageSize.getWidth(); 
+      const pageHeight = doc.internal.pageSize.getHeight(); 
       const marginTop = 15;
-      const marginBottom = 30; // espacio para footer
+      const marginBottom = 30;
       let y = marginTop;
 
       // ==================== CARGAR LOGO ====================
@@ -168,9 +168,9 @@ export default function FacturaDetailPage() {
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100, 100, 100);
-        doc.text("NIT: 900123456-7", 48, y + 23);
+        doc.text("NIT: 1152700355-6", 48, y + 23);
         doc.text("Cel: 317 606 7449", 48, y + 28);
-        doc.text("info@wayra.com", 48, y + 33);
+        doc.text("wayramecanicaautomotriz@gmail.com", 48, y + 33);
 
         // Número de factura
         doc.setFontSize(34);
@@ -615,13 +615,13 @@ export default function FacturaDetailPage() {
                   Mecánica Automotriz
                 </p>
                 <p className="text-xs sm:text-sm text-gray-600">
-                  NIT: 900123456-7
+                  NIT: 1152700355-6
                 </p>
                 <p className="text-xs sm:text-sm text-gray-600">
                   Cel: 317 606 7449
                 </p>
                 <p className="text-xs sm:text-sm text-gray-600">
-                  info@wayra.com
+                  wayramecanicaautomotriz@gmail.com
                 </p>
               </div>
             </div>
