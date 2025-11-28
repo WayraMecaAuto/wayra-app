@@ -4,7 +4,6 @@ node_modules
 *.log
 .env.local
 .env*.local
-prisma/migrations
 *.md
 .git
 .github
