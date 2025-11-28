@@ -1,3 +1,4 @@
+
 import { PrismaClient } from '@prisma/client'
 
 const globalForPrisma = globalThis as unknown as {
@@ -17,12 +18,4 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma
-}
-
-// Manejar conexiones en Vercel
-if (process.env.VERCEL_ENV === 'production') {
-  // No hacer pool de conexiones en Vercel (serverless)
-  prisma.$connect()
-    .then(() => console.log('✅ Prisma connected'))
-    .catch((e) => console.error('❌ Prisma connection failed:', e))
 }
