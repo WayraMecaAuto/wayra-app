@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       'framer-motion',
       'react-chartjs-2'
     ],
+    // ✅ Asegurar que Prisma se incluya correctamente
+    serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
   },
 
   // ✅ Output standalone (reduce tamaño ~50%)

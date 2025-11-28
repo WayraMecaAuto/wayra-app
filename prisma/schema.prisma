@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -149,7 +150,7 @@ model Producto {
   // Relaciones
   movimientos       MovimientoInventario[]
   detallesOrden     DetalleOrden[]
-  detallesContables DetalleIngresoContable[] @relation("ProductoDetallesContables") // 👈 Agregada
+  detallesContables DetalleIngresoContable[] @relation("ProductoDetallesContables")
 
   @@map("productos")
 }
@@ -328,8 +329,8 @@ model DetalleOrden {
 model Configuracion {
   id          String   @id @default(cuid())
   clave       String   @unique
-  valor       String
   descripcion String?
+  valor       String
   updatedAt   DateTime @updatedAt
 
   @@map("configuracion")
