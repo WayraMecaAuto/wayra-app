@@ -8,18 +8,18 @@ const nextConfig: NextConfig = {
       'recharts',
       'chart.js',
       'date-fns',
-      '@prisma/client',
       'framer-motion',
       'react-chartjs-2'
     ],
-    // ✅ Asegurar que Prisma se incluya correctamente
-    serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
   },
+
+  // ✅ Prisma debe estar en serverExternalPackages (renombrado en Next.js 15)
+  serverExternalPackages: ['@prisma/client', 'prisma'],
 
   // ✅ Output standalone (reduce tamaño ~50%)
   output: 'standalone',
 
-  // ✅ Ignorar errores de build (como tenías)
+  // ✅ Ignorar errores de build
   eslint: {
     ignoreDuringBuilds: true,
   },
