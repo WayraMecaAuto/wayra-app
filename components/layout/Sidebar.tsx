@@ -414,7 +414,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 <Package className="h-4 w-4 text-white" />
               </div>
               <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                Sistema Wayra
+                Wayra App
               </span>
             </div>
           )}
@@ -453,8 +453,8 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         {!isCollapsed && (
           <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-blue-50 to-white">
             <div className="text-xs text-gray-500 text-center">
-              <div className="font-semibold text-gray-700 mb-1">Sistema Wayra v1.0</div>
-              <div className="text-gray-400">Fase 1 - {getRoleDisplayName(session?.user?.role || '')}</div>
+              <div className="font-semibold text-gray-700 mb-1">Wayra App v1.0</div>
+              <div className="text-gray-400">{getRoleDisplayName(session?.user?.role || '')}</div>
             </div>
           </div>
         )}
