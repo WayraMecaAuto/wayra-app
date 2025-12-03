@@ -555,49 +555,36 @@ export default function OrdenDetallePage() {
 
   const handleProductSelected = async (
     producto: any,
-    tipoPrecio: string,
+    cantidad: number,
     precioPersonalizado?: number
   ) => {
     try {
       // Usar precio personalizado si se proporciona
       let precio = precioPersonalizado || producto.precioVenta;
 
-      if (!precioPersonalizado) {
-        switch (tipoPrecio) {
-          case "MINORISTA":
-            precio = producto.precioMinorista;
-            break;
-          case "MAYORISTA":
-            precio = producto.precioMayorista;
-            break;
-          case "VENTA":
-          default:
-            precio = producto.precioVenta;
-            break;
-        }
-      }
-
       const response = await fetch(`/api/ordenes/${params.id}/productos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productoId: producto.id,
-          cantidad: 1,
-          precioUnitario: precio, // Enviar precio correcto (personalizado o por tipo)
-          tipoPrecio,
+          cantidad: cantidad, // ✅ Enviar cantidad del modal
+          precioUnitario: precio,
+          tipoPrecio: "VENTA",
         }),
       });
 
       if (response.ok) {
         toast.success(
-          `${producto.nombre} agregado${precioPersonalizado ? " con precio personalizado" : ""}`
+          `${producto.nombre} agregado (${cantidad} unidades)${precioPersonalizado ? " con precio personalizado" : ""}`
         );
         fetchOrden();
         setShowProductSelector(false);
       } else {
-        toast.error("Error al agregar producto");
+        const errorData = await response.json();
+        toast.error(errorData.error || "Error al agregar producto");
       }
     } catch (error) {
+      console.error("Error:", error);
       toast.error("Error al agregar producto");
     }
   };
@@ -1500,11 +1487,143 @@ export default function OrdenDetallePage() {
 
         {orden.repuestosExternos.length > 0 ? (
           <CardContent>
-            {/* Similar a productos, con botones deshabilitados si isCompletado */}
-            {/* Aquí iría el mismo patrón de tabla desktop/mobile con botones disabled={isCompletado} */}
-            <p className="text-gray-500 text-sm">
-              Repuestos externos listados aquí...
-            </p>
+            <div className="max-h-96 overflow-y-auto">
+              {/* Vista desktop */}
+              <div className="hidden lg:block">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
+                        Repuesto
+                      </th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                        Proveedor
+                      </th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                        Cantidad
+                      </th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                        P. Venta
+                      </th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
+                        Subtotal
+                      </th>
+                      {canAddItems && (
+                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
+                          Acciones
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orden.repuestosExternos.map((repuesto: any, index) => (
+                      <tr
+                        key={repuesto.id}
+                        className="border-b border-gray-100"
+                      >
+                        <td className="py-3 px-3 min-w-0">
+                          <div className="whitespace-normal break-words">
+                            <div className="font-medium text-sm sm:text-base text-gray-900">
+                              {repuesto.nombre}
+                            </div>
+                            {repuesto.descripcion && (
+                              <div className="text-xs sm:text-sm text-gray-500">
+                                {repuesto.descripcion}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-sm sm:text-base text-gray-600 whitespace-normal break-words">
+                          {repuesto.proveedor || "-"}
+                        </td>
+                        <td className="py-3 px-3 font-medium text-sm sm:text-base">
+                          {repuesto.cantidad}
+                        </td>
+                        <td className="py-3 px-3 font-medium text-orange-600 text-sm sm:text-base">
+                          ${repuesto.precioVenta.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-3 font-bold text-orange-600 text-sm sm:text-base">
+                          ${repuesto.subtotal.toLocaleString()}
+                        </td>
+                        {canAddItems && (
+                          <td className="py-3 px-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => eliminarRepuesto(repuesto.id)}
+                              disabled={isCompletado}
+                              className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Vista móvil */}
+              <div className="lg:hidden space-y-4">
+                {orden.repuestosExternos.map((repuesto: any) => (
+                  <div
+                    key={repuesto.id}
+                    className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">
+                        {repuesto.nombre}
+                      </span>
+                      {repuesto.descripcion && (
+                        <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">
+                          {repuesto.descripcion}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="text-sm sm:text-base flex flex-col">
+                        <div>
+                          <span className="font-medium">Proveedor: </span>
+                          {repuesto.proveedor || "-"}
+                        </div>
+                        <div>
+                          <span className="font-medium">Cantidad: </span>
+                          {repuesto.cantidad}
+                        </div>
+                      </div>
+                      <div className="text-sm sm:text-base text-right">
+                        <div>
+                          <span className="font-medium">P. Venta: </span>
+                          <span className="text-orange-600">
+                            ${repuesto.precioVenta.toLocaleString()}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Subtotal: </span>
+                          <span className="font-bold text-orange-600">
+                            ${repuesto.subtotal.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {canAddItems && !isCompletado && (
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => eliminarRepuesto(repuesto.id)}
+                          className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </CardContent>
         ) : (
           <CardContent className="text-center text-gray-500 py-8">

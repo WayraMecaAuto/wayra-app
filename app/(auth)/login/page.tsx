@@ -57,7 +57,7 @@ export default function LoginPage() {
           <div className="flex justify-center items-center space-x-8 sm:space-x-12 mb-6">
             <div className="group cursor-pointer animate-slide-in-left">
               <Image
-                src="/images/WayraLogo.png"
+                src="/images/WayraNuevoLogo.png"
                 alt="Logo de Wayra"
                 width={80}
                 height={80}

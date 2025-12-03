@@ -163,7 +163,7 @@ export default function ContabilidadWayraProductosPage() {
         <motion.div variants={itemVariants} className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-2xl p-6 shadow-xl text-white">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="w-14 h-14 bg-white/25 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <Image src="/images/WayraLogo.png" alt="Wayra" width={38} height={38} className="object-contain" />
+              <Image src="/images/WayraNuevoLogo.png" alt="Wayra" width={70} height={70} className="object-contain" />
             </div>
             <div className="text-center sm:text-left">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Contabilidad Productos Wayra</h1>

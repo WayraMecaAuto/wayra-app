@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Download, Edit, XCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import WayraLogo from "@/public/images/WayraLogo.png";
+import WayraLogo from "@/public/images/WayraNuevoLogo.png";
 
 interface Factura {
   id: string;
@@ -129,7 +129,7 @@ export default function FacturaDetailPage() {
       // ==================== CARGAR LOGO ====================
       let logoBase64 = "";
       try {
-        const logoModule = await import("@/public/images/WayraLogo.png");
+        const logoModule = await import("@/public/images/WayraNuevoLogo.png");
         const res = await fetch(logoModule.default.src);
         if (res.ok) {
           const blob = await res.blob();
@@ -600,7 +600,7 @@ export default function FacturaDetailPage() {
             <div className="flex items-start space-x-3 sm:space-x-4">
               <div className="flex-shrink-0">
                 <Image
-                  src="/images/WayraLogo.png"
+                  src="/images/WayraNuevoLogo.png"
                   alt="Wayra Logo"
                   width={60}
                   height={60}

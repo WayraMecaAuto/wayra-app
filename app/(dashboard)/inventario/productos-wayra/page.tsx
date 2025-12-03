@@ -283,10 +283,10 @@ export default function ProductosWayraPage() {
             <div className="flex items-start sm:items-center space-x-4">
               <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-lg hover:rotate-6 transition-transform duration-300">
                 <Image
-                  src="/images/WayraLogo.png"
+                  src="/images/WayraNuevoLogo.png"
                   alt="Wayra Logo"
-                  width={40}
-                  height={40}
+                  width={70}
+                  height={70}
                   className="object-contain"
                 />
               </div>

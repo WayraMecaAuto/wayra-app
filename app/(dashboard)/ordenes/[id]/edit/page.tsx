@@ -4,11 +4,22 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { ArrowLeft, Save, RefreshCw, Plus, Trash2, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  RefreshCw,
+  Plus,
+  Trash2,
+  Wrench,
+  Package,
+  ShoppingCart,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LubricacionModal } from "@/components/forms/LubricacionModal";
+import { ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
+import { Modal } from "@/components/ui/modal";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -27,6 +38,29 @@ interface ServicioEditable {
   requiereLubricacion?: boolean;
 }
 
+interface ProductoOrden {
+  id: string;
+  nombre: string;
+  codigo: string;
+  cantidad: number;
+  precioVenta: number;
+  subtotal: number;
+  isNew?: boolean;
+}
+
+interface RepuestoExterno {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  cantidad: number;
+  precioCompra: number;
+  precioVenta: number;
+  subtotal: number;
+  utilidad: number;
+  proveedor: string;
+  isNew?: boolean;
+}
+
 export default function EditOrdenPage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -40,6 +74,13 @@ export default function EditOrdenPage() {
   const [showLubricacionModal, setShowLubricacionModal] = useState(false);
   const [servicioLubricacionTemp, setServicioLubricacionTemp] =
     useState<any>(null);
+
+  // Estados para productos y repuestos
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [showRepuestoExternoModal, setShowRepuestoExternoModal] =
+    useState(false);
+  const [productosOrden, setProductosOrden] = useState<ProductoOrden[]>([]);
+  const [repuestosOrden, setRepuestosOrden] = useState<RepuestoExterno[]>([]);
 
   const canEdit = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(
     session?.user?.role || ""
@@ -66,85 +107,6 @@ export default function EditOrdenPage() {
     }
   }, [params.id]);
 
-  // Productos y Repuestos Externos
-  const [productos, setProductos] = useState<any[]>([]);
-  const [productosOrden, setProductosOrden] = useState<any[]>([]);
-  const [repuestosExternos, setRepuestosExternos] = useState<any[]>([]);
-  const [repuestosOrden, setRepuestosOrden] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetchProductos();
-    fetchRepuestosExternos();
-  }, []);
-
-  const fetchProductos = async () => {
-    try {
-      const res = await fetch("/api/productos");
-      if (res.ok) setProductos(await res.json());
-    } catch (err) {
-      console.error("Error cargando productos", err);
-    }
-  };
-
-  const fetchRepuestosExternos = async () => {
-    try {
-      const res = await fetch("/api/repuestos-externos");
-      if (res.ok) setRepuestosExternos(await res.json());
-    } catch (err) {
-      console.error("Error cargando repuestos externos", err);
-    }
-  };
-
-  // Agregar producto a la orden
-  const agregarProducto = (p: any) => {
-    const yaExiste = productosOrden.find((x) => x.id === p.id);
-    if (yaExiste) return toast.error("Este producto ya fue agregado");
-
-    const nuevo = { ...p, cantidad: 1, subtotal: p.precioVenta };
-    setProductosOrden([...productosOrden, nuevo]);
-    toast.success("Producto agregado");
-  };
-
-  // Agregar repuesto externo
-  const agregarRepuestoExterno = (r: any) => {
-    const yaExiste = repuestosOrden.find((x) => x.id === r.id);
-    if (yaExiste) return toast.error("Este repuesto ya fue agregado");
-
-    const nuevo = { ...r, cantidad: 1, subtotal: r.precioVenta };
-    setRepuestosOrden([...repuestosOrden, nuevo]);
-    toast.success("Repuesto externo agregado");
-  };
-
-  // Editar precios manualmente (solo locales)
-  const actualizarPrecioLocal = (
-    tipo: string,
-    index: number,
-    nuevoPrecio: number
-  ) => {
-    if (tipo === "producto") {
-      const nuevos = [...productosOrden];
-      nuevos[index].precioVenta = nuevoPrecio;
-      nuevos[index].subtotal = nuevos[index].cantidad * nuevoPrecio;
-      setProductosOrden(nuevos);
-    } else if (tipo === "repuesto") {
-      const nuevos = [...repuestosOrden];
-      nuevos[index].precioVenta = nuevoPrecio;
-      nuevos[index].subtotal = nuevos[index].cantidad * nuevoPrecio;
-      setRepuestosOrden(nuevos);
-    } else if (tipo === "servicio") {
-      const nuevos = [...serviciosOrden];
-      nuevos[index].precio = nuevoPrecio;
-      setServiciosOrden(nuevos);
-    }
-  };
-
-  // Calcular totales
-  const totalProductos = productosOrden.reduce((sum, p) => sum + p.subtotal, 0);
-  const totalRepuestosExternos = repuestosOrden.reduce(
-    (sum, r) => sum + r.subtotal,
-    0
-  );
-
   const fetchOrden = async () => {
     try {
       const response = await fetch(`/api/ordenes/${params.id}`);
@@ -162,6 +124,36 @@ export default function EditOrdenPage() {
             descripcion: s.descripcion,
             precio: s.precio,
             isNew: false,
+          }))
+        );
+
+        // Cargar productos existentes (marcar como NO nuevos)
+        setProductosOrden(
+          data.detalles.map((d: any) => ({
+            id: d.id,
+            productoId: d.productoId,
+            nombre: d.producto.nombre,
+            codigo: d.producto.codigo,
+            cantidad: d.cantidad,
+            precioVenta: d.precioUnitario,
+            subtotal: d.subtotal,
+            isNew: false, // ✅ Importante
+          }))
+        );
+
+        // Cargar repuestos externos existentes (marcar como NO nuevos)
+        setRepuestosOrden(
+          data.repuestosExternos.map((r: any) => ({
+            id: r.id,
+            nombre: r.nombre,
+            descripcion: r.descripcion || "",
+            cantidad: r.cantidad,
+            precioCompra: r.precioCompra,
+            precioVenta: r.precioVenta,
+            subtotal: r.subtotal,
+            utilidad: r.utilidad,
+            proveedor: r.proveedor || "",
+            isNew: false, // ✅ Importante
           }))
         );
       } else {
@@ -211,7 +203,7 @@ export default function EditOrdenPage() {
       const nuevoServicio: ServicioEditable = {
         clave: servicio.clave,
         descripcion: servicio.descripcion,
-        precio: parseFloat(servicio.valor), // Precio inicial del catálogo
+        precio: parseFloat(servicio.valor),
         isNew: true,
       };
       setServiciosOrden([...serviciosOrden, nuevoServicio]);
@@ -227,7 +219,6 @@ export default function EditOrdenPage() {
     try {
       console.log("🔧 Procesando lubricación en edición:", productos);
 
-      // Separar aceites y filtros
       const aceites = productos.filter((p) => p.tipo === "ACEITE");
       const filtros = productos.filter((p) => p.tipo === "FILTRO");
 
@@ -236,7 +227,6 @@ export default function EditOrdenPage() {
         return;
       }
 
-      // Obtener información completa de todos los productos
       const productosCompletos = await Promise.all(
         productos.map(async (p) => {
           const response = await fetch(`/api/productos/${p.id}`);
@@ -247,13 +237,11 @@ export default function EditOrdenPage() {
         })
       );
 
-      // Calcular precio total
       const precioTotal = productosCompletos.reduce(
         (sum, p) => sum + p.precioVenta,
         0
       );
 
-      // Crear descripción detallada
       const nombresAceites = aceites
         .map((a) => {
           const producto = productosCompletos.find((p) => p.id === a.id);
@@ -270,7 +258,6 @@ export default function EditOrdenPage() {
 
       const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
 
-      // Agregar a la lista de servicios
       const nuevoServicio: ServicioEditable = {
         clave: servicioLubricacionTemp.clave,
         descripcion: descripcion,
@@ -325,20 +312,134 @@ export default function EditOrdenPage() {
     return serviciosOrden.reduce((sum, s) => sum + s.precio, 0);
   };
 
+  // Funciones para Productos
+  const handleProductSelected = (
+    producto: any,
+    cantidad: number,
+    precioPersonalizado?: number
+  ) => {
+    const existe = productosOrden.find(
+      (p) => p.productoId === producto.id || p.id === producto.id
+    );
+    if (existe) {
+      toast.error("Este producto ya está agregado");
+      return;
+    }
+
+    const precio = precioPersonalizado || producto.precioVenta;
+
+    const nuevoProducto: ProductoOrden = {
+      id: `temp-${Date.now()}`,
+      productoId: producto.id,
+      nombre: producto.nombre,
+      codigo: producto.codigo,
+      cantidad: cantidad,
+      precioVenta: precio,
+      subtotal: precio * cantidad,
+      isNew: true,
+    };
+
+    setProductosOrden([...productosOrden, nuevoProducto]);
+    toast.success(`${producto.nombre} agregado (${cantidad} unidades)`);
+  };
+
+  const actualizarPrecioProducto = (index: number, nuevoPrecio: number) => {
+    const nuevosProductos = [...productosOrden];
+    nuevosProductos[index].precioVenta = nuevoPrecio;
+    nuevosProductos[index].subtotal =
+      nuevosProductos[index].cantidad * nuevoPrecio;
+    setProductosOrden(nuevosProductos);
+  };
+
+  const removerProducto = (index: number) => {
+    setProductosOrden(productosOrden.filter((_, i) => i !== index));
+    toast.success("Producto removido");
+  };
+
+  const calcularTotalProductos = () => {
+    return productosOrden.reduce((sum, p) => sum + p.subtotal, 0);
+  };
+
+  // Funciones para Repuestos Externos
+  const agregarRepuestoExterno = (repuesto: RepuestoExterno) => {
+    setRepuestosOrden([
+      ...repuestosOrden,
+      {
+        ...repuesto,
+        id: `temp-${Date.now()}`,
+        isNew: true,
+      },
+    ]);
+    toast.success("Repuesto externo agregado");
+  };
+
+  const actualizarCantidadProducto = (index: number, nuevaCantidad: number) => {
+    const nuevosProductos = [...productosOrden];
+    nuevosProductos[index].cantidad = nuevaCantidad;
+    nuevosProductos[index].subtotal =
+      nuevosProductos[index].cantidad * nuevosProductos[index].precioVenta;
+    setProductosOrden(nuevosProductos);
+  };
+
+  const actualizarPrecioRepuesto = (index: number, nuevoPrecio: number) => {
+    const nuevosRepuestos = [...repuestosOrden];
+    nuevosRepuestos[index].precioVenta = nuevoPrecio;
+    nuevosRepuestos[index].subtotal =
+      nuevosRepuestos[index].cantidad * nuevoPrecio;
+    nuevosRepuestos[index].utilidad =
+      nuevosRepuestos[index].subtotal -
+      nuevosRepuestos[index].cantidad * nuevosRepuestos[index].precioCompra;
+    setRepuestosOrden(nuevosRepuestos);
+  };
+
+  const removerRepuesto = (index: number) => {
+    setRepuestosOrden(repuestosOrden.filter((_, i) => i !== index));
+    toast.success("Repuesto removido");
+  };
+
+  const calcularTotalRepuestos = () => {
+    return repuestosOrden.reduce((sum, r) => sum + r.subtotal, 0);
+  };
+
   const onSubmit = async (data: EditOrdenForm) => {
     setSaving(true);
     try {
-      // Preparar datos según el rol
       const updateData: any = {
         descripcion: data.descripcion,
-        servicios: serviciosOrden, // Enviar los servicios con sus precios editados
+        servicios: serviciosOrden,
       };
 
-      // Solo admin puede cambiar mecánico y mano de obra
       if (canEdit) {
         updateData.mecanicoId = data.mecanicoId;
         updateData.manoDeObra = parseFloat(data.manoDeObra) || 0;
       }
+
+      //  AGREGAR PRODUCTOS NUEVOS
+      const productosNuevos = productosOrden.filter((p) => p.isNew);
+      if (productosNuevos.length > 0) {
+        updateData.productosNuevos = productosNuevos.map((p) => ({
+          productoId: p.productoId,
+          cantidad: p.cantidad,
+          precioUnitario: p.precioVenta,
+        }));
+      }
+
+      //  AGREGAR REPUESTOS NUEVOS
+      const repuestosNuevos = repuestosOrden.filter((r) => r.isNew);
+      if (repuestosNuevos.length > 0) {
+        updateData.repuestosNuevos = repuestosNuevos.map((r) => ({
+          nombre: r.nombre,
+          descripcion: r.descripcion,
+          cantidad: r.cantidad,
+          precioCompra: r.precioCompra,
+          precioVenta: r.precioVenta,
+          subtotal: r.subtotal,
+          utilidad: r.utilidad,
+          proveedor: r.proveedor,
+        }));
+      }
+
+      console.log("📤 Enviando datos:", updateData);
 
       const response = await fetch(`/api/ordenes/${params.id}`, {
         method: "PATCH",
@@ -354,6 +455,7 @@ export default function EditOrdenPage() {
         toast.error(error.error || "Error al actualizar orden");
       }
     } catch (error) {
+      console.error("Error:", error);
       toast.error("Error al actualizar orden");
     } finally {
       setSaving(false);
@@ -380,8 +482,6 @@ export default function EditOrdenPage() {
       </div>
     );
   }
-
-  
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -506,8 +606,7 @@ export default function EditOrdenPage() {
                         </div>
                         {!servicio.requiereLubricacion && (
                           <div className="text-sm text-gray-500">
-                            Precio base: $
-                            {parseFloat(servicio.valor).toLocaleString()}
+                            ${parseFloat(servicio.valor).toLocaleString()}
                           </div>
                         )}
                         {servicio.requiereLubricacion && (
@@ -618,85 +717,266 @@ export default function EditOrdenPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Productos del Inventario */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <span className="text-blue-600">🧴 Productos</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Package className="h-5 w-5 text-blue-600" />
+                <span>Productos del Inventario</span>
+              </div>
+              {canEdit && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setShowProductSelector(true)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Producto
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <h4 className="font-semibold text-gray-800 mb-3">
-              Agregar Productos:
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
-              {productos.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                >
-                  <div>
-                    <div className="font-medium">{p.nombre}</div>
-                    <div className="text-sm text-gray-500">
-                      ${p.precioVenta.toLocaleString()}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                    onClick={() => agregarProducto(p)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {productosOrden.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="font-semibold mb-2">Productos en esta orden:</h4>
-                {productosOrden.map((p, i) => (
+            {productosOrden.length > 0 ? (
+              <div className="space-y-3">
+                {productosOrden.map((producto, index) => (
                   <div
-                    key={p.id}
-                    className="flex justify-between items-center border p-3 rounded-lg mb-2"
+                    key={producto.id}
+                    className="bg-white border-2 border-blue-200 rounded-xl p-4 space-y-3"
                   >
-                    <div>
-                      <div className="font-medium">{p.nombre}</div>
-                      <div className="text-sm text-gray-500">
-                        Cantidad: {p.cantidad}
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm sm:text-base break-words">
+                          {producto.nombre}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Código: {producto.codigo} | Cantidad:{" "}
+                          {producto.cantidad}
+                        </div>
                       </div>
+                      {canEdit && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removerProducto(index)}
+                          className="text-red-600 hover:bg-red-50 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        type="number"
-                        className="w-24 text-sm"
-                        value={p.precioVenta}
-                        onChange={(e) =>
-                          actualizarPrecioLocal(
-                            "producto",
-                            i,
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                      />
-                      <span className="font-semibold text-blue-600">
-                        ${p.subtotal.toLocaleString()}
-                      </span>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Cantidad
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-9 text-sm"
+                          value={producto.cantidad}
+                          onChange={(e) =>
+                            actualizarCantidadProducto(
+                              index,
+                              parseInt(e.target.value) || 1
+                            )
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Precio Unit.
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                            $
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="h-9 text-sm pl-6"
+                            value={producto.precioVenta}
+                            onChange={(e) =>
+                              actualizarPrecioProducto(
+                                index,
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Subtotal
+                        </label>
+                        <div className="h-9 flex items-center px-3 bg-blue-50 rounded-md border-2 border-blue-200">
+                          <span className="font-bold text-blue-600 text-sm">
+                            ${producto.subtotal.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
 
-                <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg mt-2">
-                  <span className="font-semibold">Total Productos:</span>
-                  <span className="font-bold text-blue-600">
-                    ${totalProductos.toLocaleString()}
-                  </span>
+                <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-700">
+                      Total Productos:
+                    </span>
+                    <span className="text-xl font-bold text-blue-600">
+                      ${calcularTotalProductos().toLocaleString()}
+                    </span>
+                  </div>
                 </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Package className="h-8 w-8 mx-auto mb-2 text-blue-400" />
+                <p>No hay productos agregados aún.</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        
+        {/* Repuestos Externos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ShoppingCart className="h-5 w-5 text-orange-600" />
+                <span>Repuestos Externos</span>
+              </div>
+              {canEdit && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setShowRepuestoExternoModal(true)}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Repuesto
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {repuestosOrden.length > 0 ? (
+              <div className="space-y-3">
+                {repuestosOrden.map((repuesto, index) => (
+                  <div
+                    key={repuesto.id}
+                    className="bg-white border-2 border-orange-200 rounded-xl p-4 space-y-3"
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm sm:text-base break-words">
+                          {repuesto.nombre}
+                        </div>
+                        {repuesto.descripcion && (
+                          <div className="text-xs text-gray-500 mt-1 break-words">
+                            {repuesto.descripcion}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-600 mt-1">
+                          Cantidad: {repuesto.cantidad} | Proveedor:{" "}
+                          {repuesto.proveedor || "N/A"}
+                        </div>
+                      </div>
+                      {canEdit && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removerRepuesto(index)}
+                          className="text-red-600 hover:bg-red-50 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          P. Compra
+                        </label>
+                        <div className="h-9 flex items-center px-3 bg-gray-50 rounded-md border">
+                          <span className="text-sm">
+                            ${repuesto.precioCompra.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          P. Venta
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                            $
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="h-9 text-sm pl-6"
+                            value={repuesto.precioVenta}
+                            onChange={(e) =>
+                              actualizarPrecioRepuesto(
+                                index,
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Subtotal
+                        </label>
+                        <div className="h-9 flex items-center px-3 bg-orange-50 rounded-md border-2 border-orange-200">
+                          <span className="font-bold text-orange-600 text-sm">
+                            ${repuesto.subtotal.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 rounded-lg p-2 border border-green-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">Utilidad:</span>
+                        <span className="font-semibold text-green-600 text-sm">
+                          ${repuesto.utilidad.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-700">
+                      Total Repuestos:
+                    </span>
+                    <span className="text-xl font-bold text-orange-600">
+                      ${calcularTotalRepuestos().toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-orange-400" />
+                <p>No hay repuestos externos agregados aún.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Botones */}
         <div className="flex justify-end space-x-4">
@@ -720,7 +1000,7 @@ export default function EditOrdenPage() {
         </div>
       </form>
 
-      {/* Modal de lubricación */}
+      {/* Modales */}
       <LubricacionModal
         isOpen={showLubricacionModal}
         onClose={() => {
@@ -729,6 +1009,182 @@ export default function EditOrdenPage() {
         }}
         onAdd={handleLubricacionAdded}
       />
+
+      <ProductSelectorModal
+        isOpen={showProductSelector}
+        onClose={() => setShowProductSelector(false)}
+        onSelect={handleProductSelected}
+      />
+
+      <RepuestoExternoModal
+        isOpen={showRepuestoExternoModal}
+        onClose={() => setShowRepuestoExternoModal(false)}
+        onAdd={agregarRepuestoExterno}
+      />
     </div>
+  );
+}
+// Componente Modal para Repuesto Externo
+function RepuestoExternoModal({ isOpen, onClose, onAdd }: any) {
+  const [formData, setFormData] = useState({
+    nombre: "",
+    descripcion: "",
+    cantidad: 1,
+    precioCompra: 0,
+    precioVenta: 0,
+    proveedor: "",
+  });
+  const calcularUtilidad = () => {
+    const totalCompra = formData.cantidad * formData.precioCompra;
+    const totalVenta = formData.cantidad * formData.precioVenta;
+    return totalVenta - totalCompra;
+  };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.nombre || formData.precioVenta <= 0) {
+      toast.error("Completa todos los campos obligatorios");
+      return;
+    }
+    onAdd({
+      ...formData,
+      subtotal: formData.cantidad * formData.precioVenta,
+      utilidad: calcularUtilidad(),
+    });
+    setFormData({
+      nombre: "",
+      descripcion: "",
+      cantidad: 1,
+      precioCompra: 0,
+      precioVenta: 0,
+      proveedor: "",
+    });
+  };
+  if (!isOpen) return null;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Agregar Repuesto Externo">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre del repuesto *
+            </label>
+            <Input
+              placeholder="Ej. Bujía NGK"
+              value={formData.nombre}
+              onChange={(e) =>
+                setFormData({ ...formData, nombre: e.target.value })
+              }
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Proveedor
+            </label>
+            <Input
+              placeholder="Ej. Importadora XYZ"
+              value={formData.proveedor}
+              onChange={(e) =>
+                setFormData({ ...formData, proveedor: e.target.value })
+              }
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Descripción
+          </label>
+          <textarea
+            className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+            placeholder="Detalles adicionales..."
+            value={formData.descripcion}
+            onChange={(e) =>
+              setFormData({ ...formData, descripcion: e.target.value })
+            }
+            rows={2}
+          ></textarea>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad
+            </label>
+            <Input
+              type="number"
+              min={1}
+              value={formData.cantidad}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  cantidad: parseInt(e.target.value) || 1,
+                })
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Precio Compra
+            </label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={formData.precioCompra}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  precioCompra: parseFloat(e.target.value) || 0,
+                })
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Precio Venta *
+            </label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={formData.precioVenta}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  precioVenta: parseFloat(e.target.value) || 0,
+                })
+              }
+              required
+            />
+          </div>
+        </div>
+
+        <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Utilidad:</span>
+            <span className="font-bold text-green-600">
+              ${calcularUtilidad().toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="border-gray-300 hover:bg-gray-100"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            className="bg-orange-600 hover:bg-orange-700 text-white px-6"
+          >
+            Agregar
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

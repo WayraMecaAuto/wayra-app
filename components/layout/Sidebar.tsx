@@ -44,7 +44,7 @@ const menuItems: MenuItem[] = [
   {
     title: 'Wayra Productos',
     icon: Package,
-    logo: '/images/WayraLogo.png',
+    logo: '/images/WayraNuevoLogo.png',
     roles: ['SUPER_USUARIO', 'ADMIN_WAYRA_PRODUCTOS', 'VENDEDOR_WAYRA'],
     children: [
       { 

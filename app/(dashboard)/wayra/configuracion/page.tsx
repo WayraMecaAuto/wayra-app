@@ -165,10 +165,10 @@ export default function WayraConfiguracionPage() {
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-xl border border-white/30">
                 <Image
-                  src="/images/WayraLogo.png"
+                  src="/images/WayraNuevoLogo.png" 
                   alt="Wayra Logo"
-                  width={48}
-                  height={48}
+                  width={70}
+                  height={70}
                   className="object-contain drop-shadow-lg"
                 />
               </div>

@@ -31,7 +31,7 @@ import { Modal } from "@/components/ui/modal";
 import { ClienteForm } from "@/components/forms/ClienteForm";
 import { VehiculoForm } from "@/components/forms/VehiculoForm";
 import { LubricacionModal } from "@/components/forms/LubricacionModal";
-import  {ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
+import { ProductSelectorModal } from "@/components/forms/ProductSelectorModal";
 import Dropdown from "@/components/forms/Dropdown";
 import toast from "react-hot-toast";
 
@@ -261,7 +261,11 @@ export default function NuevaOrdenPage() {
     setShowScanner(false);
   };
 
-  const handleProductSelected = async (producto: any, tipoPrecio: string, precioPersonalizado?: number) => {
+  const handleProductSelected = async (
+    producto: any,
+    tipoPrecio: string,
+    precioPersonalizado?: number
+  ) => {
     // Verificar si ya está agregado
     const exists = productosSeleccionados.find((p) => p.id === producto.id);
     if (exists) {
@@ -805,17 +809,17 @@ export default function NuevaOrdenPage() {
         {/* Productos del Inventario */}
         <Card className="shadow-lg border-0 animate-fade-in">
           <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
+            <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-lg sm:text-xl">
               <div className="flex items-center space-x-2">
                 <Package className="h-5 w-5" />
                 <span>Productos del Inventario</span>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 {/* BOTÓN NUEVO: Seleccionar Productos */}
                 <Button
                   type="button"
                   onClick={() => setShowProductSelector(true)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white border-white/30 hover:scale-105 transition-transform"
+                  className="bg-purple-600 hover:bg-purple-700 text-white border-white/30 hover:scale-105 transition-transform w-full sm:w-auto"
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Seleccionar Productos
@@ -824,7 +828,7 @@ export default function NuevaOrdenPage() {
                 <Button
                   type="button"
                   onClick={() => setShowScanner(true)}
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform w-full sm:w-auto"
                 >
                   <Camera className="h-4 w-4 mr-2" />
                   Escanear Producto
@@ -834,198 +838,122 @@ export default function NuevaOrdenPage() {
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             {productosSeleccionados.length > 0 ? (
-              <div className="max-h-96 overflow-y-auto">
-                <div className="hidden lg:block">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
-                          Producto
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
-                          Stock
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
-                          Cantidad
-                        </th>
-
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          Precio Unit.
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          Subtotal
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productosSeleccionados.map((producto, index) => (
-                        <tr
-                          key={producto.id}
-                          className="border-b border-gray-100"
-                        >
-                          <td className="py-3 px-3 min-w-0">
-                            <div className="whitespace-normal break-words">
-                              <div className="font-medium text-sm sm:text-base text-gray-900">
-                                {producto.nombre}
-                              </div>
-                              <div className="text-xs sm:text-sm text-gray-500">
-                                {producto.codigo}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`font-medium ${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}
-                            >
-                              {producto.stock}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3">
-                            <Input
-                              type="number"
-                              min="1"
-                              max={producto.stock}
-                              value={producto.cantidad}
-                              onChange={(e) =>
-                                actualizarProducto(
-                                  index,
-                                  "cantidad",
-                                  parseInt(e.target.value) || 1
-                                )
-                              }
-                              className="w-16 h-8 text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-                            />
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-gray-500">$</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={producto.precio}
-                                onChange={(e) => {
-                                  const nuevoPrecio =
-                                    parseFloat(e.target.value) || 0;
-                                  const nuevosProductos = [
-                                    ...productosSeleccionados,
-                                  ];
-                                  nuevosProductos[index].precio = nuevoPrecio;
-                                  nuevosProductos[index].subtotal =
-                                    nuevosProductos[index].cantidad *
-                                    nuevoPrecio;
-                                  setProductosSeleccionados(nuevosProductos);
-                                }}
-                                className="w-24 h-8 text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-                              />
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-3 font-bold text-green-600 text-sm sm:text-base">
-                            ${producto.subtotal.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => removerProducto(index)}
-                              className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="lg:hidden space-y-4">
-                  {productosSeleccionados.map((producto, index) => (
-                    <div
-                      key={producto.id}
-                      className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">
+              <div className="space-y-3">
+                {/* Cards responsivas para cada producto */}
+                {productosSeleccionados.map((producto, index) => (
+                  <div
+                    key={producto.id}
+                    className="bg-white border-2 border-purple-200 rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow"
+                  >
+                    {/* Header del producto */}
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm sm:text-base break-words">
                           {producto.nombre}
-                        </span>
-                        <span className="text-xs sm:text-sm text-gray-500">
-                          {producto.codigo}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="text-sm sm:text-base">
-                          <span className="font-medium">Stock: </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Código: {producto.codigo}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-gray-600">Stock:</span>
                           <span
-                            className={`${producto.stock <= 5 ? "text-red-600 animate-pulse" : "text-gray-900"}`}
+                            className={`text-xs font-semibold ${
+                              producto.stock <= 5
+                                ? "text-red-600 animate-pulse"
+                                : "text-green-600"
+                            }`}
                           >
-                            {producto.stock}
+                            {producto.stock} unidades
                           </span>
                         </div>
-                        <div className="text-sm sm:text-base">
-                          <span className="font-medium">Cantidad: </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => removerProducto(index)}
+                        className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform flex-shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Controles del producto */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Cantidad
+                        </label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max={producto.stock}
+                          value={producto.cantidad}
+                          onChange={(e) =>
+                            actualizarProducto(
+                              index,
+                              "cantidad",
+                              parseInt(e.target.value) || 1
+                            )
+                          }
+                          className="h-9 text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-purple-500 transition-all duration-200"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Precio Unit.
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                            $
+                          </span>
                           <Input
                             type="number"
-                            min="1"
-                            max={producto.stock}
-                            value={producto.cantidad}
-                            onChange={(e) =>
-                              actualizarProducto(
-                                index,
-                                "cantidad",
-                                parseInt(e.target.value) || 1
-                              )
-                            }
-                            className="w-16 h-8 inline-block text-center text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                            step="0.01"
+                            min="0"
+                            value={producto.precio}
+                            onChange={(e) => {
+                              const nuevoPrecio =
+                                parseFloat(e.target.value) || 0;
+                              const nuevosProductos = [
+                                ...productosSeleccionados,
+                              ];
+                              nuevosProductos[index].precio = nuevoPrecio;
+                              nuevosProductos[index].subtotal =
+                                nuevosProductos[index].cantidad * nuevoPrecio;
+                              setProductosSeleccionados(nuevosProductos);
+                            }}
+                            className="h-9 text-sm pl-6 border-gray-200 shadow-sm focus:ring-2 focus:ring-purple-500 transition-all duration-200"
                           />
                         </div>
-                        <div className="text-sm sm:text-base text-right">
-                          <div>
-                            <span className="font-medium">Precio Unit.: </span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={producto.precio}
-                              onChange={(e) => {
-                                const nuevoPrecio =
-                                  parseFloat(e.target.value) || 0;
-                                const nuevosProductos = [
-                                  ...productosSeleccionados,
-                                ];
-                                nuevosProductos[index].precio = nuevoPrecio;
-                                nuevosProductos[index].subtotal =
-                                  nuevosProductos[index].cantidad * nuevoPrecio;
-                                setProductosSeleccionados(nuevosProductos);
-                              }}
-                              className="w-24 h-8 inline-block text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-                            />
-                          </div>
-                          <div>
-                            <span className="font-medium">Subtotal: </span>
-                            <span className="font-bold text-green-600">
-                              ${producto.subtotal.toLocaleString()}
-                            </span>
-                          </div>
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-2">
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Subtotal
+                        </label>
+                        <div className="h-9 flex items-center justify-between px-3 bg-purple-50 rounded-md border-2 border-purple-200">
+                          <span className="text-xs text-gray-600">Total:</span>
+                          <span className="font-bold text-purple-600 text-sm sm:text-base">
+                            ${producto.subtotal.toLocaleString()}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => removerProducto(index)}
-                          className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+
+                {/* Total de productos */}
+                <div className="bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-4 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-700 text-sm sm:text-base">
+                      Total Productos:
+                    </span>
+                    <span className="text-xl sm:text-2xl font-bold text-purple-600">
+                      ${totales.totalProductos.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1035,7 +963,7 @@ export default function NuevaOrdenPage() {
                   No hay productos agregados
                 </p>
                 <p className="text-xs sm:text-sm">
-                  Escanea códigos de barras para agregar productos
+                  Selecciona o escanea productos para agregar
                 </p>
               </div>
             )}
@@ -1050,7 +978,7 @@ export default function NuevaOrdenPage() {
         {/* Repuestos Externos */}
         <Card className="shadow-lg border-0 animate-fade-in">
           <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
-            <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
+            <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-lg sm:text-xl">
               <div className="flex items-center space-x-2">
                 <ShoppingCart className="h-5 w-5" />
                 <span>Repuestos Externos</span>
@@ -1058,7 +986,7 @@ export default function NuevaOrdenPage() {
               <Button
                 type="button"
                 onClick={() => setShowRepuestoModal(true)}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:scale-105 transition-transform w-full sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar Repuesto
@@ -1067,199 +995,137 @@ export default function NuevaOrdenPage() {
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             {repuestosExternos.length > 0 ? (
-              <div className="max-h-96 overflow-y-auto">
-                <div className="hidden lg:block">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 min-w-0">
-                          Repuesto
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          Proveedor
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
-                          Cantidad
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          P. Compra
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          P. Venta
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          Utilidad
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-28">
-                          Subtotal
-                        </th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-700 w-20">
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {repuestosExternos.map((repuesto, index) => (
-                        <tr
-                          key={repuesto.id}
-                          className="border-b border-gray-100"
-                        >
-                          <td className="py-3 px-3 min-w-0">
-                            <div className="whitespace-normal break-words">
-                              <div className="font-medium text-sm sm:text-base text-gray-900">
-                                {repuesto.nombre}
-                              </div>
-                              {repuesto.descripcion && (
-                                <div className="text-xs sm:text-sm text-gray-500">
-                                  {repuesto.descripcion}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600 whitespace-normal break-words">
-                            {repuesto.proveedor || "-"}
-                          </td>
-                          <td className="py-3 px-3 font-medium text-sm sm:text-base">
-                            {repuesto.cantidad}
-                          </td>
-                          <td className="py-3 px-3 text-sm sm:text-base text-gray-600">
-                            ${repuesto.precioCompra.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-gray-500">$</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={repuesto.precioVenta}
-                                onChange={(e) => {
-                                  const nuevoPrecio =
-                                    parseFloat(e.target.value) || 0;
-                                  const nuevosRepuestos = [
-                                    ...repuestosExternos,
-                                  ];
-                                  nuevosRepuestos[index].precioVenta =
-                                    nuevoPrecio;
-                                  nuevosRepuestos[index].subtotal =
-                                    nuevosRepuestos[index].cantidad *
-                                    nuevoPrecio;
-                                  nuevosRepuestos[index].utilidad =
-                                    nuevosRepuestos[index].subtotal -
-                                    nuevosRepuestos[index].cantidad *
-                                      nuevosRepuestos[index].precioCompra;
-                                  setRepuestosExternos(nuevosRepuestos);
-                                }}
-                                className="w-24 h-8 text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500 transition-all duration-200"
-                              />
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-3 font-medium text-green-600 text-sm sm:text-base">
-                            ${repuesto.utilidad.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3 font-bold text-orange-600 text-sm sm:text-base">
-                            ${repuesto.subtotal.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => removerRepuestoExterno(index)}
-                              className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="lg:hidden space-y-4">
-                  {repuestosExternos.map((repuesto, index) => (
-                    <div
-                      key={repuesto.id}
-                      className="border-b border-gray-100 pb-4 flex flex-col gap-2 min-w-0"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm sm:text-base text-gray-900 whitespace-normal break-words">
+              <div className="space-y-3">
+                {repuestosExternos.map((repuesto, index) => (
+                  <div
+                    key={repuesto.id}
+                    className="bg-white border-2 border-orange-200 rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow"
+                  >
+                    {/* Header del repuesto */}
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm sm:text-base break-words">
                           {repuesto.nombre}
-                        </span>
+                        </div>
                         {repuesto.descripcion && (
-                          <span className="text-xs sm:text-sm text-gray-500 whitespace-normal break-words">
+                          <div className="text-xs text-gray-500 mt-1 break-words">
                             {repuesto.descripcion}
-                          </span>
+                          </div>
+                        )}
+                        {repuesto.proveedor && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            Proveedor: {repuesto.proveedor}
+                          </div>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="text-sm sm:text-base flex flex-col">
-                          <div>
-                            <span className="font-medium">Proveedor: </span>
-                            {repuesto.proveedor || "-"}
-                          </div>
-                          <div>
-                            <span className="font-medium">Cantidad: </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => removerRepuestoExterno(index)}
+                        className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform flex-shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Controles del repuesto - Responsive Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Cantidad
+                        </label>
+                        <div className="h-9 flex items-center px-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-sm font-medium">
                             {repuesto.cantidad}
-                          </div>
-                        </div>
-                        <div className="text-sm sm:text-base text-right">
-                          <div>
-                            <span className="font-medium">P. Compra: </span>$
-                            {repuesto.precioCompra.toLocaleString()}
-                          </div>
-                          <div>
-                            <span className="font-medium">P. Venta: </span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={repuesto.precioVenta}
-                              onChange={(e) => {
-                                const nuevoPrecio =
-                                  parseFloat(e.target.value) || 0;
-                                const nuevosRepuestos = [...repuestosExternos];
-                                nuevosRepuestos[index].precioVenta =
-                                  nuevoPrecio;
-                                nuevosRepuestos[index].subtotal =
-                                  nuevosRepuestos[index].cantidad * nuevoPrecio;
-                                nuevosRepuestos[index].utilidad =
-                                  nuevosRepuestos[index].subtotal -
-                                  nuevosRepuestos[index].cantidad *
-                                    nuevosRepuestos[index].precioCompra;
-                                setRepuestosExternos(nuevosRepuestos);
-                              }}
-                              className="w-24 h-8 inline-block text-sm border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500 transition-all duration-200"
-                            />
-                          </div>
-                          <div>
-                            <span className="font-medium">Utilidad: </span>
-                            <span className="text-green-600">
-                              ${repuesto.utilidad.toLocaleString()}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Subtotal: </span>
-                            <span className="font-bold text-orange-600">
-                              ${repuesto.subtotal.toLocaleString()}
-                            </span>
-                          </div>
+                          </span>
                         </div>
                       </div>
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => removerRepuestoExterno(index)}
-                          className="text-red-600 hover:bg-red-50 hover:scale-105 transition-transform"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          P. Compra
+                        </label>
+                        <div className="h-9 flex items-center px-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-xs sm:text-sm truncate">
+                            ${repuesto.precioCompra.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          P. Venta
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                            $
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={repuesto.precioVenta}
+                            onChange={(e) => {
+                              const nuevoPrecio =
+                                parseFloat(e.target.value) || 0;
+                              const nuevosRepuestos = [...repuestosExternos];
+                              nuevosRepuestos[index].precioVenta = nuevoPrecio;
+                              nuevosRepuestos[index].subtotal =
+                                nuevosRepuestos[index].cantidad * nuevoPrecio;
+                              nuevosRepuestos[index].utilidad =
+                                nuevosRepuestos[index].subtotal -
+                                nuevosRepuestos[index].cantidad *
+                                  nuevosRepuestos[index].precioCompra;
+                              setRepuestosExternos(nuevosRepuestos);
+                            }}
+                            className="h-9 text-sm pl-6 border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500 transition-all duration-200"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Subtotal
+                        </label>
+                        <div className="h-9 flex items-center px-3 bg-orange-50 rounded-md border-2 border-orange-200">
+                          <span className="font-bold text-orange-600 text-xs sm:text-sm truncate">
+                            ${repuesto.subtotal.toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  ))}
+
+                    {/* Info de utilidad */}
+                    <div className="bg-green-50 rounded-lg p-2 border border-green-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">Utilidad:</span>
+                        <span className="font-semibold text-green-600 text-xs sm:text-sm">
+                          ${repuesto.utilidad.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Total de repuestos */}
+                <div className="bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-4 mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold text-gray-700 text-sm sm:text-base">
+                      Total Repuestos:
+                    </span>
+                    <span className="text-xl sm:text-2xl font-bold text-orange-600">
+                      ${totales.totalRepuestosExternos.toLocaleString()}
+                    </span>
+                  </div>
+                  {totales.utilidadRepuestos > 0 && (
+                    <div className="flex justify-between items-center text-sm pt-2 border-t border-orange-200">
+                      <span className="text-gray-600">Utilidad Total:</span>
+                      <span className="font-bold text-green-600">
+                        ${totales.utilidadRepuestos.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1275,7 +1141,6 @@ export default function NuevaOrdenPage() {
             )}
           </CardContent>
         </Card>
-
         {/* Resumen y Total */}
         <Card className="shadow-lg border-0 bg-gradient-to-r from-gray-50 to-blue-50 animate-fade-in">
           <CardHeader>

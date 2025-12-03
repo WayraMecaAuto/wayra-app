@@ -7,10 +7,10 @@ import  SessionProvider  from '@/components/providers/SessionProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Wayra Software',
+  title: 'Wayra App',
   description: 'Sistema integral de gestión de inventarios para Wayra Mecanica Automotriz',
   icons: {
-    icon: '/images/WayraLogo.png',
+    icon: '/images/WayraNuevoLogo.png',
   }
 }
 

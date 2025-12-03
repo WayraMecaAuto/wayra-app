@@ -68,20 +68,25 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    // ✅ PERMISOS AMPLIADOS: Mecánico puede cambiar estado
     const hasAccess = [
       "SUPER_USUARIO",
       "ADMIN_WAYRA_TALLER",
-      "MECANICO" // ✅ Agregado
+      "MECANICO",
     ].includes(session?.user?.role || "");
-    
+
     if (!session || !hasAccess) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
-    const { servicios, ...ordenData } = body;
+    const { servicios, productosNuevos, repuestosNuevos, ...ordenData } = body;
+
+    console.log("📥 Recibiendo actualización de orden:", {
+      servicios: servicios?.length || 0,
+      productosNuevos: productosNuevos?.length || 0,
+      repuestosNuevos: repuestosNuevos?.length || 0,
+    });
 
     // Obtener orden actual
     const ordenActual = await prisma.ordenServicio.findUnique({
@@ -105,9 +110,8 @@ export async function PATCH(
       );
     }
 
-    // ✅ RESTRICCIÓN: Solo admins pueden editar servicios manualmente
     const isMecanico = session?.user?.role === "MECANICO";
-    
+
     if (isMecanico && servicios) {
       return NextResponse.json(
         { error: "Los mecánicos no pueden editar servicios directamente" },
@@ -115,7 +119,6 @@ export async function PATCH(
       );
     }
 
-    // ✅ RESTRICCIÓN: Solo admins pueden cancelar órdenes
     if (isMecanico && ordenData.estado === "CANCELADO") {
       return NextResponse.json(
         { error: "Los mecánicos no pueden cancelar órdenes" },
@@ -123,14 +126,12 @@ export async function PATCH(
       );
     }
 
-    // Si es CANCELADO, auditar (solo admins llegan aquí)
     if (ordenData.estado === "CANCELADO") {
       const { ip, userAgent } = obtenerInfoRequest(request);
-
       await auditarOrden(
         "CANCELAR",
         ordenActual?.numeroOrden || "",
-        "", 
+        "",
         0,
         session.user.id,
         ip,
@@ -138,7 +139,100 @@ export async function PATCH(
       );
     }
 
-    // Actualizar servicios si se proporcionan (solo admins)
+    // ✅ PROCESAR PRODUCTOS NUEVOS
+    if (
+      productosNuevos &&
+      Array.isArray(productosNuevos) &&
+      productosNuevos.length > 0
+    ) {
+      console.log("🆕 Agregando productos nuevos:", productosNuevos.length);
+
+      for (const prod of productosNuevos) {
+        // Verificar stock
+        const producto = await prisma.producto.findUnique({
+          where: { id: prod.productoId },
+        });
+
+        if (!producto) {
+          console.error(`❌ Producto ${prod.productoId} no encontrado`);
+          continue;
+        }
+
+        if (producto.stock < prod.cantidad) {
+          return NextResponse.json(
+            {
+              error: `Stock insuficiente para ${producto.nombre}. Disponible: ${producto.stock}`,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Crear detalle
+        await prisma.detalleOrden.create({
+          data: {
+            ordenId: id,
+            productoId: prod.productoId,
+            cantidad: prod.cantidad,
+            precioUnitario: prod.precioUnitario,
+            tipoPrecio: "VENTA",
+            subtotal: prod.precioUnitario * prod.cantidad,
+          },
+        });
+
+        // Actualizar stock
+        await prisma.producto.update({
+          where: { id: prod.productoId },
+          data: { stock: { decrement: prod.cantidad } },
+        });
+
+        // Movimiento inventario
+        await prisma.movimientoInventario.create({
+          data: {
+            tipo: "SALIDA",
+            cantidad: prod.cantidad,
+            motivo: `Agregado a orden ${ordenActual?.numeroOrden}`,
+            precioUnitario: prod.precioUnitario,
+            total: prod.precioUnitario * prod.cantidad,
+            productoId: prod.productoId,
+            usuarioId: session.user.id,
+          },
+        });
+
+        console.log(
+          `✅ Producto agregado: ${producto.nombre} x${prod.cantidad}`
+        );
+      }
+    }
+
+    // ✅ PROCESAR REPUESTOS NUEVOS
+    if (
+      repuestosNuevos &&
+      Array.isArray(repuestosNuevos) &&
+      repuestosNuevos.length > 0
+    ) {
+      console.log("🆕 Agregando repuestos nuevos:", repuestosNuevos.length);
+
+      for (const rep of repuestosNuevos) {
+        await prisma.repuestoExterno.create({
+          data: {
+            nombre: rep.nombre,
+            descripcion: rep.descripcion || "",
+            cantidad: rep.cantidad,
+            precioCompra: rep.precioCompra || 0,
+            precioVenta: rep.precioVenta,
+            precioUnitario: rep.precioVenta,
+            subtotal: rep.subtotal,
+            utilidad: rep.utilidad || 0,
+            proveedor: rep.proveedor || "",
+            ordenId: id,
+          },
+        });
+
+        console.log(`✅ Repuesto agregado: ${rep.nombre} x${rep.cantidad}`);
+      }
+    }
+
+    // Actualizar servicios si se proporcionan
     if (servicios && Array.isArray(servicios)) {
       const serviciosActuales = await prisma.servicioOrden.findMany({
         where: { ordenId: id },
@@ -182,41 +276,47 @@ export async function PATCH(
           })),
         });
       }
-
-      const todosLosServicios = await prisma.servicioOrden.findMany({
-        where: { ordenId: id },
-      });
-
-      const subtotalServicios = todosLosServicios.reduce(
-        (sum, s) => sum + s.precio,
-        0
-      );
-      ordenData.subtotalServicios = subtotalServicios;
-
-      const detalles = await prisma.detalleOrden.findMany({
-        where: { ordenId: id },
-      });
-      const repuestos = await prisma.repuestoExterno.findMany({
-        where: { ordenId: id },
-      });
-
-      const subtotalProductos = detalles.reduce(
-        (sum, d) => sum + d.subtotal,
-        0
-      );
-      const subtotalRepuestos = repuestos.reduce(
-        (sum, r) => sum + r.subtotal,
-        0
-      );
-
-      ordenData.subtotalProductos = subtotalProductos;
-      ordenData.subtotalRepuestosExternos = subtotalRepuestos;
-      ordenData.total =
-        subtotalServicios +
-        subtotalProductos +
-        subtotalRepuestos +
-        (ordenData.manoDeObra || 0);
     }
+
+    // ✅ RECALCULAR TOTALES
+    const todosLosServicios = await prisma.servicioOrden.findMany({
+      where: { ordenId: id },
+    });
+    const todosLosDetalles = await prisma.detalleOrden.findMany({
+      where: { ordenId: id },
+    });
+    const todosLosRepuestos = await prisma.repuestoExterno.findMany({
+      where: { ordenId: id },
+    });
+
+    const subtotalServicios = todosLosServicios.reduce(
+      (sum, s) => sum + s.precio,
+      0
+    );
+    const subtotalProductos = todosLosDetalles.reduce(
+      (sum, d) => sum + d.subtotal,
+      0
+    );
+    const subtotalRepuestos = todosLosRepuestos.reduce(
+      (sum, r) => sum + r.subtotal,
+      0
+    );
+
+    ordenData.subtotalServicios = subtotalServicios;
+    ordenData.subtotalProductos = subtotalProductos;
+    ordenData.subtotalRepuestosExternos = subtotalRepuestos;
+    ordenData.total =
+      subtotalServicios +
+      subtotalProductos +
+      subtotalRepuestos +
+      (ordenData.manoDeObra || ordenActual?.manoDeObra || 0);
+
+    console.log("💰 Totales recalculados:", {
+      servicios: subtotalServicios,
+      productos: subtotalProductos,
+      repuestos: subtotalRepuestos,
+      total: ordenData.total,
+    });
 
     // Actualizar la orden
     const orden = await prisma.ordenServicio.update({
@@ -256,7 +356,6 @@ export async function PATCH(
       const mes = ahora.getMonth() + 1;
       const anio = ahora.getFullYear();
 
-      //  Obtener tasa de cambio
       let tasaDolar = 4000;
       try {
         const tasaConfig = await prisma.configuracion.findUnique({
@@ -268,7 +367,7 @@ export async function PATCH(
         console.error("Error obteniendo tasa:", error);
       }
 
-      // 1. Registrar productos WAYRA en contabilidad WAYRA_PRODUCTOS
+      // Registrar productos WAYRA en contabilidad
       const productosWayra = orden.detalles.filter(
         (d) =>
           d.producto.tipo === "WAYRA_ENI" || d.producto.tipo === "WAYRA_CALAN"
@@ -304,13 +403,6 @@ export async function PATCH(
             detalle.producto.precioCompra < 1000
           ) {
             precioCompraContable = detalle.producto.precioCompra * tasaDolar;
-            console.log(
-              `💱 Conversión CALAN en orden completada: $${detalle.producto.precioCompra} USD x ${tasaDolar} = $${precioCompraContable.toFixed(2)} COP`
-            );
-          } else {
-            console.log(
-              `✅ Precio compra ya en COP: $${precioCompraContable.toFixed(2)} (${detalle.producto.monedaCompra})`
-            );
           }
 
           const subtotalCompra = precioCompraContable * detalle.cantidad;
@@ -328,15 +420,10 @@ export async function PATCH(
               utilidad: utilidadReal,
             },
           });
-
-          console.log(`✅ CALAN ${detalle.producto.nombre}:`);
-          console.log(`   Compra COP: $${precioCompraContable.toFixed(2)}`);
-          console.log(`   Venta: $${detalle.precioUnitario}`);
-          console.log(`   Utilidad: $${utilidadReal.toFixed(2)}`);
         }
       }
 
-      // 2. Registrar productos TORNI_REPUESTO en contabilidad TORNIREPUESTOS
+      // Registrar productos TORNI en contabilidad
       const productosTorni = orden.detalles.filter(
         (d) =>
           d.producto.tipo === "TORNI_REPUESTO" ||
@@ -387,9 +474,10 @@ export async function PATCH(
       );
     }
 
+    console.log("✅ Orden actualizada exitosamente");
     return NextResponse.json(orden);
   } catch (error) {
-    console.error("Error updating orden:", error);
+    console.error("❌ Error updating orden:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }
