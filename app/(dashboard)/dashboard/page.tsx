@@ -256,7 +256,7 @@ export default function DashboardPage() {
             <div className="logo-container">
               <div className="w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:scale-110 transition-transform duration-300 cursor-pointer">
                 <Image
-                  src="/images/WayraLogo.png"
+                  src="/images/WayraNuevoLogo.png"
                   alt="Wayra"
                   width={48}
                   height={48}
@@ -501,7 +501,7 @@ export default function DashboardPage() {
               <div className="floating-logo text-center p-6 bg-white rounded-2xl border border-purple-100 hover:shadow-xl transition-all duration-500 hover:-translate-y-2 cursor-pointer group">
                 <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Image
-                    src="/images/WayraLogo.png"
+                    src="/images/WayraNuevoLogo.png"
                     alt="Wayra"
                     width={64}
                     height={64}
