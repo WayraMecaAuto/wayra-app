@@ -681,7 +681,7 @@ export default function OrdenDetallePage() {
     }
   };
 
-  const actualizarPrecioMomentaneo = (
+  const actualizarPrecioMomentaneo = async (
     tipo: "servicios" | "productos" | "repuestos",
     id: string,
     nuevoPrecio: number
@@ -697,62 +697,85 @@ export default function OrdenDetallePage() {
       return;
     }
 
-    let nuevaOrden = { ...orden };
+    try {
+      if (tipo === "servicios") {
+        // Actualizar servicios usando la API general
+        const serviciosActualizados = orden.servicios.map((s) =>
+          s.id === id
+            ? {
+                id: s.id,
+                descripcion: s.descripcion,
+                precio: nuevoPrecio,
+                isNew: false,
+              }
+            : {
+                id: s.id,
+                descripcion: s.descripcion,
+                precio: s.precio,
+                isNew: false,
+              }
+        );
 
-    if (tipo === "servicios") {
-      nuevaOrden.servicios = orden.servicios.map((s) =>
-        s.id === id ? { ...s, precio: nuevoPrecio } : s
-      );
-    } else if (tipo === "productos") {
-      nuevaOrden.detalles = orden.detalles.map((d) =>
-        d.id === id
-          ? {
-              ...d,
+        const response = await fetch(`/api/ordenes/${params.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ servicios: serviciosActualizados }),
+        });
+
+        if (!response.ok) {
+          toast.error("Error al actualizar precio");
+          return;
+        }
+      } else if (tipo === "productos") {
+        const detalle = orden.detalles.find((d) => d.id === id);
+        if (!detalle) return;
+
+        const response = await fetch(
+          `/api/ordenes/${orden.id}/productos/${id}/precio`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
               precioUnitario: nuevoPrecio,
-              subtotal: nuevoPrecio * d.cantidad,
-            }
-          : d
-      );
-    } else if (tipo === "repuestos") {
-      nuevaOrden.repuestosExternos = orden.repuestosExternos.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              precioUnitario: nuevoPrecio,
-              subtotal: nuevoPrecio * r.cantidad,
-            }
-          : r
-      );
+              cantidad: detalle.cantidad,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          toast.error("Error al actualizar precio");
+          return;
+        }
+      } else if (tipo === "repuestos") {
+        const repuesto = orden.repuestosExternos.find((r) => r.id === id);
+        if (!repuesto) return;
+
+        const response = await fetch(
+          `/api/ordenes/${orden.id}/repuestos/${id}/precio`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              precioVenta: nuevoPrecio,
+              cantidad: repuesto.cantidad,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          toast.error("Error al actualizar precio");
+          return;
+        }
+      }
+
+      // Recargar la orden para tener datos actualizados
+      await fetchOrden();
+      setEditando(null);
+      toast.success("✅ Precio actualizado para esta orden");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar precio");
     }
-
-    const subtotalServicios = nuevaOrden.servicios.reduce(
-      (sum, s) => sum + s.precio,
-      0
-    );
-    const subtotalProductos = nuevaOrden.detalles.reduce(
-      (sum, d) => sum + d.subtotal,
-      0
-    );
-    const subtotalRepuestosExternos = nuevaOrden.repuestosExternos.reduce(
-      (sum, r) => sum + r.subtotal,
-      0
-    );
-    const total =
-      subtotalServicios +
-      subtotalProductos +
-      subtotalRepuestosExternos +
-      (nuevaOrden.manoDeObra || 0);
-
-    setOrden({
-      ...nuevaOrden,
-      subtotalServicios,
-      subtotalProductos,
-      subtotalRepuestosExternos,
-      total,
-    });
-
-    setEditando(null);
-    toast.success("💰 Precio actualizado temporalmente");
   };
 
   const eliminarOrden = async () => {

@@ -211,89 +211,148 @@ export default function EditOrdenPage() {
     }
   };
 
-  const handleLubricacionAdded = async (
-    productos: Array<{ id: string; nombre: string; tipo: "ACEITE" | "FILTRO" }>
-  ) => {
-    if (!servicioLubricacionTemp) return;
-
+  const handleLubricacionAdded = async (data: {
+    productosInventario: Array<{
+      id: string;
+      nombre: string;
+      cantidad: number;
+      precio: number;
+      tipoPrecio: string;
+    }>;
+    repuestosExternos: Array<{
+      nombre: string;
+      descripcion: string;
+      cantidad: number;
+      precioCompra: number;
+      precioVenta: number;
+      proveedor: string;
+    }>;
+    precioManoObra: number;
+  }) => {
     try {
-      console.log("🔧 Procesando lubricación en edición:", productos);
+      console.log("🔧 Procesando lubricación en edición:", data);
 
-      const aceites = productos.filter((p) => p.tipo === "ACEITE");
-      const filtros = productos.filter((p) => p.tipo === "FILTRO");
+      // ✅ Validar que productosInventario sea un array
+      const productosInventario = Array.isArray(data.productosInventario)
+        ? data.productosInventario
+        : [];
 
-      if (aceites.length === 0 || filtros.length === 0) {
-        toast.error("❌ Debe haber al menos un aceite y un filtro");
+      const repuestosExternos = Array.isArray(data.repuestosExternos)
+        ? data.repuestosExternos
+        : [];
+
+      // Validaciones
+      const aceites = productosInventario.filter(
+        (p) =>
+          p.nombre.toLowerCase().includes("aceite") ||
+          p.nombre.toLowerCase().includes("oil")
+      );
+
+      const filtros = productosInventario.filter(
+        (p) =>
+          p.nombre.toLowerCase().includes("filtro") ||
+          p.nombre.toLowerCase().includes("filter")
+      );
+
+      if (
+        aceites.length === 0 &&
+        repuestosExternos.filter((r) =>
+          r.nombre.toLowerCase().includes("aceite")
+        ).length === 0
+      ) {
+        toast.error("❌ Debe haber al menos un aceite");
         return;
       }
 
-      const productosCompletos = await Promise.all(
-        productos.map(async (p) => {
-          const response = await fetch(`/api/productos/${p.id}`);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error(`No se pudo obtener el producto ${p.nombre}`);
-        })
-      );
+      if (
+        filtros.length === 0 &&
+        repuestosExternos.filter((r) =>
+          r.nombre.toLowerCase().includes("filtro")
+        ).length === 0
+      ) {
+        toast.error("❌ Debe haber al menos un filtro");
+        return;
+      }
 
-      const precioTotal = productosCompletos.reduce(
-        (sum, p) => sum + p.precioVenta,
-        0
-      );
+      // 1️⃣ AGREGAR PRODUCTOS DEL INVENTARIO
+      for (const prod of productosInventario) {
+        const response = await fetch(`/api/ordenes/${params.id}/productos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productoId: prod.id,
+            cantidad: prod.cantidad,
+            precioUnitario: prod.precio,
+            tipoPrecio: prod.tipoPrecio || "MINORISTA",
+          }),
+        });
 
-      const nombresAceites = aceites
-        .map((a) => {
-          const producto = productosCompletos.find((p) => p.id === a.id);
-          return producto?.nombre || a.nombre;
-        })
-        .join(", ");
+        if (!response.ok) {
+          throw new Error(`Error al agregar producto ${prod.nombre}`);
+        }
+        console.log(`✅ Producto agregado: ${prod.nombre}`);
+      }
 
-      const nombresFiltros = filtros
-        .map((f) => {
-          const producto = productosCompletos.find((p) => p.id === f.id);
-          return producto?.nombre || f.nombre;
-        })
-        .join(", ");
+      // 2️⃣ AGREGAR REPUESTOS EXTERNOS
+      for (const rep of repuestosExternos) {
+        const response = await fetch(`/api/ordenes/${params.id}/repuestos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: rep.nombre,
+            descripcion: rep.descripcion,
+            cantidad: rep.cantidad,
+            precioCompra: rep.precioCompra,
+            precioVenta: rep.precioVenta,
+            subtotal: rep.precioVenta * rep.cantidad,
+            utilidad: (rep.precioVenta - rep.precioCompra) * rep.cantidad,
+            proveedor: rep.proveedor,
+          }),
+        });
 
-      const descripcion = `${servicioLubricacionTemp.descripcion} - Aceites: ${nombresAceites} | Filtros: ${nombresFiltros}`;
+        if (!response.ok) {
+          throw new Error(`Error al agregar repuesto ${rep.nombre}`);
+        }
+        console.log(`✅ Repuesto externo agregado: ${rep.nombre}`);
+      }
 
-      const nuevoServicio: ServicioEditable = {
-        clave: servicioLubricacionTemp.clave,
-        descripcion: descripcion,
-        precio: precioTotal,
-        isNew: true,
-      };
+      // 3️⃣ AGREGAR SERVICIO DE MANO DE OBRA (si es mayor a 0)
+      if (data.precioManoObra > 0) {
+        const response = await fetch(`/api/ordenes/${params.id}/servicios`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            descripcion: "Mano de Obra - Lubricación",
+            precio: data.precioManoObra,
+          }),
+        });
 
-      setServiciosOrden([...serviciosOrden, nuevoServicio]);
+        if (!response.ok) {
+          throw new Error("Error al agregar servicio de mano de obra");
+        }
+        console.log(`✅ Mano de obra agregada: $${data.precioManoObra}`);
+      }
 
       toast.success(
         <div>
           <div className="font-semibold">
-            ✅ Servicio de lubricación agregado
+            ✅ Lubricación agregada correctamente
           </div>
           <div className="text-sm mt-1">
-            <div>
-              • {aceites.length} aceite{aceites.length > 1 ? "s" : ""}
-            </div>
-            <div>
-              • {filtros.length} filtro{filtros.length > 1 ? "s" : ""}
-            </div>
-            <div className="font-semibold mt-1">
-              Total: ${precioTotal.toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-600 mt-1">
-              Puedes editar el precio si es necesario
-            </div>
+            <div>• {productosInventario.length} productos del inventario</div>
+            <div>• {repuestosExternos.length} repuestos externos</div>
+            {data.precioManoObra > 0 && (
+              <div>• Mano de obra: ${data.precioManoObra.toLocaleString()}</div>
+            )}
           </div>
         </div>,
-        { duration: 5000 }
+        { duration: 6000 }
       );
+
+      fetchOrden();
     } catch (error) {
-      console.error("❌ Error al procesar lubricación:", error);
-      toast.error("Error al agregar servicio");
-    } finally {
-      setServicioLubricacionTemp(null);
+      console.error("❌ Error al agregar lubricación:", error);
+      toast.error("Error al agregar lubricación");
     }
   };
 
