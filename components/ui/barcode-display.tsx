@@ -2,103 +2,102 @@
 
 import { useEffect, useRef, useState } from 'react'
 import JsBarcode from 'jsbarcode'
-import { Button } from './button'
+import { Button } from '@/components/ui/button'
 import { Download, Printer, Copy, Check } from 'lucide-react'
 
 interface BarcodeDisplayProps {
   value: string
-  width?: number
-  height?: number
-  displayValue?: boolean
-  showDownload?: boolean
   productName?: string
   productCode?: string
-  className?: string
+  width?: number
+  height?: number
 }
 
 export function BarcodeDisplay({ 
   value, 
-  width = 2, 
-  height = 80, 
-  displayValue = true,
-  showDownload = true,
-  productName = 'Producto',
+  productName = 'Producto', 
   productCode,
-  className = ''
+  width = 2,
+  height = 100 
 }: BarcodeDisplayProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const barcodeRef = useRef<SVGSVGElement>(null)
   const [copied, setCopied] = useState(false)
   const [barcodeGenerated, setBarcodeGenerated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (canvasRef.current && value) {
-      setIsLoading(true)
+    if (barcodeRef.current && value) {
       try {
-        // Limpiar canvas primero
-        const canvas = canvasRef.current
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-        }
-
-        // Determinar el formato del código de barras
-        let format = 'CODE128'
-        if (value.length === 13 && /^\d+$/.test(value)) {
-          format = 'EAN13'
-        } else if (value.length === 12 && /^\d+$/.test(value)) {
-          format = 'EAN13' // JsBarcode puede manejar EAN12 como EAN13
-        } else if (value.length === 8 && /^\d+$/.test(value)) {
-          format = 'EAN8'
-        }
-
-        JsBarcode(canvas, value, {
-          format,
-          width,
-          height,
-          displayValue,
-          fontSize: 12,
-          textMargin: 8,
-          background: '#ffffff',
-          lineColor: '#000000',
-          margin: 10,
-          textAlign: 'center',
-          textPosition: 'bottom',
-          font: 'monospace'
-        })
+        console.log('🔢 [BarcodeDisplay] Generando código de barras:', value)
+        console.log('📏 [BarcodeDisplay] Longitud:', value.length)
         
-        setBarcodeGenerated(true)
-      } catch (error) {
-        console.error('Error generating barcode:', error)
-        setBarcodeGenerated(false)
+        // Detectar el formato del código de barras
+        let format = 'CODE128' // Por defecto
         
-        // Mostrar mensaje de error en el canvas
-        if (canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d')
-          if (ctx) {
-            ctx.font = '14px Arial'
-            ctx.fillStyle = '#dc2626'
-            ctx.textAlign = 'center'
-            ctx.fillText('Error generando código', canvasRef.current.width / 2, 30)
-            ctx.fillText(`Código: ${value}`, canvasRef.current.width / 2, 50)
+        if (/^\d+$/.test(value)) { // Solo números
+          if (value.length === 13) {
+            format = 'EAN13'
+            console.log('✓ [BarcodeDisplay] Formato detectado: EAN-13')
+          } else if (value.length === 12) {
+            format = 'UPC'
+            console.log('✓ [BarcodeDisplay] Formato detectado: UPC-A (12 dígitos)')
+          } else if (value.length === 8) {
+            format = 'EAN8'
+            console.log('✓ [BarcodeDisplay] Formato detectado: EAN-8')
+          } else {
+            format = 'CODE128'
+            console.log('✓ [BarcodeDisplay] Formato detectado: CODE128 (genérico)')
           }
         }
-      } finally {
-        setTimeout(() => setIsLoading(false), 300)
+
+        // Generar código de barras con el formato correcto
+        JsBarcode(barcodeRef.current, value, {
+          format: format,
+          width: width,
+          height: height,
+          displayValue: true,
+          fontSize: 14,
+          margin: 10,
+          background: '#ffffff',
+          lineColor: '#000000',
+        })
+        
+        console.log('✅ [BarcodeDisplay] Código de barras generado exitosamente')
+        setBarcodeGenerated(true)
+      } catch (error) {
+        console.error('❌ [BarcodeDisplay] Error al generar código de barras:', error)
+        console.error('   - Valor:', value)
+        console.error('   - Longitud:', value.length)
+        console.error('   - Tipo:', typeof value)
+        setBarcodeGenerated(false)
       }
     }
-  }, [value, width, height, displayValue])
+  }, [value, width, height])
 
   const downloadBarcode = () => {
-    if (canvasRef.current && barcodeGenerated) {
+    if (barcodeRef.current && barcodeGenerated) {
       try {
-        const link = document.createElement('a')
-        const filename = `barcode-${productName.replace(/\s+/g, '-')}-${value}.png`
-        link.download = filename
-        link.href = canvasRef.current.toDataURL('image/png', 1.0)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        // Convertir SVG a PNG usando canvas
+        const svg = barcodeRef.current
+        const svgData = new XMLSerializer().serializeToString(svg)
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const img = new Image()
+
+        img.onload = () => {
+          canvas.width = img.width
+          canvas.height = img.height
+          ctx?.drawImage(img, 0, 0)
+          
+          const link = document.createElement('a')
+          const filename = `barcode-${productName.replace(/\s+/g, '-')}-${value}.png`
+          link.download = filename
+          link.href = canvas.toDataURL('image/png', 1.0)
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
+
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
       } catch (error) {
         console.error('Error downloading barcode:', error)
         alert('Error al descargar el código de barras')
@@ -107,9 +106,13 @@ export function BarcodeDisplay({
   }
 
   const printBarcode = () => {
-    if (canvasRef.current && barcodeGenerated) {
+    if (barcodeRef.current && barcodeGenerated) {
       try {
-        const dataUrl = canvasRef.current.toDataURL('image/png', 1.0)
+        const svg = barcodeRef.current
+        const svgData = new XMLSerializer().serializeToString(svg)
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+        const svgUrl = URL.createObjectURL(svgBlob)
+        
         const printWindow = window.open('', '_blank', 'width=600,height=400')
         
         if (printWindow) {
@@ -175,9 +178,9 @@ export function BarcodeDisplay({
                 <div class="barcode-container">
                   <div class="product-name">${productName}</div>
                   ${productCode && productCode !== value ? `<div class="product-info">Código Interno: ${productCode}</div>` : ''}
-                  <img src="${dataUrl}" alt="Código de barras" style="max-width: 100%; height: auto;" />
+                  <img src="${svgUrl}" alt="Código de barras" style="max-width: 100%; height: auto;" />
                   <div class="barcode-info">
-                    Código de Barras: ${value}<br>
+                    Código de Barras: ${value} (${value.length} dígitos)<br>
                     Generado el: ${new Date().toLocaleDateString('es-ES')}
                   </div>
                 </div>
@@ -189,7 +192,6 @@ export function BarcodeDisplay({
           `)
           printWindow.document.close()
           
-          // Auto-print después de cargar
           printWindow.onload = () => {
             setTimeout(() => {
               printWindow.print()
@@ -210,7 +212,6 @@ export function BarcodeDisplay({
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       console.error('Error copying code:', error)
-      // Fallback para navegadores que no soportan clipboard API
       const textArea = document.createElement('textarea')
       textArea.value = value
       document.body.appendChild(textArea)
@@ -224,100 +225,81 @@ export function BarcodeDisplay({
 
   if (!value) {
     return (
-      <div className="flex items-center justify-center p-12 bg-gradient-to-br from-gray-50 to-slate-100 rounded-2xl border-2 border-dashed border-gray-300 transition-all duration-300 hover:border-gray-400">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center opacity-50">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-          <p className="text-gray-500 font-medium">No hay código de barras para mostrar</p>
-        </div>
+      <div className="text-center text-gray-500 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+        <p className="text-sm">Sin código de barras</p>
       </div>
     )
   }
 
   return (
-    <div className={`flex flex-col items-center space-y-6 ${className} animate-in fade-in-0 duration-500`}>
+    <div className="flex flex-col items-center space-y-4">
       {/* Información del producto */}
-      <div className="text-center">
-        <h3 className="font-bold text-xl text-gray-900 mb-2 animate-in slide-in-from-top-2 duration-500 delay-100">{productName}</h3>
-        {productCode && productCode !== value && (
-          <p className="text-sm text-gray-600 mb-3 animate-in slide-in-from-top-2 duration-500 delay-200 bg-gray-100 px-3 py-1 rounded-lg inline-block">
-            Código Interno: <span className="font-mono font-medium">{productCode}</span>
+      {productName && (
+        <div className="text-center">
+          <h3 className="font-bold text-xl text-gray-900 mb-2">{productName}</h3>
+          {productCode && productCode !== value && (
+            <p className="text-sm text-gray-600 mb-2 bg-gray-100 px-3 py-1 rounded-lg inline-block">
+              Código Interno: <span className="font-mono font-medium">{productCode}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Código de barras */}
+      <div className="barcode-container bg-white p-6 rounded-lg border-2 border-gray-200 shadow-md">
+        <div className="flex justify-center">
+          <svg ref={barcodeRef}></svg>
+        </div>
+        
+        <div className="text-center mt-3 flex items-center justify-center gap-2">
+          <p className="text-xs text-gray-500 font-mono bg-gray-50 px-3 py-1 rounded">
+            {value} ({value.length} dígitos)
           </p>
-        )}
-        <div className="flex items-center justify-center gap-3 animate-in slide-in-from-top-2 duration-500 delay-300">
-          <span className="text-sm text-gray-600 bg-slate-100 px-3 py-2 rounded-lg font-mono tracking-wide">
-            {value}
-          </span>
           <Button
             onClick={copyCode}
             variant="ghost"
             size="sm"
-            className="group h-8 w-8 p-0 hover:bg-blue-50 hover:scale-110 transition-all duration-200 rounded-lg"
+            className="h-7 w-7 p-0 hover:bg-blue-50"
           >
-            <div className={`transition-all duration-300 ${copied ? 'scale-110' : 'scale-100'}`}>
-              {copied ? (
-                <Check className="h-4 w-4 text-green-600 animate-in zoom-in-50 duration-200" />
-              ) : (
-                <Copy className="h-4 w-4 text-gray-600 group-hover:text-blue-600 transition-colors duration-200" />
-              )}
-            </div>
+            {copied ? (
+              <Check className="h-3 w-3 text-green-600" />
+            ) : (
+              <Copy className="h-3 w-3 text-gray-600" />
+            )}
           </Button>
         </div>
       </div>
 
-      {/* Canvas del código de barras */}
-      <div className="relative bg-white border border-gray-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 animate-in slide-in-from-bottom-4 duration-500 delay-200">
-        {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-90 rounded-2xl flex items-center justify-center z-10">
-            <div className="flex flex-col items-center space-y-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
-              <p className="text-sm text-gray-600 animate-pulse">Generando código...</p>
-            </div>
-          </div>
-        )}
-        <canvas 
-          ref={canvasRef} 
-          className={`block mx-auto transition-all duration-500 ${isLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
-          style={{ maxWidth: '100%', height: 'auto' }}
-        />
-        {barcodeGenerated && !isLoading && (
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-green-500/5 to-blue-500/5 opacity-0 hover:opacity-100 transition-all duration-300 pointer-events-none"></div>
-        )}
-      </div>
-
       {/* Botones de acción */}
-      {showDownload && barcodeGenerated && (
-        <div className="flex flex-wrap justify-center gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-400">
+      {barcodeGenerated && (
+        <div className="flex flex-wrap justify-center gap-3">
           <Button
             onClick={downloadBarcode}
             variant="outline"
             size="sm"
-            className="group px-6 py-3 h-auto border-2 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 hover:scale-105 hover:shadow-lg transition-all duration-300 rounded-xl"
+            className="px-4 py-2 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400"
           >
-            <Download className="h-4 w-4 mr-2 group-hover:animate-bounce" />
-            <span className="font-medium">Descargar PNG</span>
+            <Download className="h-4 w-4 mr-2" />
+            Descargar PNG
           </Button>
           <Button
             onClick={printBarcode}
             variant="outline"
             size="sm"
-            className="group px-6 py-3 h-auto border-2 hover:border-green-400 hover:bg-green-50 hover:text-green-700 hover:scale-105 hover:shadow-lg transition-all duration-300 rounded-xl"
+            className="px-4 py-2 hover:bg-green-50 hover:text-green-700 hover:border-green-400"
           >
-            <Printer className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-            <span className="font-medium">Imprimir</span>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir
           </Button>
         </div>
       )}
 
-      {/* Mensaje de estado */}
+      {/* Mensaje de copiado */}
       {copied && (
-        <div className="text-sm text-green-700 bg-green-100 px-4 py-2 rounded-xl border border-green-200 animate-in slide-in-from-bottom-2 duration-300 shadow-sm">
+        <div className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
           <div className="flex items-center space-x-2">
-            <Check className="h-4 w-4 animate-pulse" />
-            <span className="font-medium">Código copiado al portapapeles</span>
+            <Check className="h-4 w-4" />
+            <span>Código copiado</span>
           </div>
         </div>
       )}
