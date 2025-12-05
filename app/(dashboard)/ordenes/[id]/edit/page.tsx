@@ -451,6 +451,17 @@ export default function EditOrdenPage() {
     setRepuestosOrden(nuevosRepuestos);
   };
 
+  const actualizarCantidadRepuesto = (index: number, nuevaCantidad: number) => {
+    const nuevosRepuestos = [...repuestosOrden];
+    nuevosRepuestos[index].cantidad = nuevaCantidad;
+    nuevosRepuestos[index].subtotal =
+      nuevosRepuestos[index].cantidad * nuevosRepuestos[index].precioVenta;
+    nuevosRepuestos[index].utilidad =
+      nuevosRepuestos[index].subtotal -
+      nuevosRepuestos[index].cantidad * nuevosRepuestos[index].precioCompra;
+    setRepuestosOrden(nuevosRepuestos);
+  };
+
   const removerRepuesto = (index: number) => {
     setRepuestosOrden(repuestosOrden.filter((_, i) => i !== index));
     toast.success("Repuesto removido");
@@ -465,7 +476,12 @@ export default function EditOrdenPage() {
     try {
       const updateData: any = {
         descripcion: data.descripcion,
-        servicios: serviciosOrden,
+        servicios: serviciosOrden.map((s) => ({
+          id: s.id,
+          descripcion: s.descripcion,
+          precio: s.precio,
+          isNew: s.isNew || false,
+        })),
       };
 
       if (canEdit) {
@@ -473,17 +489,27 @@ export default function EditOrdenPage() {
         updateData.manoDeObra = parseFloat(data.manoDeObra) || 0;
       }
 
-      //  AGREGAR PRODUCTOS NUEVOS
+      // ✅ ENVIAR PRODUCTOS NUEVOS
       const productosNuevos = productosOrden.filter((p) => p.isNew);
       if (productosNuevos.length > 0) {
         updateData.productosNuevos = productosNuevos.map((p) => ({
-          productoId: p.productoId,
+          productoId: p.productoId || p.id,
           cantidad: p.cantidad,
           precioUnitario: p.precioVenta,
         }));
       }
 
-      //  AGREGAR REPUESTOS NUEVOS
+      // ✅ ENVIAR CAMBIOS EN PRODUCTOS EXISTENTES (precio y cantidad)
+      const productosExistentes = productosOrden.filter((p) => !p.isNew);
+      if (productosExistentes.length > 0) {
+        updateData.productosActualizados = productosExistentes.map((p) => ({
+          detalleId: p.id,
+          cantidad: p.cantidad,
+          precioUnitario: p.precioVenta,
+        }));
+      }
+
+      // ✅ ENVIAR REPUESTOS NUEVOS
       const repuestosNuevos = repuestosOrden.filter((r) => r.isNew);
       if (repuestosNuevos.length > 0) {
         updateData.repuestosNuevos = repuestosNuevos.map((r) => ({
@@ -498,7 +524,18 @@ export default function EditOrdenPage() {
         }));
       }
 
-      console.log("📤 Enviando datos:", updateData);
+      // ✅ ENVIAR CAMBIOS EN REPUESTOS EXISTENTES (precio y cantidad)
+      const repuestosExistentes = repuestosOrden.filter((r) => !r.isNew);
+      if (repuestosExistentes.length > 0) {
+        updateData.repuestosActualizados = repuestosExistentes.map((r) => ({
+          repuestoId: r.id,
+          cantidad: r.cantidad,
+          precioVenta: r.precioVenta,
+          precioCompra: r.precioCompra,
+        }));
+      }
+
+      console.log("📤 Enviando datos de actualización:", updateData);
 
       const response = await fetch(`/api/ordenes/${params.id}`, {
         method: "PATCH",
@@ -944,8 +981,7 @@ export default function EditOrdenPage() {
                           </div>
                         )}
                         <div className="text-xs text-gray-600 mt-1">
-                          Cantidad: {repuesto.cantidad} | Proveedor:{" "}
-                          {repuesto.proveedor || "N/A"}
+                          Proveedor: {repuesto.proveedor || "N/A"}
                         </div>
                       </div>
                       {canEdit && (
@@ -960,7 +996,28 @@ export default function EditOrdenPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {/* Cantidad editable */}
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">
+                          Cantidad
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-9 text-sm"
+                          value={repuesto.cantidad}
+                          onChange={(e) =>
+                            actualizarCantidadRepuesto(
+                              index,
+                              parseInt(e.target.value) || 1
+                            )
+                          }
+                        />
+                      </div>
+
+                      {/* Precio Compra (solo lectura) */}
                       <div>
                         <label className="text-xs text-gray-600 block mb-1">
                           P. Compra
@@ -971,6 +1028,8 @@ export default function EditOrdenPage() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Precio Venta editable */}
                       <div>
                         <label className="text-xs text-gray-600 block mb-1">
                           P. Venta
@@ -994,6 +1053,8 @@ export default function EditOrdenPage() {
                           />
                         </div>
                       </div>
+
+                      {/* Subtotal calculado */}
                       <div>
                         <label className="text-xs text-gray-600 block mb-1">
                           Subtotal
@@ -1006,6 +1067,7 @@ export default function EditOrdenPage() {
                       </div>
                     </div>
 
+                    {/* Utilidad */}
                     <div className="bg-green-50 rounded-lg p-2 border border-green-200">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-600">Utilidad:</span>

@@ -168,14 +168,13 @@ export default function ProductosWayraPage() {
           toast.error("Este producto no pertenece a Wayra");
         }
       } else if (response.status === 404 && canEdit) {
-        // Preguntar tipo al crear nuevo producto desde escáner
         const tipo = prompt(
           `Producto con código ${code} no encontrado.\n\n¿De qué tipo Wayra deseas crear este producto?\n\nEscribe: ENI | CALAN | OTROS`,
           "ENI"
         );
 
         const tipoNormalizado = tipo?.trim().toUpperCase();
-        if (["ENI", "CALAN", "OTROS"].includes(tipoNormalizado)) {
+        if (["ENI", "CALAN", "OTROS"].includes(tipoNormalizado || "")) {
           const tipoMap = {
             ENI: "WAYRA_ENI",
             CALAN: "WAYRA_CALAN",
@@ -1010,7 +1009,7 @@ export default function ProductosWayraPage() {
             onSuccess={fetchProducts}
             tipo={newProductType}
             categoria={newProductType === "WAYRA_ENI" ? "ENI" : "CALAN"}
-            initialBarcode={scannedBarcode}
+            initialBarcode={scannedBarcode} 
           />
 
           <ProductForm

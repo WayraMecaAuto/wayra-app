@@ -80,12 +80,21 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { servicios, productosNuevos, repuestosNuevos, ...ordenData } = body;
+    const {
+      servicios,
+      productosNuevos,
+      productosActualizados,
+      repuestosNuevos,
+      repuestosActualizados,
+      ...ordenData
+    } = body;
 
     console.log("📥 Recibiendo actualización de orden:", {
       servicios: servicios?.length || 0,
       productosNuevos: productosNuevos?.length || 0,
+      productosActualizados: productosActualizados?.length || 0,
       repuestosNuevos: repuestosNuevos?.length || 0,
+      repuestosActualizados: repuestosActualizados?.length || 0,
     });
 
     // Obtener orden actual
@@ -148,7 +157,6 @@ export async function PATCH(
       console.log("🆕 Agregando productos nuevos:", productosNuevos.length);
 
       for (const prod of productosNuevos) {
-        // Verificar stock
         const producto = await prisma.producto.findUnique({
           where: { id: prod.productoId },
         });
@@ -167,7 +175,6 @@ export async function PATCH(
           );
         }
 
-        // Crear detalle
         await prisma.detalleOrden.create({
           data: {
             ordenId: id,
@@ -179,13 +186,11 @@ export async function PATCH(
           },
         });
 
-        // Actualizar stock
         await prisma.producto.update({
           where: { id: prod.productoId },
           data: { stock: { decrement: prod.cantidad } },
         });
 
-        // Movimiento inventario
         await prisma.movimientoInventario.create({
           data: {
             tipo: "SALIDA",
@@ -200,6 +205,106 @@ export async function PATCH(
 
         console.log(
           `✅ Producto agregado: ${producto.nombre} x${prod.cantidad}`
+        );
+      }
+    }
+
+    // ✅ ACTUALIZAR PRODUCTOS EXISTENTES (precio y cantidad)
+    if (
+      productosActualizados &&
+      Array.isArray(productosActualizados) &&
+      productosActualizados.length > 0
+    ) {
+      console.log(
+        "🔄 Actualizando productos existentes:",
+        productosActualizados.length
+      );
+
+      for (const prod of productosActualizados) {
+        const detalleActual = await prisma.detalleOrden.findUnique({
+          where: { id: prod.detalleId },
+        });
+
+        if (!detalleActual) {
+          console.error(`❌ Detalle ${prod.detalleId} no encontrado`);
+          continue;
+        }
+
+        // Si cambió la cantidad, ajustar stock
+        const diferenciaCantidad = prod.cantidad - detalleActual.cantidad;
+
+        if (diferenciaCantidad !== 0) {
+          const producto = await prisma.producto.findUnique({
+            where: { id: detalleActual.productoId },
+          });
+
+          if (!producto) continue;
+
+          // Si aumentó la cantidad, necesitamos más stock
+          if (diferenciaCantidad > 0) {
+            if (producto.stock < diferenciaCantidad) {
+              return NextResponse.json(
+                {
+                  error: `Stock insuficiente para ${producto.nombre}. Necesitas ${diferenciaCantidad} más, disponible: ${producto.stock}`,
+                },
+                { status: 400 }
+              );
+            }
+
+            // Decrementar stock
+            await prisma.producto.update({
+              where: { id: detalleActual.productoId },
+              data: { stock: { decrement: diferenciaCantidad } },
+            });
+
+            await prisma.movimientoInventario.create({
+              data: {
+                tipo: "SALIDA",
+                cantidad: diferenciaCantidad,
+                motivo: `Ajuste de cantidad en orden ${ordenActual?.numeroOrden}`,
+                precioUnitario: prod.precioUnitario,
+                total: prod.precioUnitario * diferenciaCantidad,
+                productoId: detalleActual.productoId,
+                usuarioId: session.user.id,
+              },
+            });
+          } else {
+            // Si disminuyó la cantidad, devolver stock
+            await prisma.producto.update({
+              where: { id: detalleActual.productoId },
+              data: { stock: { increment: Math.abs(diferenciaCantidad) } },
+            });
+
+            await prisma.movimientoInventario.create({
+              data: {
+                tipo: "ENTRADA",
+                cantidad: Math.abs(diferenciaCantidad),
+                motivo: `Ajuste de cantidad en orden ${ordenActual?.numeroOrden} (reducción)`,
+                precioUnitario: prod.precioUnitario,
+                total: prod.precioUnitario * Math.abs(diferenciaCantidad),
+                productoId: detalleActual.productoId,
+                usuarioId: session.user.id,
+              },
+            });
+          }
+
+          console.log(
+            `📦 Stock ajustado: ${diferenciaCantidad > 0 ? "-" : "+"}${Math.abs(diferenciaCantidad)}`
+          );
+        }
+
+        // Actualizar el detalle con nuevo precio y cantidad
+        await prisma.detalleOrden.update({
+          where: { id: prod.detalleId },
+          data: {
+            cantidad: prod.cantidad,
+            precioUnitario: prod.precioUnitario,
+            subtotal: prod.cantidad * prod.precioUnitario,
+          },
+        });
+
+        console.log(
+          `✅ Detalle actualizado: cantidad=${prod.cantidad}, precio=${prod.precioUnitario}`
         );
       }
     }
@@ -229,6 +334,38 @@ export async function PATCH(
         });
 
         console.log(`✅ Repuesto agregado: ${rep.nombre} x${rep.cantidad}`);
+      }
+    }
+
+    // ✅ ACTUALIZAR REPUESTOS EXISTENTES (precio y cantidad)
+    if (
+      repuestosActualizados &&
+      Array.isArray(repuestosActualizados) &&
+      repuestosActualizados.length > 0
+    ) {
+      console.log(
+        "🔄 Actualizando repuestos existentes:",
+        repuestosActualizados.length
+      );
+
+      for (const rep of repuestosActualizados) {
+        const nuevoSubtotal = rep.cantidad * rep.precioVenta;
+        const nuevaUtilidad = nuevoSubtotal - rep.precioCompra * rep.cantidad;
+
+        await prisma.repuestoExterno.update({
+          where: { id: rep.repuestoId },
+          data: {
+            cantidad: rep.cantidad,
+            precioVenta: rep.precioVenta,
+            precioUnitario: rep.precioVenta,
+            subtotal: nuevoSubtotal,
+            utilidad: nuevaUtilidad,
+          },
+        });
+
+        console.log(
+          `✅ Repuesto actualizado: cantidad=${rep.cantidad}, precio=${rep.precioVenta}`
+        );
       }
     }
 

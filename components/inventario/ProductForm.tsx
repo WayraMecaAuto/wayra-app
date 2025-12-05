@@ -58,7 +58,19 @@ export function ProductForm({
   const [showBarcodePreview, setShowBarcodePreview] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm<ProductFormData>()
+  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm<ProductFormData>({
+    defaultValues: {
+      codigo: '',
+      codigoBarras: '',
+      nombre: '',
+      descripcion: '',
+      precioCompra: '',
+      monedaCompra: 'COP',
+      aplicaIva: false,
+      stockMinimo: '1',
+      stockInicial: '0'
+    }
+  })
   
   const precioCompra = watch('precioCompra')
   const aplicaIva = watch('aplicaIva')
@@ -67,8 +79,27 @@ export function ProductForm({
   const config = getPricingConfig(tipo as any, categoria)
   const esCalan = tipo === 'WAYRA_CALAN'
 
+  // Efecto separado SOLO para initialBarcode
   useEffect(() => {
-    if (product && isOpen) {
+    if (isOpen && !product && initialBarcode) {
+      console.log('🔢 [ProductForm] Recibido initialBarcode:', initialBarcode)
+      console.log('🔢 [ProductForm] Tipo:', tipo)
+      console.log('🔢 [ProductForm] Categoría:', categoria)
+      
+      if (tipo !== 'TORNILLERIA') {
+        setValue('codigoBarras', initialBarcode, { shouldValidate: true })
+        console.log('✅ [ProductForm] Código de barras establecido:', initialBarcode)
+      }
+    }
+  }, [initialBarcode, isOpen, product, tipo, setValue])
+
+  // Efecto para inicializar el formulario
+  useEffect(() => {
+    if (!isOpen) return
+
+    if (product) {
+      // Modo edición - cargar datos del producto existente
+      console.log('📝 [ProductForm] Modo edición, cargando producto:', product)
       setValue('codigo', product.codigo)
       setValue('codigoBarras', product.codigoBarras || '')
       setValue('nombre', product.nombre)
@@ -77,22 +108,33 @@ export function ProductForm({
       setValue('monedaCompra', product.monedaCompra)
       setValue('aplicaIva', product.aplicaIva)
       setValue('stockMinimo', product.stockMinimo.toString())
-    } else if (isOpen) {
+    } else {
+      // Modo creación - generar valores por defecto
+      console.log('✨ [ProductForm] Modo creación nuevo producto')
       const timestamp = Date.now().toString().slice(-6)
       const prefix = tipo === 'WAYRA_ENI' ? 'WE' : 
-                   tipo === 'WAYRA_CALAN' ? 'WC' : 
-                   tipo === 'WAYRA_OTROS' ? 'WO' :
-                   tipo === 'TORNILLERIA' ? 'TO' : 'TR'
-      setValue('codigo', `${prefix}${timestamp}`)
+                     tipo === 'WAYRA_CALAN' ? 'WC' : 
+                     tipo === 'WAYRA_OTROS' ? 'WO' :
+                     tipo === 'TORNILLERIA' ? 'TO' : 'TR'
       
-      if (tipo !== 'TORNILLERIA') {
-        setValue('codigoBarras', initialBarcode || generateEAN13())
+      const codigoGenerado = `${prefix}${timestamp}`
+      console.log('🔖 [ProductForm] Código generado:', codigoGenerado)
+      setValue('codigo', codigoGenerado)
+      
+      // Solo generar código de barras automático si NO hay initialBarcode
+      if (tipo !== 'TORNILLERIA' && !initialBarcode) {
+        const barcodeGenerado = generateEAN13()
+        console.log('🔢 [ProductForm] Código de barras generado:', barcodeGenerado)
+        setValue('codigoBarras', barcodeGenerado)
       }
       
       setValue('monedaCompra', esCalan ? 'USD' : 'COP')
       setValue('stockInicial', '0')
       setValue('stockMinimo', '1')
       setValue('aplicaIva', config.ivaObligatorio)
+      setValue('descripcion', '')
+      setValue('nombre', '')
+      setValue('precioCompra', '')
     }
   }, [product, isOpen, tipo, categoria, esCalan, setValue, config.ivaObligatorio, initialBarcode])
 
@@ -112,33 +154,58 @@ export function ProductForm({
   }, [precioCompra, aplicaIva, tipo, categoria])
 
   const onSubmit = async (data: ProductFormData) => {
+    console.log('📤 [ProductForm] Enviando datos del formulario:', data)
+    
+    // Validaciones adicionales antes de enviar
+    if (!data.codigo || !data.nombre || !data.precioCompra) {
+      console.error('❌ [ProductForm] Faltan campos requeridos:', {
+        codigo: data.codigo,
+        nombre: data.nombre,
+        precioCompra: data.precioCompra
+      })
+      toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
     setIsLoading(true)
     try {
       const url = product ? `/api/productos/${product.id}` : '/api/productos'
       const method = product ? 'PATCH' : 'POST'
 
+      const payload = {
+        ...data,
+        tipo,
+        categoria,
+        precioCompra: parseFloat(data.precioCompra),
+        stockMinimo: parseInt(data.stockMinimo || '1'),
+        stockInicial: parseInt(data.stockInicial || '0')
+      }
+
+      console.log('📦 [ProductForm] Payload completo a enviar:', payload)
+      console.log('🌐 [ProductForm] URL:', url)
+      console.log('🔧 [ProductForm] Method:', method)
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          tipo,
-          categoria,
-          precioCompra: parseFloat(data.precioCompra),
-          stockMinimo: parseInt(data.stockMinimo),
-          stockInicial: parseInt(data.stockInicial || '0')
-        })
+        body: JSON.stringify(payload)
       })
 
+      console.log('📡 [ProductForm] Respuesta del servidor:', response.status)
+
       if (response.ok) {
+        const result = await response.json()
+        console.log('✅ [ProductForm] Producto guardado exitosamente:', result)
         toast.success(product ? 'Producto actualizado' : 'Producto creado exitosamente')
         onSuccess()
         handleClose()
       } else {
         const error = await response.json()
+        console.error('❌ [ProductForm] Error del servidor:', error)
         toast.error(error.error || 'Error al guardar producto')
       }
     } catch (error) {
+      console.error('💥 [ProductForm] Error en onSubmit:', error)
       toast.error('Error al guardar producto')
     } finally {
       setIsLoading(false)
@@ -146,12 +213,24 @@ export function ProductForm({
   }
 
   const handleBarcodeScanned = (code: string) => {
+    console.log('📷 [ProductForm] Código escaneado desde el scanner interno:', code)
     setValue('codigoBarras', code)
     setShowScanner(false)
   }
 
   const handleClose = () => {
-    reset()
+    console.log('🔄 [ProductForm] Cerrando formulario y limpiando estado')
+    reset({
+      codigo: '',
+      codigoBarras: '',
+      nombre: '',
+      descripcion: '',
+      precioCompra: '',
+      monedaCompra: 'COP',
+      aplicaIva: false,
+      stockMinimo: '1',
+      stockInicial: '0'
+    })
     setPreviewPrices(null)
     setShowBarcodePreview(false)
     setShowAdvanced(false)
@@ -223,7 +302,9 @@ export function ProductForm({
               {/* Código de Barras */}
               {tipo !== 'TORNILLERIA' && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Código de Barras</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Código de Barras {initialBarcode && <span className="text-emerald-600">(Escaneado)</span>}
+                  </label>
                   <div className="flex gap-3">
                     <Input
                       {...register('codigoBarras')}
@@ -239,6 +320,11 @@ export function ProductForm({
                       </Button>
                     )}
                   </div>
+                  {initialBarcode && (
+                    <p className="mt-2 text-xs text-emerald-600 font-medium">
+                      ✓ Código escaneado: {initialBarcode}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -322,11 +408,11 @@ export function ProductForm({
                 </Button>
               </div>
 
-              <div className={`${showAdvanced || window.innerWidth >= 1024 ? 'block' : 'hidden lg:block'} space-y-5`}>
+              <div className={`${showAdvanced ? 'block' : 'hidden'} lg:block space-y-5`}>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-700">Stock Mínimo</label>
-                    <Input {...register('stockMinimo')} type="number" className="h-12 mt-2 rounded-xl border-2" defaultValue="5" />
+                    <Input {...register('stockMinimo')} type="number" className="h-12 mt-2 rounded-xl border-2" defaultValue="1" />
                   </div>
                   {!product && (
                     <div>
