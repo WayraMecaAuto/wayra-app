@@ -543,7 +543,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 hover:bg-gray-100 rounded-lg"
               >
-                <Bell className="h-6 w-6" />
+                <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse">
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -554,12 +554,12 @@ export function Navbar({ onMenuClick }: NavbarProps) {
               {showNotifications && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                  <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border z-50">
-                    <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold">Notificaciones</h3>
-                          <p className="text-xs text-gray-600">
+                  <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:w-96 max-w-md bg-white rounded-xl shadow-2xl border z-50 max-h-[85vh] flex flex-col">
+                    <div className="p-3 sm:p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl flex-shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-sm sm:text-base truncate">Notificaciones</h3>
+                          <p className="text-xs text-gray-600 truncate">
                             {MESES.find(m => m.value === mesFilter)?.label} {añoFilter}
                           </p>
                         </div>
@@ -569,7 +569,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                               e.stopPropagation()
                               markAllAsRead()
                             }}
-                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200"
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 whitespace-nowrap flex-shrink-0"
                           >
                             Marcar todas
                           </button>
@@ -577,7 +577,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                       </div>
                     </div>
                     
-                    <div className="max-h-80 overflow-y-auto">
+                    <div className="overflow-y-auto flex-1">
                       {notifications.slice(0, 5).map((n) => (
                         <div
                           key={n.id}
@@ -586,8 +586,8 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                             markAsRead([n.id])
                           }}
                         >
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1">{getNotificationIcon(n.type)}</div>
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <div className="mt-1 flex-shrink-0">{getNotificationIcon(n.type)}</div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-sm line-clamp-1">{n.title}</h4>
                               <p className="text-xs text-gray-600 line-clamp-2 mt-1">{n.message}</p>
@@ -598,7 +598,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                       ))}
                     </div>
                     
-                    <div className="p-3 border-t bg-gray-50 rounded-b-xl">
+                    <div className="p-3 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
                       <button 
                         onClick={() => {
                           setShowAllNotifications(true)
