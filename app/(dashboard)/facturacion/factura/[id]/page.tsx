@@ -120,13 +120,12 @@ export default function FacturaDetailPage() {
       const { default: autoTable } = await import("jspdf-autotable");
 
       const doc = new jsPDF("p", "mm", "letter");
-      const pageWidth = doc.internal.pageSize.getWidth(); 
-      const pageHeight = doc.internal.pageSize.getHeight(); 
-      const marginTop = 15;
-      const marginBottom = 30;
-      let y = marginTop;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
 
-      // ==================== CARGAR LOGO ====================
       let logoBase64 = "";
       try {
         const logoModule = await import("@/public/images/WayraNuevoLogo.png");
@@ -143,200 +142,265 @@ export default function FacturaDetailPage() {
         console.warn("Logo no disponible");
       }
 
-      // Función auxiliar para verificar espacio y añadir página si es necesario
-      const checkPageBreak = (neededHeight: number = 20) => {
-        if (y + neededHeight > pageHeight - marginBottom) {
+      // Función para verificar espacio y agregar página
+      const checkPageBreak = (neededHeight: number) => {
+        if (y + neededHeight > pageHeight - margin) {
           doc.addPage();
-          y = marginTop;
+          y = margin;
+          return true;
         }
+        return false;
       };
 
-      // ==================== HEADER (solo en primera página) ====================
-      const addHeader = () => {
-        if (logoBase64) {
-          doc.addImage(logoBase64, "PNG", 15, y, 28, 28);
-        }
+      if (logoBase64) {
+        doc.addImage(logoBase64, "PNG", margin, y, 25, 25);
+      }
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(24);
-        doc.setTextColor(37, 99, 235);
-        doc.text("Wayra", 48, y + 8);
-
-        doc.setFontSize(15);
-        doc.text("Mecánica Automotriz", 48, y + 16);
-
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 100, 100);
-        doc.text("NIT: 1152700355-6", 48, y + 23);
-        doc.text("Cel: 317 606 7449", 48, y + 28);
-        doc.text("wayramecanicaautomotriz@gmail.com", 48, y + 33);
-
-        // Número de factura
-        doc.setFontSize(34);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(37, 99, 235);
-        doc.text(factura.numeroFactura, pageWidth - 15, y + 16, {
-          align: "right",
-        });
-
-        // Badge estado
-        const estadoMap: Record<string, { text: string; color: number[] }> = {
-          PAGADA: { text: "Pagada", color: [34, 197, 94] },
-          PENDIENTE: { text: "Pendiente", color: [251, 191, 36] },
-          VENCIDA: { text: "Vencida", color: [239, 68, 68] },
-          ANULADA: { text: "Anulada", color: [156, 163, 175] },
-        };
-        const estado = estadoMap[factura.estado] || estadoMap.PENDIENTE;
-
-        doc.setFillColor(...estado.color);
-        doc.rect(pageWidth - 68, y + 20, 50, 9, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.text(estado.text, pageWidth - 43, y + 26, { align: "center" });
-
-        // Fechas
-        doc.setFontSize(10);
-        doc.setTextColor(80, 80, 80);
-        doc.setFont("helvetica", "normal");
-        doc.text(
-          `Fecha: ${new Date(factura.fecha).toLocaleDateString("es-CO")}`,
-          pageWidth - 15,
-          y + 38,
-          { align: "right" }
-        );
-        if (factura.vencimiento) {
-          doc.text(
-            `Vencimiento: ${new Date(factura.vencimiento).toLocaleDateString("es-CO")}`,
-            pageWidth - 15,
-            y + 44,
-            { align: "right" }
-          );
-          doc.text(
-            `Orden: ${factura.orden.numeroOrden}`,
-            pageWidth - 15,
-            y + 50,
-            { align: "right" }
-          );
-        } else {
-          doc.text(
-            `Orden: ${factura.orden.numeroOrden}`,
-            pageWidth - 15,
-            y + 44,
-            { align: "right" }
-          );
-        }
-
-        y += 65;
-        doc.setDrawColor(229, 231, 235);
-        doc.setLineWidth(1.5);
-        doc.line(15, y, pageWidth - 15, y);
-        y += 12;
-      };
-
-      addHeader();
-
-      // ==================== CLIENTE + VEHÍCULO ====================
-      checkPageBreak(80);
+      // Nombre y datos de la empresa
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Wayra", margin + 30, y + 8);
 
       doc.setFontSize(12);
+      doc.setTextColor(37, 99, 235);
+      doc.text("Mecánica Automotriz", margin + 30, y + 15);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 80, 80);
+      doc.text("NIT: 1152700355-6", margin + 30, y + 20);
+      doc.text("Cel: 317 606 7449", margin + 30, y + 24);
+      doc.text("wayramecanicaautomotriz@gmail.com", margin + 30, y + 28);
+
+      // Número de factura y estado (lado derecho)
+      doc.setFontSize(24);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(37, 99, 235);
-      doc.text("Información del Cliente", 15, y);
-      doc.text("Información del Vehículo", 120, y);
-      y += 8;
+      doc.text(factura.numeroFactura, pageWidth - margin, y + 8, {
+        align: "right",
+      });
 
+      // Badge de estado
+      const estadoMap: Record<string, { text: string; color: number[] }> = {
+        PAGADA: { text: "Pagada", color: [34, 197, 94] },
+        PENDIENTE: { text: "Pendiente", color: [251, 191, 36] },
+        VENCIDA: { text: "Vencida", color: [239, 68, 68] },
+        ANULADA: { text: "Anulada", color: [156, 163, 175] },
+      };
+      const estado = estadoMap[factura.estado] || estadoMap.PENDIENTE;
+
+      const badgeWidth = 40;
+      const badgeHeight = 8;
+      const badgeX = pageWidth - margin - badgeWidth;
+      const badgeY = y + 12;
+
+      doc.setFillColor(...estado.color);
+      doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 2, 2, "F");
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        estado.text,
+        badgeX + badgeWidth / 2,
+        badgeY + badgeHeight / 2 + 1.5,
+        { align: "center" }
+      );
+
+      // Fechas
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(0, 0, 0);
-
-      const leftX = 15;
-      const rightX = 120;
-      let leftY = y;
-      let rightY = y;
-
-      // Cliente
-      doc.text(`Nombre: ${factura.cliente.nombre}`, leftX, leftY);
-      leftY += 6;
-      doc.text(`Documento: ${factura.cliente.numeroDocumento}`, leftX, leftY);
-      leftY += 6;
-      if (factura.cliente.telefono) {
-        doc.text(`Teléfono: ${factura.cliente.telefono}`, leftX, leftY);
-        leftY += 6;
-      }
-      if (factura.cliente.email) {
-        doc.text(`Email: ${factura.cliente.email}`, leftX, leftY);
-        leftY += 6;
-      }
-      if (factura.cliente.direccion) {
-        const lines = doc.splitTextToSize(
-          `Dirección: ${factura.cliente.direccion}`,
-          90
+      doc.text(
+        `Fecha: ${new Date(factura.fecha).toLocaleDateString("es-CO")}`,
+        pageWidth - margin,
+        y + 25,
+        { align: "right" }
+      );
+      if (factura.vencimiento) {
+        doc.text(
+          `Vencimiento: ${new Date(factura.vencimiento).toLocaleDateString("es-CO")}`,
+          pageWidth - margin,
+          y + 30,
+          { align: "right" }
         );
-        doc.text(lines, leftX, leftY);
-        leftY += lines.length * 5 + 4;
       }
+      doc.text(
+        `Orden: ${factura.orden.numeroOrden}`,
+        pageWidth - margin,
+        y + (factura.vencimiento ? 35 : 30),
+        { align: "right" }
+      );
 
-      // Vehículo
-      doc.text(`Placa: ${factura.orden.vehiculo.placa}`, rightX, rightY);
-      rightY += 6;
-      doc.text(`Marca: ${factura.orden.vehiculo.marca}`, rightX, rightY);
-      rightY += 6;
-      doc.text(`Modelo: ${factura.orden.vehiculo.modelo}`, rightX, rightY);
-      rightY += 6;
-      if (factura.orden.vehiculo.anio) {
-        doc.text(`Año: ${factura.orden.vehiculo.anio}`, rightX, rightY);
-        rightY += 6;
-      }
+      y += 40;
 
-      y = Math.max(leftY, rightY) + 15;
+      // Línea separadora
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(1);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 10;
 
-      // ==================== TABLAS CON SALTO DE PÁGINA AUTOMÁTICO ====================
-      const addTableSection = (
-        title: string,
-        head: string[],
-        body: any[],
-        columnStyles = {}
-      ) => {
-        if (body.length === 0) return;
+      checkPageBreak(50);
 
-        checkPageBreak(40);
+      // Fondo gris claro
+      doc.setFillColor(249, 250, 251);
+      doc.rect(margin, y, contentWidth / 2 - 3, 40, "F");
+      doc.rect(margin + contentWidth / 2 + 3, y, contentWidth / 2 - 3, 40, "F");
 
-        doc.setFontSize(12);
+      // Borde
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.5);
+      doc.rect(margin, y, contentWidth / 2 - 3, 40);
+      doc.rect(margin + contentWidth / 2 + 3, y, contentWidth / 2 - 3, 40);
+
+      // Headers
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(55, 65, 81);
+      doc.text("INFORMACIÓN DEL CLIENTE", margin + 2, y + 5);
+      doc.text(
+        "INFORMACIÓN DEL VEHÍCULO",
+        margin + contentWidth / 2 + 5,
+        y + 5
+      );
+
+      // Línea debajo del header
+      doc.setDrawColor(229, 231, 235);
+      doc.line(margin, y + 7, margin + contentWidth / 2 - 3, y + 7);
+      doc.line(margin + contentWidth / 2 + 3, y + 7, pageWidth - margin, y + 7);
+
+      // Datos del cliente
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(55, 65, 81);
+      let clienteY = y + 12;
+
+      doc.text("Nombre:", margin + 2, clienteY);
+      doc.setFont("helvetica", "normal");
+      const nombreLines = doc.splitTextToSize(
+        factura.cliente.nombre,
+        contentWidth / 2 - 20
+      );
+      doc.text(nombreLines, margin + 20, clienteY);
+      clienteY += nombreLines.length * 4;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Documento:", margin + 2, clienteY);
+      doc.setFont("helvetica", "normal");
+      doc.text(factura.cliente.numeroDocumento, margin + 20, clienteY);
+      clienteY += 4;
+
+      if (factura.cliente.telefono) {
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(37, 99, 235);
-        doc.text(title, 15, y);
-        y += 8;
+        doc.text("Teléfono:", margin + 2, clienteY);
+        doc.setFont("helvetica", "normal");
+        doc.text(factura.cliente.telefono, margin + 20, clienteY);
+        clienteY += 4;
+      }
+
+      if (factura.cliente.email) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Email:", margin + 2, clienteY);
+        doc.setFont("helvetica", "normal");
+        const emailLines = doc.splitTextToSize(
+          factura.cliente.email,
+          contentWidth / 2 - 20
+        );
+        doc.text(emailLines, margin + 20, clienteY);
+        clienteY += emailLines.length * 4;
+      }
+
+      if (factura.cliente.direccion) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Dirección:", margin + 2, clienteY);
+        doc.setFont("helvetica", "normal");
+        const dirLines = doc.splitTextToSize(
+          factura.cliente.direccion,
+          contentWidth / 2 - 20
+        );
+        doc.text(dirLines, margin + 20, clienteY);
+      }
+
+      // Datos del vehículo
+      let vehiculoY = y + 12;
+      const vehiculoX = margin + contentWidth / 2 + 5;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Placa:", vehiculoX, vehiculoY);
+      doc.setFont("helvetica", "normal");
+      doc.text(factura.orden.vehiculo.placa, vehiculoX + 15, vehiculoY);
+      vehiculoY += 4;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Marca:", vehiculoX, vehiculoY);
+      doc.setFont("helvetica", "normal");
+      doc.text(factura.orden.vehiculo.marca, vehiculoX + 15, vehiculoY);
+      vehiculoY += 4;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Modelo:", vehiculoX, vehiculoY);
+      doc.setFont("helvetica", "normal");
+      doc.text(factura.orden.vehiculo.modelo, vehiculoX + 15, vehiculoY);
+      vehiculoY += 4;
+
+      if (factura.orden.vehiculo.anio) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Año:", vehiculoX, vehiculoY);
+        doc.setFont("helvetica", "normal");
+        doc.text(
+          String(factura.orden.vehiculo.anio),
+          vehiculoX + 15,
+          vehiculoY
+        );
+      }
+
+      y += 45;
+
+      const addTableSection = (title: string, columns: any[], rows: any[]) => {
+        if (rows.length === 0) return;
+
+        checkPageBreak(30);
+
+        // Header de la sección
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(55, 65, 81);
+        doc.text(title.toUpperCase(), margin, y);
+
+        // Línea debajo del título
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y + 2, pageWidth - margin, y + 2);
+        y += 6;
 
         autoTable(doc, {
-          head: [head],
-          body,
+          columns,
+          body: rows,
           startY: y,
-          theme: "grid",
+          theme: "plain",
+          styles: {
+            fontSize: 8,
+            cellPadding: 3,
+            lineColor: [229, 231, 235],
+            lineWidth: 0.3,
+          },
           headStyles: {
-            fillColor: [243, 244, 246],
+            fillColor: [249, 250, 251],
             textColor: [55, 65, 81],
             fontStyle: "bold",
-            fontSize: 10,
+            halign: "left",
           },
-          styles: {
-            fontSize: 10,
-            cellPadding: 5,
-            lineColor: [229, 231, 235],
-            lineWidth: 0.1,
+          alternateRowStyles: {
+            fillColor: [255, 255, 255],
           },
-          alternateRowStyles: { fillColor: [249, 250, 251] },
-          columnStyles,
-          margin: { left: 15, right: 15 },
-          pageBreak: "auto",
-          rowPageBreak: "avoid",
+          margin: { left: margin, right: margin },
+          tableWidth: "auto",
           didDrawPage: (data) => {
-            y = data.cursor.y + 15;
+            y = data.cursor.y;
           },
         });
 
-        y = (doc as any).lastAutoTable.finalY + 15;
+        y = (doc as any).lastAutoTable.finalY + 8;
       };
 
       // Servicios
@@ -345,156 +409,160 @@ export default function FacturaDetailPage() {
           s.descripcion,
           `$${s.precio.toLocaleString("es-CO")}`,
         ]);
-        if (factura.orden.manoDeObra > 0)
+        if (factura.orden.manoDeObra > 0) {
           rows.push([
             "Mano de Obra",
             `$${factura.orden.manoDeObra.toLocaleString("es-CO")}`,
           ]);
+        }
         addTableSection(
           "Servicios Realizados",
-          ["Descripción", "Precio"],
-          rows,
-          {
-            1: { halign: "right" },
-          }
+          [
+            { header: "Descripción", dataKey: "desc" },
+            { header: "Precio", dataKey: "precio" },
+          ],
+          rows.map((r) => ({ desc: r[0], precio: r[1] }))
         );
       }
 
       // Productos
       if (factura.orden.detalles.length > 0) {
-        const rows = factura.orden.detalles.map((d) => [
-          d.producto.codigo,
-          d.producto.nombre + (d.producto.aplicaIva ? " (+IVA)" : ""),
-          d.cantidad,
-          `$${d.precioUnitario.toLocaleString("es-CO")}`,
-          `$${d.subtotal.toLocaleString("es-CO")}`,
-        ]);
+        const rows = factura.orden.detalles.map((d) => ({
+          codigo: d.producto.codigo,
+          desc: d.producto.nombre + (d.producto.aplicaIva ? " (+IVA)" : ""),
+          cant: d.cantidad,
+          precio: `$${d.precioUnitario.toLocaleString("es-CO")}`,
+          subtotal: `$${d.subtotal.toLocaleString("es-CO")}`,
+        }));
         addTableSection(
           "Productos Utilizados",
-          ["Código", "Descripción", "Cant.", "P. Unitario", "Subtotal"],
-          rows,
-          {
-            0: { cellWidth: 28 },
-            2: { cellWidth: 20, halign: "center" },
-            3: { cellWidth: 32, halign: "right" },
-            4: { cellWidth: 32, halign: "right" },
-          }
+          [
+            { header: "Código", dataKey: "codigo" },
+            { header: "Descripción", dataKey: "desc" },
+            { header: "Cant.", dataKey: "cant" },
+            { header: "Precio Unit.", dataKey: "precio" },
+            { header: "Subtotal", dataKey: "subtotal" },
+          ],
+          rows
         );
       }
 
       // Repuestos externos
       if (factura.orden.repuestosExternos.length > 0) {
-        const rows = factura.orden.repuestosExternos.map((r) => [
-          r.nombre + (r.descripcion ? `\n${r.descripcion}` : ""),
-          r.cantidad,
-          `$${r.precioUnitario.toLocaleString("es-CO")}`,
-          `$${r.subtotal.toLocaleString("es-CO")}`,
-        ]);
+        const rows = factura.orden.repuestosExternos.map((r) => ({
+          desc: r.nombre + (r.descripcion ? `\n${r.descripcion}` : ""),
+          cant: r.cantidad,
+          precio: `$${r.precioUnitario.toLocaleString("es-CO")}`,
+          subtotal: `$${r.subtotal.toLocaleString("es-CO")}`,
+        }));
         addTableSection(
           "Repuestos Externos",
-          ["Descripción", "Cant.", "P. Unitario", "Subtotal"],
-          rows,
-          {
-            0: { cellWidth: 95 },
-            1: { cellWidth: 25, halign: "center" },
-            2: { cellWidth: 32, halign: "right" },
-            3: { cellWidth: 32, halign: "right" },
-          }
+          [
+            { header: "Descripción", dataKey: "desc" },
+            { header: "Cant.", dataKey: "cant" },
+            { header: "Precio Unit.", dataKey: "precio" },
+            { header: "Subtotal", dataKey: "subtotal" },
+          ],
+          rows
         );
       }
 
-      // ==================== TOTALES (siempre visible) ====================
-      checkPageBreak(70);
+      checkPageBreak(35);
 
-      const totalX = pageWidth - 100;
+      const boxWidth = 80;
+      const boxX = pageWidth - margin - boxWidth;
+
+      // Fondo
       doc.setFillColor(249, 250, 251);
-      doc.rect(totalX, y, 85, 52, "F");
+      doc.roundedRect(boxX, y, boxWidth, 30, 2, 2, "F");
 
-      doc.setFontSize(11);
+      // Borde
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(boxX, y, boxWidth, 30, 2, 2);
+
+      doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(75, 85, 99);
-      doc.text("Subtotal:", totalX + 10, y + 14);
+
+      // Subtotal
+      doc.text("Subtotal:", boxX + 5, y + 8);
       doc.text(
         `$${factura.subtotal.toLocaleString("es-CO")}`,
-        pageWidth - 15,
-        y + 14,
+        pageWidth - margin - 5,
+        y + 8,
         { align: "right" }
       );
 
-      doc.text("IVA (19%):", totalX + 10, y + 26);
+      // IVA
+      doc.text("IVA (19%):", boxX + 5, y + 15);
       doc.text(
         `$${factura.iva.toLocaleString("es-CO")}`,
-        pageWidth - 15,
+        pageWidth - margin - 5,
+        y + 15,
+        { align: "right" }
+      );
+
+      // Línea separadora
+      doc.setDrawColor(209, 213, 219);
+      doc.line(boxX + 5, y + 18, pageWidth - margin - 5, y + 18);
+
+      // Total
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(37, 99, 235);
+      doc.text("Total:", boxX + 5, y + 26);
+      doc.text(
+        `$${factura.total.toLocaleString("es-CO")}`,
+        pageWidth - margin - 5,
         y + 26,
         { align: "right" }
       );
 
-      doc.setDrawColor(209, 213, 219);
-      doc.setLineWidth(0.5);
-      doc.line(totalX + 10, y + 34, pageWidth - 15, y + 34);
+      y += 35;
 
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(37, 99, 235);
-      doc.text("Total:", totalX + 10, y + 48);
-      doc.text(
-        `$${factura.total.toLocaleString("es-CO")}`,
-        pageWidth - 15,
-        y + 48,
-        { align: "right" }
-      );
-
-      y += 60;
-
-      // ==================== OBSERVACIONES ====================
       if (factura.observaciones) {
-        checkPageBreak(50);
+        checkPageBreak(30);
 
-        doc.setFontSize(12);
+        doc.setFillColor(249, 250, 251);
+        const obsHeight = 25;
+        doc.roundedRect(margin, y, contentWidth, obsHeight, 2, 2, "F");
+        doc.setDrawColor(229, 231, 235);
+        doc.roundedRect(margin, y, contentWidth, obsHeight, 2, 2);
+
+        doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(37, 99, 235);
-        doc.text("Observaciones", 15, y);
-        y += 8;
+        doc.setTextColor(55, 65, 81);
+        doc.text("OBSERVACIONES", margin + 3, y + 5);
 
-        doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 100, 100);
+        doc.setTextColor(80, 80, 80);
         const obsLines = doc.splitTextToSize(
           factura.observaciones,
-          pageWidth - 30
+          contentWidth - 6
         );
-        doc.text(obsLines, 15, y);
-        y += obsLines.length * 5 + 10;
+        doc.text(obsLines, margin + 3, y + 10);
+
+        y += obsHeight + 5;
       }
 
-      // ==================== FOOTER EN TODAS LAS PÁGINAS ====================
-      const addFooter = () => {
-        const footerY = pageHeight - 20;
-        doc.setFontSize(10);
-        doc.setTextColor(150, 150, 150);
-        doc.setFont("helvetica", "italic");
-        doc.text(
-          "Gracias por confiar en Wayra Mecánica Automotriz",
-          pageWidth / 2,
-          footerY,
-          { align: "center" }
-        );
-        doc.text(
-          "Para cualquier consulta, contáctenos al 317 606 7449",
-          pageWidth / 2,
-          footerY + 6,
-          { align: "center" }
-        );
-      };
+      const footerY = pageHeight - 20;
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Gracias por confiar en Wayra Mecánica Automotriz",
+        pageWidth / 2,
+        footerY,
+        { align: "center" }
+      );
+      doc.text(
+        "Para cualquier consulta, contáctenos al 317 606 7449",
+        pageWidth / 2,
+        footerY + 4,
+        { align: "center" }
+      );
 
-      // Footer en todas las páginas
-      const totalPages = doc.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        addFooter();
-      }
-
-      // ==================== GUARDAR ====================
       const fecha = new Date(factura.fecha);
       const mes = String(fecha.getMonth() + 1).padStart(2, "0");
       const año = fecha.getFullYear();
