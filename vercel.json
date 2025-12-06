@@ -3,38 +3,31 @@
   "installCommand": "npm ci --prefer-offline --no-audit",
   "framework": "nextjs",
   "regions": ["iad1"],
-  
+
   "functions": {
     "app/api/**/*.ts": {
-      "memory": 1024,
       "maxDuration": 10
     },
     "app/api/reportes/**/*.ts": {
-      "memory": 2048,
       "maxDuration": 25
     },
     "app/api/ordenes/[id]/route.ts": {
-      "memory": 1536,
       "maxDuration": 15
     },
     "app/api/ordenes/route.ts": {
-      "memory": 1536,
       "maxDuration": 15
     },
     "app/api/contabilidad/**/*.ts": {
-      "memory": 1536,
       "maxDuration": 15
     },
     "app/api/productos/route.ts": {
-      "memory": 1024,
       "maxDuration": 10
     },
     "app/api/movimientos/route.ts": {
-      "memory": 1024,
       "maxDuration": 10
     }
   },
-  
+
   "env": {
     "NODE_ENV": "production",
     "PRISMA_GENERATE_SKIP": "false"
