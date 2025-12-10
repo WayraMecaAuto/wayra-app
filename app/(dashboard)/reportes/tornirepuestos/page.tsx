@@ -55,12 +55,13 @@ export default function ReportesTorniRepuestosPage() {
   >("productos");
 
   // Filtros para productos
-  const [filtroProductos, setFiltroProductos] = useState<"todo" | "mes">(
-    "todo"
-  );
+  const [filtroProductos, setFiltroProductos] = useState<
+    "todo" | "mes" | "quincenal"
+  >("todo");
   const [quincena, setQuincena] = useState(1);
   const [mesProductos, setMesProductos] = useState(new Date().getMonth() + 1);
   const [añoProductos, setAñoProductos] = useState(new Date().getFullYear());
+  const [quincenaProductos, setQuincenaProductos] = useState(1);
 
   // Filtros para contabilidad
   const [periodo, setPeriodo] = useState<
@@ -107,6 +108,7 @@ export default function ReportesTorniRepuestosPage() {
     filtroProductos,
     mesProductos,
     añoProductos,
+    quincenaProductos,
   ]);
 
   const cargarDatos = async () => {
@@ -116,6 +118,8 @@ export default function ReportesTorniRepuestosPage() {
         let url = `/api/reportes/tornirepuestos?tipo=productos-vendidos`;
         if (filtroProductos === "mes") {
           url += `&mes=${mesProductos}&año=${añoProductos}`;
+        } else if (filtroProductos === "quincenal") {
+          url += `&mes=${mesProductos}&año=${añoProductos}&quincena=${quincenaProductos}`;
         }
         const res = await fetch(url);
         if (res.ok) {
@@ -272,13 +276,15 @@ export default function ReportesTorniRepuestosPage() {
                   options={[
                     { value: "todo", label: "Todo el tiempo" },
                     { value: "mes", label: "Por mes" },
+                    { value: "quincenal", label: "Quincenal" },
                   ]}
                   value={filtroProductos}
                   onChange={(val) => setFiltroProductos(val as "todo" | "mes")}
                   icon={<Calendar className="h-4 w-4" />}
                 />
               </div>
-              {filtroProductos === "mes" && (
+              {(filtroProductos === "mes" ||
+                filtroProductos === "quincenal") && (
                 <>
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -302,6 +308,19 @@ export default function ReportesTorniRepuestosPage() {
                       icon={<Calendar className="h-4 w-4" />}
                     />
                   </div>
+                  {filtroProductos === "quincenal" && (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Quincena
+                      </label>
+                      <Dropdown
+                        options={quincenaOptions}
+                        value={quincenaProductos}
+                        onChange={setQuincenaProductos}
+                        icon={<Calendar className="h-4 w-4" />}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>

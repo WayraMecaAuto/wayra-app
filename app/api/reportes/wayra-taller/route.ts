@@ -7,7 +7,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    const hasAccess = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER", "MECANICO"].includes(session?.user?.role || "");
+    const hasAccess = [
+      "SUPER_USUARIO",
+      "ADMIN_WAYRA_TALLER",
+      "MECANICO",
+    ].includes(session?.user?.role || "");
     if (!session || !hasAccess) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -15,23 +19,51 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tipo = searchParams.get("tipo");
     const periodo = searchParams.get("periodo");
-    const año = parseInt(searchParams.get("año") || String(new Date().getFullYear()));
-    const mes = searchParams.get("mes") ? parseInt(searchParams.get("mes")!) : null;
-    const trimestre = searchParams.get("trimestre") ? parseInt(searchParams.get("trimestre")!) : null;
-    const semestre = searchParams.get("semestre") ? parseInt(searchParams.get("semestre")!) : null;
-    const quincena = searchParams.get("quincena") ? parseInt(searchParams.get("quincena")!) : null;
+    const año = parseInt(
+      searchParams.get("año") || String(new Date().getFullYear())
+    );
+    const mes = searchParams.get("mes")
+      ? parseInt(searchParams.get("mes")!)
+      : null;
+    const trimestre = searchParams.get("trimestre")
+      ? parseInt(searchParams.get("trimestre")!)
+      : null;
+    const semestre = searchParams.get("semestre")
+      ? parseInt(searchParams.get("semestre")!)
+      : null;
+    const quincena = searchParams.get("quincena")
+      ? parseInt(searchParams.get("quincena")!)
+      : null;
 
     // Verificar permisos para contabilidad
-    const canViewContabilidad = ["SUPER_USUARIO", "ADMIN_WAYRA_TALLER"].includes(session?.user?.role || "");
+    const canViewContabilidad = [
+      "SUPER_USUARIO",
+      "ADMIN_WAYRA_TALLER",
+    ].includes(session?.user?.role || "");
 
     // SERVICIOS MÁS/MENOS REALIZADOS
     if (tipo === "servicios-frecuencia") {
-      const filtrarPorMes = searchParams.get("mes") ? parseInt(searchParams.get("mes")!) : null;
-      const filtrarPorAño = searchParams.get("año") ? parseInt(searchParams.get("año")!) : null;
+      const filtrarPorMes = searchParams.get("mes")
+        ? parseInt(searchParams.get("mes")!)
+        : null;
+      const filtrarPorAño = searchParams.get("año")
+        ? parseInt(searchParams.get("año")!)
+        : null;
+      const filtrarPorQuincena = searchParams.get("quincena")
+        ? parseInt(searchParams.get("quincena")!)
+        : null;
 
       let queryCondition = "";
       if (filtrarPorMes && filtrarPorAño) {
         queryCondition = `AND os.mes = ${filtrarPorMes} AND os.anio = ${filtrarPorAño}`;
+
+        if (filtrarPorQuincena) {
+          if (filtrarPorQuincena === 1) {
+            queryCondition += ` AND EXTRACT(DAY FROM os."fechaFin") >= 1 AND EXTRACT(DAY FROM os."fechaFin") <= 15`;
+          } else {
+            queryCondition += ` AND EXTRACT(DAY FROM os."fechaFin") >= 16`;
+          }
+        }
       }
 
       const servicios = await prisma.$queryRawUnsafe<any[]>(`
@@ -50,7 +82,10 @@ export async function GET(request: NextRequest) {
       // Normalizar descripciones de lubricación
       const serviciosAgrupados = servicios.reduce((acc: any[], serv: any) => {
         let descripcion = serv.descripcion.trim();
-        if (descripcion.toLowerCase().includes("lubricación") || descripcion.toLowerCase().includes("lubricacion")) {
+        if (
+          descripcion.toLowerCase().includes("lubricación") ||
+          descripcion.toLowerCase().includes("lubricacion")
+        ) {
           descripcion = "Lubricación";
         }
 
@@ -85,7 +120,11 @@ export async function GET(request: NextRequest) {
       };
 
       // Filtrar por periodo
-      if (periodo === "mensual" && mes) {
+      if (periodo === "quincenal" && mes && quincena) {
+        // NUEVO
+        whereClause.mes = mes;
+        // La condición de días se aplica más abajo en las órdenes
+      } else if (periodo === "mensual" && mes) {
         whereClause.mes = mes;
       } else if (periodo === "trimestral" && trimestre) {
         const mesInicio = (trimestre - 1) * 3 + 1;
@@ -104,7 +143,7 @@ export async function GET(request: NextRequest) {
 
       const productividad = await Promise.all(
         mecanicos.map(async (mecanico) => {
-          const ordenes = await prisma.ordenServicio.findMany({
+          let ordenes = await prisma.ordenServicio.findMany({
             where: {
               ...whereClause,
               mecanicoId: mecanico.id,
@@ -114,12 +153,27 @@ export async function GET(request: NextRequest) {
             },
           });
 
+          // NUEVO: Filtrar por quincena si es necesario
+          if (periodo === "quincenal" && quincena) {
+            ordenes = ordenes.filter((orden) => {
+              const fechaUsar = orden.fechaFin || orden.fechaCreacion;
+              const dia = new Date(fechaUsar).getDate();
+              if (quincena === 1) {
+                return dia >= 1 && dia <= 15;
+              } else {
+                return dia >= 16;
+              }
+            });
+          }
+
           const totalOrdenes = ordenes.length;
           const totalIngresos = ordenes.reduce((sum, o) => sum + o.total, 0);
           const utilidadTotal = ordenes.reduce((sum, o) => sum + o.utilidad, 0);
 
           // Calcular tiempo promedio
-          const ordenesConTiempo = ordenes.filter((o) => o.fechaInicio && o.fechaFin);
+          const ordenesConTiempo = ordenes.filter(
+            (o) => o.fechaInicio && o.fechaFin
+          );
           const tiempoPromedio =
             ordenesConTiempo.length > 0
               ? ordenesConTiempo.reduce((sum, o) => {
@@ -136,7 +190,10 @@ export async function GET(request: NextRequest) {
             totalIngresos,
             utilidadTotal,
             tiempoPromedioHoras: tiempoPromedio.toFixed(2),
-            ingresoPromedioPorOrden: totalOrdenes > 0 ? (totalIngresos / totalOrdenes).toFixed(2) : "0",
+            ingresoPromedioPorOrden:
+              totalOrdenes > 0
+                ? (totalIngresos / totalOrdenes).toFixed(2)
+                : "0",
           };
         })
       );
@@ -153,12 +210,15 @@ export async function GET(request: NextRequest) {
     // REPORTES CONTABLES
     if (tipo === "contabilidad") {
       if (!canViewContabilidad) {
-        return NextResponse.json({ error: "Sin permisos para ver contabilidad" }, { status: 403 });
+        return NextResponse.json(
+          { error: "Sin permisos para ver contabilidad" },
+          { status: 403 }
+        );
       }
 
       // Determinar rango de meses según el periodo
       let mesesRango: number[] = [];
-      
+
       if (periodo === "quincenal" && mes && quincena) {
         mesesRango = [mes];
       } else if (periodo === "mensual" && mes) {
@@ -174,7 +234,11 @@ export async function GET(request: NextRequest) {
         mesesRango = Array.from({ length: 12 }, (_, i) => i + 1);
       }
 
-      console.log("📅 Consultando contabilidad Wayra Taller:", { periodo, año, meses: mesesRango });
+      console.log("📅 Consultando contabilidad Wayra Taller:", {
+        periodo,
+        año,
+        meses: mesesRango,
+      });
 
       // OBTENER DATOS DE CADA MES
       const todosIngresos: any[] = [];
@@ -211,7 +275,7 @@ export async function GET(request: NextRequest) {
               monto: servicio.precio,
               tipo: "SERVICIO",
               ordenId: orden.id,
-              mes: mesNum
+              mes: mesNum,
             });
           });
 
@@ -225,7 +289,7 @@ export async function GET(request: NextRequest) {
               utilidad: repuesto.utilidad,
               tipo: "REPUESTO_EXTERNO",
               ordenId: orden.id,
-              mes: mesNum
+              mes: mesNum,
             });
           });
 
@@ -238,7 +302,7 @@ export async function GET(request: NextRequest) {
               monto: orden.manoDeObra,
               tipo: "MANO_OBRA",
               ordenId: orden.id,
-              mes: mesNum
+              mes: mesNum,
             });
           }
         });
@@ -270,13 +334,18 @@ export async function GET(request: NextRequest) {
           usuario: e.usuario.name,
           rol: e.usuario.role,
           valor: e.monto,
-          mes: mesNum
+          mes: mesNum,
         }));
 
         todosEgresos.push(...egresosFormatoMes);
       }
 
-      console.log("✅ Wayra Taller - Ingresos:", todosIngresos.length, "Egresos:", todosEgresos.length);
+      console.log(
+        "✅ Wayra Taller - Ingresos:",
+        todosIngresos.length,
+        "Egresos:",
+        todosEgresos.length
+      );
 
       // CALCULAR TOTALES
       const totalIngresos = todosIngresos.reduce((s, i) => s + i.monto, 0);
@@ -294,24 +363,29 @@ export async function GET(request: NextRequest) {
 
       // QUINCENAL - NUEVO
       if (periodo === "quincenal" && mes && quincena) {
-        const filtrarIngresos = todosIngresos.filter(ing => {
+        const filtrarIngresos = todosIngresos.filter((ing) => {
           const dia = new Date(ing.fecha).getDate();
           if (quincena === 1) return dia >= 1 && dia <= 15;
           return dia >= 16 && dia <= 31;
         });
 
-        const filtrarEgresos = todosEgresos.filter(egr => {
+        const filtrarEgresos = todosEgresos.filter((egr) => {
           const dia = new Date(egr.fecha).getDate();
           if (quincena === 1) return dia >= 1 && dia <= 15;
           return dia >= 16 && dia <= 31;
         });
 
-        const diasRango = quincena === 1 ? 15 : new Date(año, mes, 0).getDate() - 15;
-        
+        const diasRango =
+          quincena === 1 ? 15 : new Date(año, mes, 0).getDate() - 15;
+
         porPeriodo = Array.from({ length: diasRango }, (_, i) => {
           const dia = quincena === 1 ? i + 1 : i + 16;
-          const ingresosDia = filtrarIngresos.filter(ing => new Date(ing.fecha).getDate() === dia);
-          const egresosDia = filtrarEgresos.filter(egr => new Date(egr.fecha).getDate() === dia);
+          const ingresosDia = filtrarIngresos.filter(
+            (ing) => new Date(ing.fecha).getDate() === dia
+          );
+          const egresosDia = filtrarEgresos.filter(
+            (egr) => new Date(egr.fecha).getDate() === dia
+          );
 
           const ingresosVal = ingresosDia.reduce((s, i) => s + i.monto, 0);
           const egresosVal = egresosDia.reduce((s, e) => s + e.valor, 0);
@@ -322,7 +396,7 @@ export async function GET(request: NextRequest) {
             ingresos: Math.round(ingresosVal),
             egresos: Math.round(egresosVal),
             utilidad: Math.round(ingresosVal - egresosVal),
-            ordenes: ingresosDia.filter(i => i.tipo === "SERVICIO").length
+            ordenes: ingresosDia.filter((i) => i.tipo === "SERVICIO").length,
           };
         });
       }
@@ -332,8 +406,12 @@ export async function GET(request: NextRequest) {
         const diasEnMes = new Date(año, mes, 0).getDate();
         porPeriodo = Array.from({ length: diasEnMes }, (_, i) => {
           const dia = i + 1;
-          const ingresosDia = todosIngresos.filter(ing => new Date(ing.fecha).getDate() === dia);
-          const egresosDia = todosEgresos.filter(egr => new Date(egr.fecha).getDate() === dia);
+          const ingresosDia = todosIngresos.filter(
+            (ing) => new Date(ing.fecha).getDate() === dia
+          );
+          const egresosDia = todosEgresos.filter(
+            (egr) => new Date(egr.fecha).getDate() === dia
+          );
 
           const ingresosVal = ingresosDia.reduce((s, i) => s + i.monto, 0);
           const egresosVal = egresosDia.reduce((s, e) => s + e.valor, 0);
@@ -344,25 +422,27 @@ export async function GET(request: NextRequest) {
             ingresos: Math.round(ingresosVal),
             egresos: Math.round(egresosVal),
             utilidad: Math.round(ingresosVal - egresosVal),
-            ordenes: ingresosDia.filter(i => i.tipo === "SERVICIO").length
+            ordenes: ingresosDia.filter((i) => i.tipo === "SERVICIO").length,
           };
         });
       } else {
         // Agrupar por mes (trimestral, semestral, anual)
-        porPeriodo = mesesRango.map(mesNum => {
-          const ingresosMes = todosIngresos.filter(i => i.mes === mesNum);
-          const egresosMes = todosEgresos.filter(e => e.mes === mesNum);
+        porPeriodo = mesesRango.map((mesNum) => {
+          const ingresosMes = todosIngresos.filter((i) => i.mes === mesNum);
+          const egresosMes = todosEgresos.filter((e) => e.mes === mesNum);
 
           const ingresosVal = ingresosMes.reduce((s, i) => s + i.monto, 0);
           const egresosVal = egresosMes.reduce((s, e) => s + e.valor, 0);
 
           return {
-            periodo: new Date(año, mesNum - 1).toLocaleString("es-CO", { month: "short" }).replace(".", ""),
+            periodo: new Date(año, mesNum - 1)
+              .toLocaleString("es-CO", { month: "short" })
+              .replace(".", ""),
             mes: mesNum,
             ingresos: Math.round(ingresosVal),
             egresos: Math.round(egresosVal),
             utilidad: Math.round(ingresosVal - egresosVal),
-            ordenes: ingresosMes.filter(i => i.tipo === "SERVICIO").length
+            ordenes: ingresosMes.filter((i) => i.tipo === "SERVICIO").length,
           };
         });
       }
@@ -374,8 +454,12 @@ export async function GET(request: NextRequest) {
           totalIngresos: Math.round(totalIngresos),
           totalEgresos: Math.round(totalEgresos),
           utilidadNeta: Math.round(utilidadNeta),
-          margenUtilidad: totalIngresos > 0 ? ((utilidadNeta / totalIngresos) * 100).toFixed(2) : "0",
-          totalOrdenes: todosIngresos.filter(i => i.tipo === "SERVICIO").length,
+          margenUtilidad:
+            totalIngresos > 0
+              ? ((utilidadNeta / totalIngresos) * 100).toFixed(2)
+              : "0",
+          totalOrdenes: todosIngresos.filter((i) => i.tipo === "SERVICIO")
+            .length,
         },
         porPeriodo,
         egresos: todosEgresos.slice(0, 50),
@@ -410,14 +494,14 @@ export async function GET(request: NextRequest) {
           });
 
           ordenesCompletadas.forEach((orden) => {
-            const ingresoOrden = 
+            const ingresoOrden =
               orden.servicios.reduce((s, serv) => s + serv.precio, 0) +
               orden.repuestosExternos.reduce((s, r) => s + r.subtotal, 0) +
               (orden.manoDeObra || 0);
 
             todosIngresos.push({
               monto: ingresoOrden,
-              mes: mesNum
+              mes: mesNum,
             });
           });
 
@@ -431,17 +515,19 @@ export async function GET(request: NextRequest) {
             },
           });
 
-          todosEgresos.push(...egresosMes.map(e => ({
-            valor: e.monto,
-            mes: mesNum
-          })));
+          todosEgresos.push(
+            ...egresosMes.map((e) => ({
+              valor: e.monto,
+              mes: mesNum,
+            }))
+          );
         }
 
         // Calcular por mes
         const porMes = Array.from({ length: 12 }, (_, i) => {
           const mesNum = i + 1;
-          const ingresosMes = todosIngresos.filter(ing => ing.mes === mesNum);
-          const egresosMes = todosEgresos.filter(egr => egr.mes === mesNum);
+          const ingresosMes = todosIngresos.filter((ing) => ing.mes === mesNum);
+          const egresosMes = todosEgresos.filter((egr) => egr.mes === mesNum);
 
           const ingresosVal = ingresosMes.reduce((s, i) => s + i.monto, 0);
           const egresosVal = egresosMes.reduce((s, e) => s + e.valor, 0);
@@ -451,7 +537,7 @@ export async function GET(request: NextRequest) {
             ingresos: Math.round(ingresosVal),
             egresos: Math.round(egresosVal),
             utilidad: Math.round(ingresosVal - egresosVal),
-            ordenes: ingresosMes.length
+            ordenes: ingresosMes.length,
           };
         });
 
@@ -467,21 +553,41 @@ export async function GET(request: NextRequest) {
       const datos1 = await procesarDatosAnio(año);
       const datos2 = await procesarDatosAnio(año2);
 
-      const crecimientoIngresos = datos2.totalIngresos > 0
-        ? (((datos1.totalIngresos - datos2.totalIngresos) / datos2.totalIngresos) * 100).toFixed(2)
-        : "0";
+      const crecimientoIngresos =
+        datos2.totalIngresos > 0
+          ? (
+              ((datos1.totalIngresos - datos2.totalIngresos) /
+                datos2.totalIngresos) *
+              100
+            ).toFixed(2)
+          : "0";
 
-      const crecimientoEgresos = datos2.totalEgresos > 0
-        ? (((datos1.totalEgresos - datos2.totalEgresos) / datos2.totalEgresos) * 100).toFixed(2)
-        : "0";
+      const crecimientoEgresos =
+        datos2.totalEgresos > 0
+          ? (
+              ((datos1.totalEgresos - datos2.totalEgresos) /
+                datos2.totalEgresos) *
+              100
+            ).toFixed(2)
+          : "0";
 
-      const crecimientoUtilidad = datos2.utilidadTotal > 0
-        ? (((datos1.utilidadTotal - datos2.utilidadTotal) / datos2.utilidadTotal) * 100).toFixed(2)
-        : "0";
+      const crecimientoUtilidad =
+        datos2.utilidadTotal > 0
+          ? (
+              ((datos1.utilidadTotal - datos2.utilidadTotal) /
+                datos2.utilidadTotal) *
+              100
+            ).toFixed(2)
+          : "0";
 
-      const crecimientoOrdenes = datos2.totalOrdenes > 0
-        ? (((datos1.totalOrdenes - datos2.totalOrdenes) / datos2.totalOrdenes) * 100).toFixed(2)
-        : "0";
+      const crecimientoOrdenes =
+        datos2.totalOrdenes > 0
+          ? (
+              ((datos1.totalOrdenes - datos2.totalOrdenes) /
+                datos2.totalOrdenes) *
+              100
+            ).toFixed(2)
+          : "0";
 
       return NextResponse.json({
         año1: { año, ...datos1 },
@@ -490,14 +596,20 @@ export async function GET(request: NextRequest) {
           ingresos: crecimientoIngresos,
           egresos: crecimientoEgresos,
           utilidad: crecimientoUtilidad,
-          ordenes: crecimientoOrdenes
+          ordenes: crecimientoOrdenes,
         },
       });
     }
 
-    return NextResponse.json({ error: "Tipo de reporte no válido" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Tipo de reporte no válido" },
+      { status: 400 }
+    );
   } catch (error) {
     console.error("Error en reportes Wayra Taller:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 }
+    );
   }
 }

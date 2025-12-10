@@ -50,12 +50,13 @@ export default function ReportesWayraTaller() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [vistaActual, setVistaActual] = useState("general");
-  const [filtroServicios, setFiltroServicios] = useState<"todo" | "mes">(
-    "todo"
-  );
+  const [filtroServicios, setFiltroServicios] = useState<
+    "todo" | "mes" | "quincenal"
+  >("todo");
   const [mesServicios, setMesServicios] = useState(new Date().getMonth() + 1);
   const [añoServicios, setAñoServicios] = useState(new Date().getFullYear());
-
+  const [quincenaServicios, setQuincenaServicios] = useState(1);
+  const [quincenaMecanicos, setQuincenaMecanicos] = useState(1);
   // Filtros
   const [periodo, setPeriodo] = useState<
     "quincenal" | "mensual" | "trimestral" | "semestral" | "anual"
@@ -99,10 +100,12 @@ export default function ReportesWayraTaller() {
     trimestre,
     semestre,
     quincena,
+    quincenaMecanicos,
     añoComparacion,
     filtroServicios,
     mesServicios,
     añoServicios,
+    quincenaServicios,
   ]);
 
   const cargarDatos = async () => {
@@ -112,6 +115,8 @@ export default function ReportesWayraTaller() {
         let url = `/api/reportes/wayra-taller?tipo=servicios-frecuencia`;
         if (filtroServicios === "mes") {
           url += `&mes=${mesServicios}&año=${añoServicios}`;
+        } else if (filtroServicios === "quincenal") {
+          url += `&mes=${mesServicios}&año=${añoServicios}&quincena=${quincenaServicios}`;
         }
         const res = await fetch(url);
         if (res.ok) setServiciosFrecuencia(await res.json());
@@ -120,7 +125,9 @@ export default function ReportesWayraTaller() {
       if (vistaActual === "general" || vistaActual === "mecanicos") {
         let url = `/api/reportes/wayra-taller?tipo=mecanicos-productividad&año=${año}&periodo=${periodo}`;
 
-        if (periodo === "mensual") {
+        if (periodo === "quincenal") {
+          url += `&mes=${mes}&quincena=${quincenaMecanicos}`;
+        } else if (periodo === "mensual") {
           url += `&mes=${mes}`;
         } else if (periodo === "trimestral") {
           url += `&trimestre=${trimestre}`;
@@ -316,8 +323,18 @@ export default function ReportesWayraTaller() {
                           </label>
                           <Dropdown
                             options={quincenaOptions}
-                            value={quincena}
-                            onChange={setQuincena}
+                            value={
+                              vistaActual === "mecanicos"
+                                ? quincenaMecanicos
+                                : quincena
+                            }
+                            onChange={(val) => {
+                              if (vistaActual === "mecanicos") {
+                                setQuincenaMecanicos(val);
+                              } else {
+                                setQuincena(val);
+                              }
+                            }}
                             icon={<Calendar className="h-4 w-4" />}
                           />
                         </div>
@@ -584,6 +601,7 @@ export default function ReportesWayraTaller() {
                           options={[
                             { value: "todo", label: "Todo el tiempo" },
                             { value: "mes", label: "Por mes" },
+                            { value: "quincenal", label: "Quincenal" },
                           ]}
                           value={filtroServicios}
                           onChange={(val) =>
@@ -592,7 +610,8 @@ export default function ReportesWayraTaller() {
                           icon={<Calendar className="h-4 w-4" />}
                         />
                       </div>
-                      {filtroServicios === "mes" && (
+                      {(filtroServicios === "mes" ||
+                        filtroServicios === "quincenal") && (
                         <>
                           <div>
                             <label className="block text-sm font-medium mb-2">
@@ -616,6 +635,19 @@ export default function ReportesWayraTaller() {
                               icon={<Calendar className="h-4 w-4" />}
                             />
                           </div>
+                          {filtroServicios === "quincenal" && ( // NUEVO
+                            <div>
+                              <label className="block text-sm font-medium mb-2">
+                                Quincena
+                              </label>
+                              <Dropdown
+                                options={quincenaOptions}
+                                value={quincenaServicios}
+                                onChange={setQuincenaServicios}
+                                icon={<Calendar className="h-4 w-4" />}
+                              />
+                            </div>
+                          )}
                         </>
                       )}
                     </div>

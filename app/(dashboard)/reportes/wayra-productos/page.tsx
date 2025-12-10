@@ -55,11 +55,12 @@ export default function ReportesWayraProductosPage() {
   >("productos");
 
   // Filtros para productos
-  const [filtroProductos, setFiltroProductos] = useState<"todo" | "mes">(
-    "todo"
-  );
+  const [filtroProductos, setFiltroProductos] = useState<
+    "todo" | "mes" | "quincenal"
+  >("todo");
   const [mesProductos, setMesProductos] = useState(new Date().getMonth() + 1);
   const [añoProductos, setAñoProductos] = useState(new Date().getFullYear());
+  const [quincenaProductos, setQuincenaProductos] = useState(1);
 
   // Filtros para contabilidad
   const [periodo, setPeriodo] = useState<
@@ -107,16 +108,18 @@ export default function ReportesWayraProductosPage() {
     filtroProductos,
     mesProductos,
     añoProductos,
+    quincenaProductos,
   ]);
 
   const cargarDatos = async () => {
     setLoading(true);
     try {
       if (vistaActual === "productos") {
-        // 🔥 CORREGIDO: Usar la ruta correcta para Wayra Productos
         let url = `/api/reportes/wayra-productos?tipo=productos-vendidos`;
         if (filtroProductos === "mes") {
           url += `&mes=${mesProductos}&año=${añoProductos}`;
+        } else if (filtroProductos === "quincenal") {
+          url += `&mes=${mesProductos}&año=${añoProductos}&quincena=${quincenaProductos}`;
         }
         console.log("📊 Cargando productos Wayra:", url);
         const res = await fetch(url);
@@ -278,38 +281,53 @@ export default function ReportesWayraProductosPage() {
                   options={[
                     { value: "todo", label: "Todo el tiempo" },
                     { value: "mes", label: "Por mes" },
+                    { value: "quincenal", label: "Quincenal" },
                   ]}
                   value={filtroProductos}
                   onChange={(val) => setFiltroProductos(val as "todo" | "mes")}
                   icon={<Calendar className="h-4 w-4" />}
                 />
               </div>
-              {filtroProductos === "mes" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Año
-                    </label>
-                    <Dropdown
-                      options={añosOptions}
-                      value={añoProductos}
-                      onChange={setAñoProductos}
-                      icon={<Calendar className="h-4 w-4" />}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Mes
-                    </label>
-                    <Dropdown
-                      options={mesesOptions}
-                      value={mesProductos}
-                      onChange={setMesProductos}
-                      icon={<Calendar className="h-4 w-4" />}
-                    />
-                  </div>
-                </>
-              )}
+              {filtroProductos === "mes" ||
+                (filtroProductos === "quincenal" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Año
+                      </label>
+                      <Dropdown
+                        options={añosOptions}
+                        value={añoProductos}
+                        onChange={setAñoProductos}
+                        icon={<Calendar className="h-4 w-4" />}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Mes
+                      </label>
+                      <Dropdown
+                        options={mesesOptions}
+                        value={mesProductos}
+                        onChange={setMesProductos}
+                        icon={<Calendar className="h-4 w-4" />}
+                      />
+                    </div>
+                    {filtroProductos === "quincenal" && ( // NUEVO
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Quincena
+                        </label>
+                        <Dropdown
+                          options={quincenaOptions}
+                          value={quincenaProductos}
+                          onChange={setQuincenaProductos}
+                          icon={<Calendar className="h-4 w-4" />}
+                        />
+                      </div>
+                    )}
+                  </>
+                ))}
             </div>
           </CardContent>
         </Card>
