@@ -68,8 +68,11 @@ export async function PATCH(request: NextRequest) {
     const recalculationMap: Record<string, { tipo?: string, categoria?: string }> = {
       'WAYRA_MARGEN_ENI': { tipo: 'WAYRA_ENI' },
       'WAYRA_MARGEN_CALAN': { tipo: 'WAYRA_CALAN' },
+      'WAYRA_MARGEN_OTROS': { tipo: 'WAYRA_OTROS' },
       'WAYRA_DESCUENTO_MINORISTA': { tipo: 'WAYRA_ENI,WAYRA_CALAN' },
       'WAYRA_DESCUENTO_MAYORISTA': { tipo: 'WAYRA_ENI,WAYRA_CALAN' },
+      'WAYRA_DESCUENTO_MINORISTA_OTROS': { tipo: 'WAYRA_OTROS' },
+      'WAYRA_DESCUENTO_MAYORISTA_OTROS': { tipo: 'WAYRA_OTROS' },
       'TASA_USD_COP': { tipo: 'WAYRA_CALAN' },
       'IVA_CALAN': { tipo: 'WAYRA_CALAN' },
       'TORNI_MARGEN_REPUESTOS': { tipo: 'TORNI_REPUESTO', categoria: 'REPUESTOS' },

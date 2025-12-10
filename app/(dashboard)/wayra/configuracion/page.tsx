@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { 
   Settings, DollarSign, Percent, Calculator, Globe, Package,
-  Save, RefreshCw, AlertCircle, CheckCircle, Zap
+  Save, RefreshCw, AlertCircle, CheckCircle, Zap, Boxes
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -100,15 +100,22 @@ export default function WayraConfiguracionPage() {
   }
 
   const getConfigValue = (clave: string) => {
-    return configuraciones.find(c => c.clave === clave)?.valor || ''
+    const config = configuraciones.find(c => c.clave === clave)
+    return config?.valor ?? ''
   }
 
   const setConfigValue = (clave: string, valor: string) => {
-    setConfiguraciones(prev => 
-      prev.map(config => 
-        config.clave === clave ? { ...config, valor } : config
-      )
-    )
+    setConfiguraciones(prev => {
+      const exists = prev.find(c => c.clave === clave)
+      if (exists) {
+        return prev.map(config => 
+          config.clave === clave ? { ...config, valor } : config
+        )
+      } else {
+        // Si no existe, crear una nueva configuración temporal
+        return [...prev, { clave, valor, descripcion: '' }]
+      }
+    })
   }
 
   if (!hasAccess) {
@@ -341,6 +348,79 @@ export default function WayraConfiguracionPage() {
                   </div>
                   <p className="text-xs text-orange-700 leading-relaxed">
                     Los cambios se aplicarán al presionar "Guardar y Actualizar Todo".
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* OTROS Card - NUEVA */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+          >
+            <Card className="overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white/80 backdrop-blur">
+              <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Boxes className="h-6 w-6" />
+                  </div>
+                  <span>Wayra OTROS</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <Percent className="h-4 w-4 text-purple-600" />
+                    Margen de Ganancia (%)
+                  </label>
+                  <Input
+                    type="number"
+                    value={getConfigValue('WAYRA_MARGEN_OTROS')}
+                    onChange={(e) => setConfigValue('WAYRA_MARGEN_OTROS', e.target.value)}
+                    placeholder="35"
+                    className="text-lg font-bold border-2 focus:border-purple-500 transition-all"
+                  />
+                  <p className="text-xs text-gray-500">Presiona "Guardar y Actualizar Todo" para aplicar</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Calculator className="h-4 w-4 text-purple-600" />
+                      Minorista (%)
+                    </label>
+                    <Input
+                      type="number"
+                      value={getConfigValue('WAYRA_DESCUENTO_MINORISTA_OTROS')}
+                      onChange={(e) => setConfigValue('WAYRA_DESCUENTO_MINORISTA_OTROS', e.target.value)}
+                      placeholder="3"
+                      className="font-bold border-2 focus:border-purple-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Calculator className="h-4 w-4 text-purple-600" />
+                      Mayorista (%)
+                    </label>
+                    <Input
+                      type="number"
+                      value={getConfigValue('WAYRA_DESCUENTO_MAYORISTA_OTROS')}
+                      onChange={(e) => setConfigValue('WAYRA_DESCUENTO_MAYORISTA_OTROS', e.target.value)}
+                      placeholder="10"
+                      className="font-bold border-2 focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertCircle className="h-4 w-4 text-purple-700" />
+                    <span className="font-medium text-purple-800 text-sm">Productos Otros</span>
+                  </div>
+                  <p className="text-xs text-purple-700 leading-relaxed">
+                    Configuración para productos que no sean ENI ni CALAN.
                   </p>
                 </div>
               </CardContent>

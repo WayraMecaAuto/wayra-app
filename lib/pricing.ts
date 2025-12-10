@@ -1,4 +1,3 @@
-// Utilidades para cálculo de precios
 import { TipoProducto } from '@prisma/client'
 
 interface PricingConfig {
@@ -90,14 +89,19 @@ export async function updatePricingConfigFromDB() {
           break
         case 'WAYRA_MARGEN_OTROS':
           PRICING_CONFIG.WAYRA_OTROS.margenGanancia = valor
+          break
         case 'WAYRA_DESCUENTO_MINORISTA':
           PRICING_CONFIG.WAYRA_ENI.descuentoMinorista = valor
           PRICING_CONFIG.WAYRA_CALAN.descuentoMinorista = valor
-          PRICING_CONFIG.WAYRA_OTROS.descuentoMinorista = valor
           break
         case 'WAYRA_DESCUENTO_MAYORISTA':
           PRICING_CONFIG.WAYRA_ENI.descuentoMayorista = valor
           PRICING_CONFIG.WAYRA_CALAN.descuentoMayorista = valor
+          break
+        case 'WAYRA_DESCUENTO_MINORISTA_OTROS':
+          PRICING_CONFIG.WAYRA_OTROS.descuentoMinorista = valor
+          break
+        case 'WAYRA_DESCUENTO_MAYORISTA_OTROS':
           PRICING_CONFIG.WAYRA_OTROS.descuentoMayorista = valor
           break
         case 'TORNI_MARGEN_REPUESTOS':
