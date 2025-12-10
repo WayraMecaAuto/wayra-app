@@ -92,8 +92,9 @@ export async function GET(request: NextRequest) {
     const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
     const trimestre = searchParams.get('trimestre') ? parseInt(searchParams.get('trimestre')!) : null
     const semestre = searchParams.get('semestre') ? parseInt(searchParams.get('semestre')!) : null
+    const quincena = searchParams.get('quincena') ? parseInt(searchParams.get('quincena')!) : null
 
-    console.log('📊 API Wayra Productos - Parámetros:', { tipo, periodo, año, mes, trimestre, semestre })
+    console.log('📊 API Wayra Productos - Parámetros:', { tipo, periodo, año, mes, trimestre, semestre, quincena })
 
     // PRODUCTOS MÁS VENDIDOS
     if (tipo === 'productos-vendidos') {
@@ -166,7 +167,9 @@ export async function GET(request: NextRequest) {
       // Determinar rango de meses
       let mesesRango: number[] = []
       
-      if (periodo === 'mensual' && mes) {
+      if (periodo === 'quincenal' && mes && quincena) {
+        mesesRango = [mes]
+      } else if (periodo === 'mensual' && mes) {
         mesesRango = [mes]
       } else if (periodo === 'trimestral' && trimestre) {
         const mesInicio = (trimestre - 1) * 3 + 1
@@ -209,7 +212,42 @@ export async function GET(request: NextRequest) {
       // GENERAR DATOS POR PERIODO
       let porPeriodo: any[] = []
 
-      if (periodo === 'mensual' && mes) {
+      // QUINCENAL - NUEVO
+      if (periodo === 'quincenal' && mes && quincena) {
+        const filtrarIngresos = todosIngresos.filter(ing => {
+          const dia = new Date(ing.fecha).getDate()
+          if (quincena === 1) return dia >= 1 && dia <= 15
+          return dia >= 16 && dia <= 31
+        })
+
+        const filtrarEgresos = todosEgresos.filter(egr => {
+          const dia = new Date(egr.fecha).getDate()
+          if (quincena === 1) return dia >= 1 && dia <= 15
+          return dia >= 16 && dia <= 31
+        })
+
+        const diasRango = quincena === 1 ? 15 : new Date(año, mes, 0).getDate() - 15
+        
+        porPeriodo = Array.from({ length: diasRango }, (_, i) => {
+          const dia = quincena === 1 ? i + 1 : i + 16
+          const ingresosDia = filtrarIngresos.filter(ing => new Date(ing.fecha).getDate() === dia)
+          const egresosDia = filtrarEgresos.filter(egr => new Date(egr.fecha).getDate() === dia)
+
+          const ingresosVal = ingresosDia.reduce((s, i) => s + (i.precioVenta * i.cantidad), 0)
+          const costosVal = ingresosDia.reduce((s, i) => s + (i.precioCompra * i.cantidad), 0)
+          const egresosVal = egresosDia.reduce((s, e) => s + e.valor, 0)
+
+          return {
+            periodo: `Día ${dia}`,
+            ingresos: Math.round(ingresosVal),
+            costos: Math.round(costosVal),
+            egresos: Math.round(egresosVal),
+            utilidad: Math.round(ingresosVal - egresosVal)
+          }
+        })
+      }
+      // MENSUAL
+      else if (periodo === 'mensual' && mes) {
         // Día a día
         const diasEnMes = new Date(año, mes, 0).getDate()
         porPeriodo = Array.from({ length: diasEnMes }, (_, i) => {
@@ -317,6 +355,10 @@ export async function GET(request: NextRequest) {
         ? ((datos1.totalIngresos - datos2.totalIngresos) / datos2.totalIngresos * 100).toFixed(2)
         : '0'
       
+      const crecimientoEgresos = datos2.totalEgresos > 0
+        ? ((datos1.totalEgresos - datos2.totalEgresos) / datos2.totalEgresos * 100).toFixed(2)
+        : '0'
+      
       const crecimientoUtilidad = datos2.utilidadTotal > 0
         ? ((datos1.utilidadTotal - datos2.utilidadTotal) / datos2.utilidadTotal * 100).toFixed(2)
         : '0'
@@ -328,6 +370,7 @@ export async function GET(request: NextRequest) {
         año2: { año: año2, ...datos2 },
         crecimiento: {
           ingresos: crecimientoIngresos,
+          egresos: crecimientoEgresos,
           utilidad: crecimientoUtilidad
         }
       })
