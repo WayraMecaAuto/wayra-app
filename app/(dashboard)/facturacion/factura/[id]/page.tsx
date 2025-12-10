@@ -494,15 +494,6 @@ export default function FacturaDetailPage() {
         { align: "right" }
       );
 
-      // IVA
-      doc.text("IVA (19%):", boxX + 5, y + 15);
-      doc.text(
-        `$${factura.iva.toLocaleString("es-CO")}`,
-        pageWidth - margin - 5,
-        y + 15,
-        { align: "right" }
-      );
-
       // Línea separadora
       doc.setDrawColor(209, 213, 219);
       doc.line(boxX + 5, y + 18, pageWidth - margin - 5, y + 18);
@@ -869,11 +860,6 @@ export default function FacturaDetailPage() {
                           <div className="break-words">
                             {detalle.producto.nombre}
                           </div>
-                          {detalle.producto.aplicaIva && (
-                            <span className="text-xs text-blue-600">
-                              (+IVA)
-                            </span>
-                          )}
                         </td>
                         <td className="p-2 sm:p-3 text-center">
                           {detalle.cantidad}
@@ -952,9 +938,6 @@ export default function FacturaDetailPage() {
                 <span className="font-medium whitespace-nowrap">
                   ${factura.subtotal.toLocaleString()}
                 </span>
-              </div>
-              <div className="flex justify-between text-xs sm:text-sm pb-2 border-b border-gray-200">
-                <span className="text-gray-600">IVA (19%)</span>
               </div>
               <div className="flex justify-between text-base sm:text-lg lg:text-xl font-bold pt-2 sm:pt-3 border-t-2 border-gray-300">
                 <span className="text-gray-900">Total:</span>
