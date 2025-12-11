@@ -143,6 +143,7 @@ export default function TornilleriaPage() {
   const filteredProducts = products.filter(
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.codigo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

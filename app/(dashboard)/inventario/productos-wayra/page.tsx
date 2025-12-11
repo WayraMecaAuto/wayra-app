@@ -226,6 +226,7 @@ export default function ProductosWayraPage() {
     const matchesSearch =
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.codigoBarras?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType = filterType === "ALL" || product.tipo === filterType;

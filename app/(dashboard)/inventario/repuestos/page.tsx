@@ -198,6 +198,7 @@ export default function RepuestosPage() {
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.codigoBarras?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
