@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats, Html5Qrcode } from 'html5-qrcode'
 import { Button } from './button'
-import { X, Camera, Upload, AlertCircle, CheckCircle, Zap, Scan, Star, Smartphone } from 'lucide-react'
+import { X, Camera, Upload, AlertCircle, CheckCircle, Zap, Scan, Smartphone } from 'lucide-react'
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void
@@ -41,10 +41,7 @@ export function BarcodeScanner({
     setIsIOS(isIOSDevice)
     setIsMobile(isMobileDevice)
     
-    // Verificar permisos de cámara al iniciar
     checkCameraPermissions()
-    
-    // Obtener cámaras disponibles
     getCameras()
   }, [])
 
@@ -68,7 +65,6 @@ export function BarcodeScanner({
           setCameraPermission(permission.state)
         }
       } else {
-        // Para navegadores que no soportan navigator.permissions
         setCameraPermission('prompt')
       }
     } catch (error) {
@@ -83,7 +79,6 @@ export function BarcodeScanner({
       setAvailableCameras(devices)
       
       if (devices.length > 0) {
-        // Preferir cámara trasera en móviles
         const backCamera = devices.find(camera => 
           camera.label.toLowerCase().includes('back') || 
           camera.label.toLowerCase().includes('rear') ||
@@ -106,7 +101,6 @@ export function BarcodeScanner({
         } 
       })
       
-      // Detener el stream inmediatamente, solo necesitábamos el permiso
       stream.getTracks().forEach(track => track.stop())
       
       setCameraPermission('granted')
@@ -131,7 +125,6 @@ export function BarcodeScanner({
         if (!granted) return
       }
 
-      // Configuración básica que funciona en todos los navegadores
       const config = {
         fps: 10,
         qrbox: { width: 280, height: 280 },
@@ -149,8 +142,7 @@ export function BarcodeScanner({
         showZoomSliderIfSupported: true,
         disableFlip: false,
         rememberLastUsedCamera: true,
-        useBarCodeDetectorIfSupported: false, // Deshabilitado para mejor compatibilidad
-        // Configuraciones específicas para mostrar la vista previa
+        useBarCodeDetectorIfSupported: false,
         videoConstraints: {
           facingMode: isMobile ? 'environment' : 'user',
           width: { min: 320, ideal: 640, max: 1280 },
@@ -160,11 +152,10 @@ export function BarcodeScanner({
 
       console.log('🎥 Inicializando scanner con configuración:', config)
 
-      // SIEMPRE usar Html5QrcodeScanner para garantizar vista previa
       scannerRef.current = new Html5QrcodeScanner(
         'barcode-scanner',
         config,
-        false // verbose = false
+        false
       )
 
       scannerRef.current.render(
@@ -173,7 +164,6 @@ export function BarcodeScanner({
           handleSuccessfulScan(decodedText)
         },
         (error) => {
-          // Solo loguear errores importantes, no cada frame de escaneo
           if (!error.includes('NotFoundException') && 
               !error.includes('No MultiFormat Readers') &&
               !error.includes('No code found') &&
@@ -187,7 +177,6 @@ export function BarcodeScanner({
       setScanStatus('idle')
       setErrorMessage('')
       
-      // Verificar si la vista previa se cargó correctamente después de un momento
       setTimeout(() => {
         const videoElement = document.querySelector('#barcode-scanner video')
         if (videoElement) {
@@ -195,7 +184,6 @@ export function BarcodeScanner({
           setIsScanning(true)
         } else {
           console.warn('⚠️ No se detectó elemento de video, intentando alternativa...')
-          // Intentar método alternativo si no se carga la vista previa
           initializeAlternativeScanner()
         }
       }, 2000)
@@ -211,7 +199,6 @@ export function BarcodeScanner({
       console.log('🔄 Intentando método alternativo...')
       cleanupScanner()
       
-      // Método alternativo usando Html5Qrcode directamente
       html5QrCodeRef.current = new Html5Qrcode('barcode-scanner')
       
       const cameraId = selectedCamera || availableCameras[0]?.id || { facingMode: isMobile ? 'environment' : 'user' }
@@ -242,25 +229,6 @@ export function BarcodeScanner({
       console.error('❌ Error con método alternativo:', altError)
       handleScannerError(altError)
     }
-  }
-
-  const initializeScannerFallback = async (config: any) => {
-    scannerRef.current = new Html5QrcodeScanner('barcode-scanner', config, false)
-
-    scannerRef.current.render(
-      (decodedText) => {
-        console.log('✅ Código escaneado exitosamente:', decodedText)
-        handleSuccessfulScan(decodedText)
-      },
-      (error) => {
-        if (!error.includes('NotFoundException') && 
-            !error.includes('No MultiFormat Readers') &&
-            !error.includes('No code found')) {
-          console.log('Scanner error:', error)
-        }
-      }
-    )
-    setIsScanning(true)
   }
 
   const handleScannerError = (error: any) => {
@@ -312,7 +280,6 @@ export function BarcodeScanner({
       scannerRef.current = null
     }
     
-    // Limpiar el contenedor del scanner
     const scannerElement = document.getElementById('barcode-scanner')
     if (scannerElement) {
       scannerElement.innerHTML = ''
@@ -327,7 +294,6 @@ export function BarcodeScanner({
     setLastScannedCode(cleanCode)
     setScanStatus('success')
     
-    // Pequeña demora para mostrar el estado de éxito
     setTimeout(() => {
       onScan(cleanCode)
       handleClose()
@@ -400,7 +366,7 @@ export function BarcodeScanner({
       cleanupScanner()
       setTimeout(() => {
         initializeScanner()
-      }, 1000) // Dar más tiempo para la limpieza
+      }, 1000)
     }
   }
 
@@ -410,14 +376,12 @@ export function BarcodeScanner({
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[95vh] overflow-hidden">
         
-        {/* Decorative elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
           <div className="absolute -top-10 -left-10 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl"></div>
           <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
         </div>
 
         <div className="relative z-10 overflow-y-auto max-h-[95vh]">
-          {/* Header simplificado */}
           <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-3">
@@ -452,7 +416,6 @@ export function BarcodeScanner({
             </div>
           </div>
 
-          {/* Selección de métodos */}
           <div className="p-4 bg-gray-50/50 border-b border-gray-100">
             <div className="flex gap-2">
               <Button
@@ -484,7 +447,6 @@ export function BarcodeScanner({
               </Button>
             </div>
 
-            {/* Selección de cámara */}
             {scanMethod === 'camera' && availableCameras.length > 1 && (
               <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
                 <p className="text-sm font-medium text-gray-700 mb-2">Seleccionar cámara:</p>
@@ -509,9 +471,7 @@ export function BarcodeScanner({
             )}
           </div>
 
-          {/* Contenido principal */}
           <div className="p-6 space-y-4">
-            {/* Mensajes de estado */}
             {scanStatus === 'success' && (
               <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
                 <div className="flex items-center">
@@ -549,7 +509,6 @@ export function BarcodeScanner({
               </div>
             )}
 
-            {/* Área de escaneo */}
             {scanMethod === 'camera' ? (
               <div className="space-y-4">
                 <div className="relative rounded-xl border-2 border-gray-200 overflow-hidden bg-gray-100">
@@ -601,7 +560,6 @@ export function BarcodeScanner({
               </div>
             )}
 
-            {/* Instrucciones */}
             <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
               <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
                 <Zap className="h-4 w-4 mr-2" />
@@ -649,7 +607,6 @@ export function BarcodeScanner({
                 )}
               </ul>
               
-              {/* Consejos móviles */}
               {isMobile && (
                 <div className="mt-3 p-3 bg-blue-100 rounded-lg">
                   <h5 className="font-medium text-blue-800 text-sm mb-2 flex items-center">
@@ -665,7 +622,6 @@ export function BarcodeScanner({
                 </div>
               )}
 
-              {/* Ayuda con permisos */}
               {cameraPermission === 'denied' && scanMethod === 'camera' && (
                 <div className="mt-3 p-3 bg-red-100 rounded-lg">
                   <h5 className="font-medium text-red-800 text-sm mb-2">Cómo habilitar la cámara:</h5>
@@ -680,7 +636,6 @@ export function BarcodeScanner({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="p-4 bg-gray-50 border-t border-gray-100">
             <div className="flex justify-between items-center text-sm">
               <div className="text-gray-600">
@@ -706,7 +661,6 @@ export function BarcodeScanner({
           </div>
         </div>
 
-        {/* Hidden temp element for file scanning */}
         <div id="temp-scanner" style={{ display: 'none' }}></div>
       </div>
     </div>

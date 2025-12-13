@@ -3,13 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { prisma } from "@/lib/db/prisma";
 import { calculatePrices } from "@/lib/pricing";
-import { generateEAN13, validateEAN13 } from "@/lib/barcode";
+import { generateEAN13, validateBarcode } from "@/lib/barcode";
 import {
   registrarAuditoria,
-  auditarEdicion,
-  auditarEliminacion,
   obtenerInfoRequest,
 } from "@/lib/auditoria";
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -107,7 +106,6 @@ export async function POST(request: NextRequest) {
       stockInicial,
     } = body;
 
-    // Validaciones
     if (!codigo || !nombre || !tipo || !categoria || !precioCompra) {
       console.error('❌ [API] Campos requeridos faltantes:', {
         codigo: !!codigo,
@@ -150,52 +148,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ==================== VALIDACIÓN FLEXIBLE DE CÓDIGO DE BARRAS ====================
-    let finalCodigoBarras = codigoBarras;
+    let finalCodigoBarras = codigoBarras?.trim();
     
-    if (!finalCodigoBarras && tipo !== "TORNILLERIA") {
-      // Solo generar automáticamente si no se proporciona ningún código
-      finalCodigoBarras = generateEAN13();
-      console.log('🔢 [API] Código de barras generado automáticamente:', finalCodigoBarras);
-    } else if (finalCodigoBarras) {
-      // Si se proporciona un código, aceptarlo con validaciones mínimas
-      console.log('✅ [API] Código de barras proporcionado:', finalCodigoBarras, `(${finalCodigoBarras.length} caracteres)`);
-      
-      // Validación 1: Longitud razonable (entre 8 y 20 caracteres)
-      if (finalCodigoBarras.length < 8 || finalCodigoBarras.length > 20) {
-        console.warn('⚠️ [API] Código de barras fuera del rango común:', finalCodigoBarras);
-        return NextResponse.json(
-          { error: `Código de barras debe tener entre 8 y 20 caracteres (actual: ${finalCodigoBarras.length})` },
-          { status: 400 }
-        );
-      }
-      
-      // Validación 2: Solo números (comentar estas líneas si quieres permitir alfanuméricos)
-      if (!/^\d+$/.test(finalCodigoBarras)) {
-        console.warn('⚠️ [API] Código de barras contiene caracteres no numéricos:', finalCodigoBarras);
-        return NextResponse.json(
-          { error: "Código de barras debe contener solo números" },
-          { status: 400 }
-        );
-      }
-      
-      // Info: Validación opcional de formatos estándar (solo informativa)
-      if (finalCodigoBarras.length === 13) {
-        const isValidEAN13 = validateEAN13(finalCodigoBarras);
-        if (!isValidEAN13) {
-          console.warn('ℹ️ [API] Código de 13 dígitos no pasa validación EAN-13, pero se acepta:', finalCodigoBarras);
-        } else {
-          console.log('✓ [API] Código de barras EAN-13 válido:', finalCodigoBarras);
-        }
-      } else if (finalCodigoBarras.length === 12) {
-        console.log('ℹ️ [API] Código de 12 dígitos (UPC-A) aceptado:', finalCodigoBarras);
-      } else if (finalCodigoBarras.length === 8) {
-        console.log('ℹ️ [API] Código de 8 dígitos (EAN-8) aceptado:', finalCodigoBarras);
+    // Caso 1: No se proporciona código de barras
+    if (!finalCodigoBarras) {
+      if (tipo === "TORNILLERIA") {
+        // Tornillería puede no tener código de barras
+        finalCodigoBarras = null;
+        console.log('ℹ️ [API] Tornillería sin código de barras');
       } else {
-        console.log('ℹ️ [API] Código de barras no estándar aceptado:', finalCodigoBarras);
+        // Otros productos: generar automáticamente
+        finalCodigoBarras = generateEAN13();
+        console.log('🔢 [API] Código de barras generado automáticamente:', finalCodigoBarras);
+      }
+    } 
+    // Caso 2: Se proporciona código de barras - VALIDAR
+    else {
+      const validation = validateBarcode(finalCodigoBarras);
+      
+      if (!validation.isValid) {
+        console.error('❌ [API] Código de barras inválido:', validation.message);
+        return NextResponse.json(
+          { error: `Código de barras inválido: ${validation.message}` },
+          { status: 400 }
+        );
+      }
+      
+      console.log(`✅ [API] Código de barras válido: ${validation.format} - ${validation.message}`);
+      console.log(`   Código: ${finalCodigoBarras} (${finalCodigoBarras.length} dígitos)`);
+    }
+
+    // Verificar que el código de barras no esté duplicado
+    if (finalCodigoBarras) {
+      const existingBarcode = await prisma.producto.findFirst({
+        where: { codigoBarras: finalCodigoBarras }
+      });
+
+      if (existingBarcode) {
+        console.error('❌ [API] Código de barras duplicado:', finalCodigoBarras);
+        return NextResponse.json(
+          { error: "Este código de barras ya está registrado en otro producto" },
+          { status: 400 }
+        );
       }
     }
-    // ==================== FIN VALIDACIÓN DE CÓDIGO DE BARRAS ====================
 
     // Obtener tasa de cambio
     const tasaConfig = await prisma.configuracion.findUnique({
@@ -214,7 +210,6 @@ export async function POST(request: NextRequest) {
 
     console.log('💰 [API] Precios calculados:', precios);
 
-    // Crear producto
     const producto = await prisma.producto.create({
       data: {
         codigo,
@@ -253,6 +248,7 @@ export async function POST(request: NextRequest) {
       console.log('📦 [API] Movimiento inicial creado:', stockInicialNum, 'unidades');
     }
 
+    // Registrar auditoría
     const { ip, userAgent } = obtenerInfoRequest(request);
 
     await registrarAuditoria({
@@ -262,6 +258,7 @@ export async function POST(request: NextRequest) {
       descripcion: `Creó producto ${producto.nombre} (${producto.tipo})`,
       datosNuevos: {
         codigo: producto.codigo,
+        codigoBarras: producto.codigoBarras,
         nombre: producto.nombre,
         tipo: producto.tipo,
         categoria: producto.categoria,
